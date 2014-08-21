@@ -435,7 +435,7 @@ unsigned int *GetKeyboard(void)
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	Uint8* keystate = (Uint8*)SDL_GetKeyboardState(&size);
 #else
-	Uint8* keystate = SDL_GetKeyState(&size);
+	Uint8* keystate = SDL_GetKeyboardState(&size);
 #endif
 	return (unsigned int*)(keystate);
 }
@@ -452,7 +452,7 @@ static void KeyboardCommands ()
 #if SDL_VERSION_ATLEAST(1, 3, 0)
 	g_keyState = (Uint8*)SDL_GetKeyboardState (NULL);
 #else
-	g_keyState = SDL_GetKeyState (NULL);
+	g_keyState = SDL_GetKeyboardState (NULL);
 #endif
 
 	// check if the family keyboard is enabled
