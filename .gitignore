@@ -1,0 +1,5 @@
+*.o
+/.sconf_temp/
+/.sconsign.dblite
+/bin/
+/config.log
