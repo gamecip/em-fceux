@@ -14,8 +14,9 @@ import platform
 
 opts = Variables(None, ARGUMENTS)
 opts.AddVariables( 
-  BoolVariable('DEBUG',     'Build with debugging symbols', 1),
-  BoolVariable('RELEASE',   'Set to 1 to build for release', 0),
+  BoolVariable('EMSCRIPTEN','Build with emscripten', 0),
+  BoolVariable('DEBUG',     'Build with debugging symbols', 0),
+  BoolVariable('RELEASE',   'Set to 1 to build for release', 1),
   BoolVariable('FRAMESKIP', 'Enable frameskipping', 1),
   BoolVariable('OPENGL',    'Enable OpenGL support', 1),
   BoolVariable('LUA',       'Enable Lua support', 1),
@@ -34,6 +35,8 @@ AddOption('--prefix', dest='prefix', type='string', nargs=1, action='store', met
 
 prefix = GetOption('prefix')
 env = Environment(options = opts)
+if env['EMSCRIPTEN']:
+  env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
 
 if env['RELEASE']:
   env.Append(CPPDEFINES=["PUBLIC_RELEASE"])
@@ -93,7 +96,7 @@ else:
     assert conf.CheckLibWithHeader('minizip', 'minizip/unzip.h', 'C', 'unzOpen;', 1), "please install: libminizip"
     assert conf.CheckLibWithHeader('z', 'zlib.h', 'c', 'inflate;', 1), "please install: zlib"
     env.Append(CPPDEFINES=["_SYSTEM_MINIZIP"])
-  else:
+  elif not env['EMSCRIPTEN']:
     assert conf.CheckLibWithHeader('z', 'zlib.h', 'c', 'inflate;', 1), "please install: zlib"
   if env['SDL2']:
     if not conf.CheckLib('SDL2'):
@@ -187,55 +190,56 @@ else:
 
 Export('env')
 fceux = SConscript('src/SConscript')
-env.Program(target="fceux-net-server", source=["fceux-server/server.cpp", "fceux-server/md5.cpp", "fceux-server/throttle.cpp"])
-
-# Installation rules
-if prefix == None:
-  prefix = "/usr/local"
-
-exe_suffix = ''
-if env['PLATFORM'] == 'win32':
-  exe_suffix = '.exe'
-
-fceux_src = 'src/fceux' + exe_suffix
-fceux_dst = 'bin/fceux' + exe_suffix
-
-fceux_net_server_src = 'fceux-net-server' + exe_suffix
-fceux_net_server_dst = 'bin/fceux-net-server' + exe_suffix
-
-auxlib_src = 'src/auxlib.lua'
-auxlib_dst = 'bin/auxlib.lua'
-auxlib_inst_dst = prefix + '/share/fceux/auxlib.lua'
-
-fceux_h_src = 'output/fceux.chm'
-fceux_h_dst = 'bin/fceux.chm'
-
-env.Command(fceux_h_dst, fceux_h_src, [Copy(fceux_h_dst, fceux_h_src)])
-env.Command(fceux_dst, fceux_src, [Copy(fceux_dst, fceux_src)])
-env.Command(fceux_net_server_dst, fceux_net_server_src, [Copy(fceux_net_server_dst, fceux_net_server_src)])
-env.Command(auxlib_dst, auxlib_src, [Copy(auxlib_dst, auxlib_src)])
-
-man_src = 'documentation/fceux.6'
-man_net_src = 'documentation/fceux-net-server.6'
-man_dst = prefix + '/share/man/man6/fceux.6'
-man_net_dst = prefix + '/share/man/man6/fceux-net-server.6'
-
-share_src = 'output/'
-share_dst = prefix + '/share/fceux/'
-
-image_src = 'fceux.png'
-image_dst = prefix + '/share/pixmaps'
-
-desktop_src = 'fceux.desktop'
-desktop_dst = prefix + '/share/applications/'
-
-env.Install(prefix + "/bin/", fceux)
-env.Install(prefix + "/bin/", "fceux-net-server")
-# TODO:  Where to put auxlib on "scons install?"
-env.Alias('install', env.Command(auxlib_inst_dst, auxlib_src, [Copy(auxlib_inst_dst, auxlib_src)]))
-env.Alias('install', env.Command(share_dst, share_src, [Copy(share_dst, share_src)]))
-env.Alias('install', env.Command(man_dst, man_src, [Copy(man_dst, man_src)]))
-env.Alias('install', env.Command(man_net_dst, man_net_src, [Copy(man_net_dst, man_net_src)]))
-env.Alias('install', env.Command(image_dst, image_src, [Copy(image_dst, image_src)]))
-env.Alias('install', env.Command(desktop_dst, desktop_src, [Copy(desktop_dst, desktop_src)]))
-env.Alias('install', (prefix + "/bin/"))
+if not env['EMSCRIPTEN']:
+  env.Program(target="fceux-net-server", source=["fceux-server/server.cpp", "fceux-server/md5.cpp", "fceux-server/throttle.cpp"])
+  
+  # Installation rules
+  if prefix == None:
+    prefix = "/usr/local"
+  
+  exe_suffix = ''
+  if env['PLATFORM'] == 'win32':
+    exe_suffix = '.exe'
+  
+  fceux_src = 'src/fceux' + exe_suffix
+  fceux_dst = 'bin/fceux' + exe_suffix
+  
+  fceux_net_server_src = 'fceux-net-server' + exe_suffix
+  fceux_net_server_dst = 'bin/fceux-net-server' + exe_suffix
+  
+  auxlib_src = 'src/auxlib.lua'
+  auxlib_dst = 'bin/auxlib.lua'
+  auxlib_inst_dst = prefix + '/share/fceux/auxlib.lua'
+  
+  fceux_h_src = 'output/fceux.chm'
+  fceux_h_dst = 'bin/fceux.chm'
+  
+  env.Command(fceux_h_dst, fceux_h_src, [Copy(fceux_h_dst, fceux_h_src)])
+  env.Command(fceux_dst, fceux_src, [Copy(fceux_dst, fceux_src)])
+  env.Command(fceux_net_server_dst, fceux_net_server_src, [Copy(fceux_net_server_dst, fceux_net_server_src)])
+  env.Command(auxlib_dst, auxlib_src, [Copy(auxlib_dst, auxlib_src)])
+  
+  man_src = 'documentation/fceux.6'
+  man_net_src = 'documentation/fceux-net-server.6'
+  man_dst = prefix + '/share/man/man6/fceux.6'
+  man_net_dst = prefix + '/share/man/man6/fceux-net-server.6'
+  
+  share_src = 'output/'
+  share_dst = prefix + '/share/fceux/'
+  
+  image_src = 'fceux.png'
+  image_dst = prefix + '/share/pixmaps'
+  
+  desktop_src = 'fceux.desktop'
+  desktop_dst = prefix + '/share/applications/'
+  
+  env.Install(prefix + "/bin/", fceux)
+  env.Install(prefix + "/bin/", "fceux-net-server")
+  # TODO:  Where to put auxlib on "scons install?"
+  env.Alias('install', env.Command(auxlib_inst_dst, auxlib_src, [Copy(auxlib_inst_dst, auxlib_src)]))
+  env.Alias('install', env.Command(share_dst, share_src, [Copy(share_dst, share_src)]))
+  env.Alias('install', env.Command(man_dst, man_src, [Copy(man_dst, man_src)]))
+  env.Alias('install', env.Command(man_net_dst, man_net_src, [Copy(man_net_dst, man_net_src)]))
+  env.Alias('install', env.Command(image_dst, image_src, [Copy(image_dst, image_src)]))
+  env.Alias('install', env.Command(desktop_dst, desktop_src, [Copy(desktop_dst, desktop_src)]))
+  env.Alias('install', (prefix + "/bin/"))

@@ -1,4 +1,5 @@
 import glob                                                                                   
+Import('env')
 #source_list = glob.glob('*.cpp')
 source_list = Split(
 """
@@ -12,8 +13,6 @@ guid.cpp
 md5.cpp  
 memory.cpp  
 """)
-
-Import('env')
 
 
 if env['SYSTEM_MINIZIP'] == 0:

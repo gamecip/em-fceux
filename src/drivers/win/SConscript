@@ -1,4 +1,5 @@
 Import('env')
+Export('env')
 
 my_list =  Split("""
 archive.cpp

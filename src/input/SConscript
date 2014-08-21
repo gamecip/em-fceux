@@ -1,4 +1,5 @@
 import glob                                                                                   
+Import('env')
 source_list = glob.glob('*.cpp')
 
 for x in range(len(source_list)):
