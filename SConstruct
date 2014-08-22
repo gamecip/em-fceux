@@ -14,7 +14,6 @@ import platform
 
 opts = Variables(None, ARGUMENTS)
 opts.AddVariables( 
-  BoolVariable('EMSCRIPTEN','Build with emscripten', 0),
   BoolVariable('DEBUG',     'Build with debugging symbols', 0),
   BoolVariable('RELEASE',   'Set to 1 to build for release', 1),
   BoolVariable('FRAMESKIP', 'Enable frameskipping', 1),
@@ -35,8 +34,24 @@ AddOption('--prefix', dest='prefix', type='string', nargs=1, action='store', met
 
 prefix = GetOption('prefix')
 env = Environment(options = opts)
-if env['EMSCRIPTEN']:
+
+if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
+  env['EMSCRIPTEN'] = 1
+  env['RELEASE'] = 1 # Force release build.
+  env['OPENGL'] = 0 # TODO: Just testing...
+  env['DEBUG'] = 0
+  env['GTK'] = 0
+  env['GTK3'] = 0
+  env['LUA'] = 0
+  env['SDL2'] = 0
+  env['SYSTEM_LUA'] = 0
+  env['SYSTEM_MINIZIP'] = 0
+  env['NEWPPU'] = 0 # Not strictly necessary, but faster.
+  env['CREATE_AVI'] = 0
+  env['LOGO'] = 0
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
+else:
+  env['EMSCRIPTEN'] = 0
 
 if env['RELEASE']:
   env.Append(CPPDEFINES=["PUBLIC_RELEASE"])
@@ -96,7 +111,10 @@ else:
     assert conf.CheckLibWithHeader('minizip', 'minizip/unzip.h', 'C', 'unzOpen;', 1), "please install: libminizip"
     assert conf.CheckLibWithHeader('z', 'zlib.h', 'c', 'inflate;', 1), "please install: zlib"
     env.Append(CPPDEFINES=["_SYSTEM_MINIZIP"])
-  elif not env['EMSCRIPTEN']:
+  elif env['EMSCRIPTEN']:
+    env.Append(CPPPATH = ["drivers/win/zlib"])
+    #pass # Skip configuring zlib.
+  else:
     assert conf.CheckLibWithHeader('z', 'zlib.h', 'c', 'inflate;', 1), "please install: zlib"
   if env['SDL2']:
     if not conf.CheckLib('SDL2'):
@@ -104,6 +122,8 @@ else:
       Exit(1)
     env.Append(CPPDEFINES=["_SDL2"])
     env.ParseConfig('pkg-config sdl2 --cflags --libs')
+  elif env['EMSCRIPTEN']:
+    pass # Skip configuring SDL.
   else:
     if not conf.CheckLib('SDL'):
       print 'Did not find libSDL or SDL.lib, exiting!'
