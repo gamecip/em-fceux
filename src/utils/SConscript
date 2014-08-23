@@ -3,7 +3,6 @@ Import('env')
 #source_list = glob.glob('*.cpp')
 source_list = Split(
 """
-backward.cpp
 ConvertUTF.c
 xstring.cpp
 crc32.cpp     
@@ -14,6 +13,8 @@ md5.cpp
 memory.cpp  
 """)
 
+if env['DEBUG'] == 1:
+  source_list.append('backward.cpp')
 
 if env['SYSTEM_MINIZIP'] == 0:
   source_list.append('unzip.cpp')

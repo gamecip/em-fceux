@@ -21,6 +21,7 @@ opts.AddVariables(
   BoolVariable('LUA',       'Enable Lua support', 1),
   BoolVariable('GTK', 'Enable GTK2 GUI (SDL only)', 1),
   BoolVariable('GTK3', 'Enable GTK3 GUI (SDL only)', 0),
+  BoolVariable('X11', 'Link with X11 (SDL only)', 1),
   BoolVariable('NEWPPU',    'Enable new PPU core', 1),
   BoolVariable('CREATE_AVI', 'Enable avi creation support (SDL only)', 1),
   BoolVariable('LOGO', 'Enable a logoscreen when creating avis (SDL only)', 1),
@@ -38,10 +39,11 @@ env = Environment(options = opts)
 if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['EMSCRIPTEN'] = 1
   env['RELEASE'] = 1 # Force release build.
-  env['OPENGL'] = 0 # TODO: Just testing...
   env['DEBUG'] = 0
+  env['OPENGL'] = 0 # TODO: Just testing...
   env['GTK'] = 0
   env['GTK3'] = 0
+  env['X11'] = 0
   env['LUA'] = 0
   env['SDL2'] = 0
   env['SYSTEM_LUA'] = 0
@@ -50,6 +52,7 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['CREATE_AVI'] = 0
   env['LOGO'] = 0
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
+  env.Replace(PROGSUFFIX = [".html", ".js"    ][0])
 else:
   env['EMSCRIPTEN'] = 0
 
@@ -60,6 +63,8 @@ if env['RELEASE']:
 # LSB_FIRST must be off for PPC to compile
 if platform.system == "ppc":
   env['LSB_FIRST'] = 0
+
+env['LIBS'] = []
 
 # Default compiler flags:
 env.Append(CCFLAGS = ['-Wall', '-Wno-write-strings', '-Wno-sign-compare'])
@@ -80,6 +85,10 @@ if os.environ.has_key('CPPFLAGS'):
   env.Append(CPPFLAGS = os.environ['CPPFLAGS'].split())
 if os.environ.has_key('LDFLAGS'):
   env.Append(LINKFLAGS = os.environ['LDFLAGS'].split())
+if os.environ.has_key('PKG_CONFIG_PATH'):
+  env['ENV']['PKG_CONFIG_PATH'] = os.environ['PKG_CONFIG_PATH']
+if os.environ.has_key('PKG_CONFIG_LIBDIR'):
+  env['ENV']['PKG_CONFIG_LIBDIR'] = os.environ['PKG_CONFIG_LIBDIR']
 
 print "platform: ", env['PLATFORM']
 
@@ -101,10 +110,11 @@ if env['PLATFORM'] == 'win32':
   env.Append(LIBS = ["rpcrt4", "comctl32", "vfw32", "winmm", "ws2_32", "comdlg32", "ole32", "gdi32", "htmlhelp"])
 else:
   conf = Configure(env)
-  # If libdw is available, compile in backward-cpp support
-  if conf.CheckLib('dw'):
-    conf.env.Append(CCFLAGS = "-DBACKWARD_HAS_DW=1")
-    conf.env.Append(LINKFLAGS = "-ldw")
+  if env['DEBUG']:
+    # If libdw is available, compile in backward-cpp support
+    if conf.CheckLib('dw'):
+      conf.env.Append(CCFLAGS = "-DBACKWARD_HAS_DW=1")
+      conf.env.Append(LINKFLAGS = "-ldw")
   if conf.CheckFunc('asprintf'):
     conf.env.Append(CCFLAGS = "-DHAVE_ASPRINTF")
   if env['SYSTEM_MINIZIP']:
@@ -113,7 +123,6 @@ else:
     env.Append(CPPDEFINES=["_SYSTEM_MINIZIP"])
   elif env['EMSCRIPTEN']:
     env.Append(CPPPATH = ["drivers/win/zlib"])
-    #pass # Skip configuring zlib.
   else:
     assert conf.CheckLibWithHeader('z', 'zlib.h', 'c', 'inflate;', 1), "please install: zlib"
   if env['SDL2']:
@@ -135,7 +144,7 @@ else:
       Exit(1)
     # Add compiler and linker flags from pkg-config
     config_string = 'pkg-config --cflags --libs gtk+-2.0'
-    if env['PLATFORM'] == 'darwin':
+    if env['PLATFORM'] == 'darwin' and env['X11']:
       config_string = 'PKG_CONFIG_PATH=/opt/X11/lib/pkgconfig/ ' + config_string
     env.ParseConfig(config_string)
     env.Append(CPPDEFINES=["_GTK2"])
@@ -143,7 +152,7 @@ else:
   if env['GTK3']:
     # Add compiler and linker flags from pkg-config
     config_string = 'pkg-config --cflags --libs gtk+-3.0'
-    if env['PLATFORM'] == 'darwin':
+    if env['PLATFORM'] == 'darwin' and env['X11']:
       config_string = 'PKG_CONFIG_PATH=/opt/X11/lib/pkgconfig/ ' + config_string
     env.ParseConfig(config_string)
     env.Append(CPPDEFINES=["_GTK3"])
@@ -201,7 +210,9 @@ print "base CCFLAGS:",env['CCFLAGS']
 if env['DEBUG']:
   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
 else:
-  env.Append(CCFLAGS = ['-O2'])
+  env.Append(LINKFLAGS = ['--preload-file', 'src/popeye.nes'])
+  #env.Append(CCFLAGS = ['-O2'])
+  #env.Append(LINKFLAGS = ['-O2'])
 
 if env['PLATFORM'] != 'win32' and env['PLATFORM'] != 'cygwin' and env['CREATE_AVI']:
   env.Append(CPPDEFINES=["CREATE_AVI"])

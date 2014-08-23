@@ -1,10 +1,11 @@
 # Fix compliation error about 'XKeysymToString' by linking X11 explicitly
 # Thanks Antonio Ospite!
 Import('env')
-config_string = 'pkg-config --cflags --libs x11'
-if env['PLATFORM'] == 'darwin':
-  config_string = 'PKG_CONFIG_PATH=/opt/X11/lib/pkgconfig/ ' + config_string
-env.ParseConfig(config_string)
+if env['X11']:
+  config_string = 'pkg-config --cflags --libs x11'
+  if env['PLATFORM'] == 'darwin':
+    config_string = 'PKG_CONFIG_PATH=/opt/X11/lib/pkgconfig/ ' + config_string
+  env.ParseConfig(config_string)
 Export('env')
 
 source_list = Split(
@@ -27,4 +28,24 @@ if env['GTK'] or env['GTK3']:
   source_list.append('gui.cpp')
 
 source_list = ['drivers/sdl/' + source for source in source_list]
+if env['EMSCRIPTEN']:
+    # Need to include zlib functions.
+    zlib_source_list = Split(
+    """
+    adler32.c
+    compress.c
+    crc32.c
+    deflate.c
+    gzio.c
+    infblock.c
+    infcodes.c
+    inffast.c
+    inflate.c
+    inftrees.c
+    infutil.c
+    trees.c
+    uncompr.c
+    zutil.c
+    """)
+    source_list += ['drivers/win/zlib/' + s for s in zlib_source_list]
 Return('source_list')
