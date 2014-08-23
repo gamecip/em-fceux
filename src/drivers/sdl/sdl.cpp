@@ -593,6 +593,8 @@ int main(int argc, char *argv[])
 #endif
 	}
 	int romIndex = g_config->parse(argc, argv);
+// tsone: just fake we have a game now
+    romIndex = 1;
 
 	// This is here so that a default fceux.cfg will be created on first
 	// run, even without a valid ROM to play.
@@ -849,14 +851,17 @@ int main(int argc, char *argv[])
 
   if(romIndex >= 0)
 	{
+// tsone: override rom with popeye.nes
 		// load the specified game
-		error = LoadGame(argv[romIndex]);
+//		error = LoadGame(argv[romIndex]);
+		error = LoadGame("src/popeye.nes");
 		if(error != 1) {
 			DriverKill();
 			SDL_Quit();
 			return -1;
 		}
-		g_config->setOption("SDL.LastOpenFile", argv[romIndex]);
+//		g_config->setOption("SDL.LastOpenFile", argv[romIndex]);
+		g_config->setOption("SDL.LastOpenFile", "src/popeye.nes");
 		g_config->save();
 
 	}
