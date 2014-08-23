@@ -210,7 +210,7 @@ print "base CCFLAGS:",env['CCFLAGS']
 if env['DEBUG']:
   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
 else:
-  env.Append(LINKFLAGS = ['--preload-file', 'src/popeye.nes'])
+  env.Append(LINKFLAGS = ['--preload-file', 'src/popeye.nes', '--pre-js', 'pre.js'])
   #env.Append(CCFLAGS = ['-O2'])
   #env.Append(LINKFLAGS = ['-O2'])
 
