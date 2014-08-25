@@ -53,6 +53,7 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['LOGO'] = 0
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
   env.Replace(PROGSUFFIX = [".html", ".js"    ][0])
+  env.Append(LINKFLAGS = ['--preload-file', 'src/popeye.nes', '--pre-js', 'pre.js'])
 else:
   env['EMSCRIPTEN'] = 0
 
@@ -210,9 +211,8 @@ print "base CCFLAGS:",env['CCFLAGS']
 if env['DEBUG']:
   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
 else:
-  env.Append(LINKFLAGS = ['--preload-file', 'src/popeye.nes', '--pre-js', 'pre.js'])
-  #env.Append(CCFLAGS = ['-O2'])
-  #env.Append(LINKFLAGS = ['-O2'])
+  env.Append(CCFLAGS = ['-O2'])
+  env.Append(LINKFLAGS = ['-O2'])
 
 if env['PLATFORM'] != 'win32' and env['PLATFORM'] != 'cygwin' and env['CREATE_AVI']:
   env.Append(CPPDEFINES=["CREATE_AVI"])
