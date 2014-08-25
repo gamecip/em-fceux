@@ -49,6 +49,7 @@ fillaudio(void *udata,
 			uint8 *stream,
 			int len)
 {
+#ifndef EMSCRIPTEN
 	int16 *tmps = (int16*)stream;
 	len >>= 1;
 	while(len) {
@@ -65,6 +66,7 @@ fillaudio(void *udata,
 		tmps++;
 		len--;
 	}
+#endif
 }
 
 /**
@@ -73,6 +75,7 @@ fillaudio(void *udata,
 int
 InitSound()
 {
+#ifndef EMSCRIPTEN
 	int sound, soundrate, soundbufsize, soundvolume, soundtrianglevolume, soundsquare1volume, soundsquare2volume, soundnoisevolume, soundpcmvolume, soundq;
 	SDL_AudioSpec spec;
 
@@ -140,6 +143,7 @@ InitSound()
 	FCEUI_SetSquare2Volume(soundsquare2volume);
 	FCEUI_SetNoiseVolume(soundnoisevolume);
 	FCEUI_SetPCMVolume(soundpcmvolume);
+#endif
 	return 1;
 }
 
@@ -150,7 +154,11 @@ InitSound()
 uint32
 GetMaxSound(void)
 {
+#ifndef EMSCRIPTEN
 	return(s_BufferSize);
+#else
+    return 0;
+#endif
 }
 
 /**
@@ -159,7 +167,11 @@ GetMaxSound(void)
 uint32
 GetWriteSound(void)
 {
+#ifndef EMSCRIPTEN
 	return(s_BufferSize - s_BufferIn);
+#else
+    return 0;
+#endif
 }
 
 /**
@@ -169,6 +181,7 @@ void
 WriteSound(int32 *buf,
            int Count)
 {
+#ifndef EMSCRIPTEN
 	extern int EmulationPaused;
 	if (EmulationPaused == 0)
 		while(Count)
@@ -188,6 +201,7 @@ WriteSound(int32 *buf,
             
 			buf++;
 		}
+#endif
 }
 
 /**
@@ -196,7 +210,9 @@ WriteSound(int32 *buf,
 void
 SilenceSound(int n)
 { 
+#ifndef EMSCRIPTEN
 	SDL_PauseAudio(n);   
+#endif
 }
 
 /**
@@ -205,6 +221,7 @@ SilenceSound(int n)
 int
 KillSound(void)
 {
+#ifndef EMSCRIPTEN
 	FCEUI_Sound(0);
 	SDL_CloseAudio();
 	SDL_QuitSubSystem(SDL_INIT_AUDIO);
@@ -212,6 +229,7 @@ KillSound(void)
 		free((void *)s_Buffer);
 		s_Buffer = 0;
 	}
+#endif
 	return 0;
 }
 
@@ -223,6 +241,7 @@ KillSound(void)
 void
 FCEUD_SoundVolumeAdjust(int n)
 {
+#ifndef EMSCRIPTEN
 	int soundvolume;
 	g_config->getOption("SDL.SoundVolume", &soundvolume);
 
@@ -249,6 +268,7 @@ FCEUD_SoundVolumeAdjust(int n)
 	g_config->setOption("SDL.SoundVolume", soundvolume);
 
 	FCEU_DispMessage("Sound volume %d.",0, soundvolume);
+#endif
 }
 
 /**
@@ -257,6 +277,7 @@ FCEUD_SoundVolumeAdjust(int n)
 void
 FCEUD_SoundToggle(void)
 {
+#ifndef EMSCRIPTEN
 	if(s_mute) {
 		int soundvolume;
 		g_config->getOption("SDL.SoundVolume", &soundvolume);
@@ -269,4 +290,5 @@ FCEUD_SoundToggle(void)
 		FCEUI_SetSoundVolume(0);
 		FCEU_DispMessage("Sound mute on.",0);
 	}
+#endif
 }
