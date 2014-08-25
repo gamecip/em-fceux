@@ -14,8 +14,8 @@ import platform
 
 opts = Variables(None, ARGUMENTS)
 opts.AddVariables( 
-  BoolVariable('DEBUG',     'Build with debugging symbols', 0),
-  BoolVariable('RELEASE',   'Set to 1 to build for release', 1),
+  BoolVariable('DEBUG',     'Build with debugging symbols', 1),
+  BoolVariable('RELEASE',   'Set to 1 to build for release', 0),
   BoolVariable('FRAMESKIP', 'Enable frameskipping', 1),
   BoolVariable('OPENGL',    'Enable OpenGL support', 1),
   BoolVariable('LUA',       'Enable Lua support', 1),
@@ -38,8 +38,6 @@ env = Environment(options = opts)
 
 if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['EMSCRIPTEN'] = 1
-  env['RELEASE'] = 1 # Force release build.
-  env['DEBUG'] = 0
   env['OPENGL'] = 0 # TODO: Just testing...
   env['GTK'] = 0
   env['GTK3'] = 0
@@ -52,7 +50,7 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['CREATE_AVI'] = 0
   env['LOGO'] = 0
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
-  env.Replace(PROGSUFFIX = [".html", ".js"    ][0])
+  env.Replace(PROGSUFFIX = [".html"])
   env.Append(LINKFLAGS = ['--preload-file', 'src/popeye.nes', '--pre-js', 'pre.js'])
 else:
   env['EMSCRIPTEN'] = 0
@@ -111,7 +109,7 @@ if env['PLATFORM'] == 'win32':
   env.Append(LIBS = ["rpcrt4", "comctl32", "vfw32", "winmm", "ws2_32", "comdlg32", "ole32", "gdi32", "htmlhelp"])
 else:
   conf = Configure(env)
-  if env['DEBUG']:
+  if env['DEBUG'] and not env['EMSCRIPTEN']:
     # If libdw is available, compile in backward-cpp support
     if conf.CheckLib('dw'):
       conf.env.Append(CCFLAGS = "-DBACKWARD_HAS_DW=1")
