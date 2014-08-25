@@ -449,6 +449,13 @@ FCEUD_Update(uint8 *XBuf,
 				tmpcan -= Count;
 			}
 		}
+#ifdef EMSCRIPTEN
+		else {
+			if(XBuf && (inited&4)) {
+				BlitScreen(XBuf);
+			}
+		}
+#endif
 
 	} else {
 		if(!NoWaiting && (!(eoptions&EO_NOTHROTTLE) || FCEUI_EmulationPaused()))
@@ -861,17 +868,17 @@ int main(int argc, char *argv[])
 
   if(romIndex >= 0)
 	{
-// tsone: override rom with popeye.nes
+// tsone: override rom with test.nes
 		// load the specified game
 //		error = LoadGame(argv[romIndex]);
-		error = LoadGame("src/popeye.nes");
+		error = LoadGame("src/test.nes");
 		if(error != 1) {
 			DriverKill();
 			SDL_Quit();
 			return -1;
 		}
 //		g_config->setOption("SDL.LastOpenFile", argv[romIndex]);
-		g_config->setOption("SDL.LastOpenFile", "src/popeye.nes");
+		g_config->setOption("SDL.LastOpenFile", "src/test.nes");
 		g_config->save();
 
 	}
