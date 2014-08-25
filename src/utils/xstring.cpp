@@ -88,7 +88,7 @@ int str_ltrim(char *str, int flags) {
 int str_rtrim(char *str, int flags) {
 	unsigned int i=0, strl; //mbg merge 7/17/06 changed to unsigned int
 
-	while (strl = strlen(str)) {
+	while ((strl = strlen(str))) {
 		if ((flags & STRIP_SP) && (str[0] == ' ')) {
 			i++;
 			str[strl] = 0;

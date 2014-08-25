@@ -152,7 +152,11 @@ void NSFGI(GI h)
 		}
 		break;
 	case GI_RESETM2:
-	case GI_POWER: NSF_init();break;
+	case GI_POWER:
+        NSF_init();
+        break;
+    default:
+        break;
 	}
 }
 

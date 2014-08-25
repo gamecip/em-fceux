@@ -464,20 +464,20 @@ void FCEUI_SetDirOverride(int which, char *n)
 	}
 }
 
-	#ifndef HAVE_ASPRINTF
-	static int asprintf(char **strp, const char *fmt, ...)
-	{
-		va_list ap;
-		int ret;
+#if !defined(HAVE_ASPRINTF) && !defined(EMSCRIPTEN)
+static int asprintf(char **strp, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
 
-		va_start(ap,fmt);
-		if(!(*strp=(char*)FCEU_dmalloc(2048))) //mbg merge 7/17/06 cast to char*
-			return(0);
-		ret=vsnprintf(*strp,2048,fmt,ap);
-		va_end(ap);
-		return(ret);
-	}
-	#endif
+	va_start(ap,fmt);
+	if(!(*strp=(char*)FCEU_dmalloc(2048))) //mbg merge 7/17/06 cast to char*
+		return(0);
+	ret=vsnprintf(*strp,2048,fmt,ap);
+	va_end(ap);
+	return(ret);
+}
+#endif
 
 std::string  FCEU_GetPath(int type)
 {

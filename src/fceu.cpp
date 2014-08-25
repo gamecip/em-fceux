@@ -1122,9 +1122,13 @@ virtual void Power() {
 };
 
 void FCEUXGameInterface(GI command) {
+// tsone: this is pretty stupid, rewrite?
 	switch (command) {
 	case GI_POWER:
 		cart->Power();
+        break;
+    default:
+        break;
 	}
 }
 

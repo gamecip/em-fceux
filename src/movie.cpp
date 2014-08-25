@@ -649,6 +649,10 @@ bool LoadFM2(MovieData& movieData, EMUFILE* fp, int size, bool stopAfterHeader)
 			return true;
 		switch(state)
 		{
+//tsone: holy shit this is nasty ass vomit
+        default:
+            goto bail;
+            break;
 		case NEWLINE:
 			if(isnewline) goto done;
 			if(iswhitespace) goto done;

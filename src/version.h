@@ -19,7 +19,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+// tsone: double declaration of this define for some reason...?
+#ifndef PUBLIC_RELEASE
 #define PUBLIC_RELEASE		// uncomment this when making a public release, but comment back before committing
+#endif
 
 #ifndef __FCEU_VERSION
 #define __FCEU_VERSION

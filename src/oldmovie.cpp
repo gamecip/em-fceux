@@ -93,7 +93,8 @@ void convert_metadata(char* metadata, int metadata_size, uint8* tmp, int metadat
 }
 
 //backwards compat
-static void FCEUI_LoadMovie_v1(char *fname, int _read_only);
+// tsone: unused func (next one line only), remove
+//static void FCEUI_LoadMovie_v1(char *fname, int _read_only);
 //static int FCEUI_MovieGetInfo_v1(const char* fname, MOVIE_INFO* info);
 
 //int _old_FCEUI_MovieGetInfo(const char* fname, MOVIE_INFO* info)
@@ -539,7 +540,9 @@ EFCM_CONVERTRESULT convert_fcm(MovieData& md, std::string fname)
 
 	uint32 framecount;
 	uint32 rerecord_count;
-	int movieConvertOffset1=0, movieConvertOffset2=0,movieSyncHackOn=0;
+// tsone: unused variables, remove
+//	int movieConvertOffset1=0, movieConvertOffset2=0;
+	int movieSyncHackOn=0;
 
 
 	EMUFILE* fp = FCEUD_UTF8_fstream(fname, "rb");

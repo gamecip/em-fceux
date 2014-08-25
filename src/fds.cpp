@@ -92,6 +92,8 @@ void FDSGI(GI h) {
 	switch (h) {
 	case GI_CLOSE: FDSClose(); break;
 	case GI_POWER: FDSInit(); break;
+    default:
+        break;
 	}
 }
 

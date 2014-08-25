@@ -228,7 +228,8 @@ void FCEU_PutImage(void)
 	//Fancy input display code
 	if(input_display)
 	{
-		extern uint32 JSAutoHeld;
+// tsone: unused var, remove
+//		extern uint32 JSAutoHeld;
 		uint32 held;
 
 		int controller, c, ci, color;
