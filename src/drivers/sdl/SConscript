@@ -21,7 +21,7 @@ source_list = Split(
     """)
 
 Import('env')
-if 'GL' in env['LIBS']:
+if 'GL' in env['LIBS'] or (env['OPENGL'] and env['EMSCRIPTEN']):
   source_list.append('sdl-opengl.cpp')
 
 if env['GTK'] or env['GTK3']:

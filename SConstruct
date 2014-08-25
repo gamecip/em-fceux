@@ -38,7 +38,6 @@ env = Environment(options = opts)
 
 if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['EMSCRIPTEN'] = 1
-  env['OPENGL'] = 0 # TODO: Just testing...
   env['GTK'] = 0
   env['GTK3'] = 0
   env['X11'] = 0
@@ -51,7 +50,12 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['LOGO'] = 0
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
   env.Replace(PROGSUFFIX = [".html"])
-  env.Append(LINKFLAGS = ['--preload-file', 'src/test.nes', '--pre-js', 'pre.js'])
+  env.Append(LINKFLAGS = '--preload-file src/test.nes --pre-js pre.js')
+  if env['OPENGL']:
+    env.Append(CCFLAGS = "-s LEGACY_GL_EMULATION=1 -s GL_FFP_ONLY=1")
+    env.Append(LINKFLAGS = "-s LEGACY_GL_EMULATION=1 -s GL_FFP_ONLY=1")
+    #env.Append(CCFLAGS = "-s LEGACY_GL_EMULATION=1 -s GL_FFP_ONLY=1 -s GL_UNSAFE_OPTS=0")
+    #env.Append(LINKFLAGS = "-s LEGACY_GL_EMULATION=1 -s GL_FFP_ONLY=1 -s GL_UNSAFE_OPTS=0")
 else:
   env['EMSCRIPTEN'] = 0
 
@@ -66,7 +70,7 @@ if platform.system == "ppc":
 env['LIBS'] = []
 
 # Default compiler flags:
-env.Append(CCFLAGS = ['-Wall', '-Wno-write-strings', '-Wno-sign-compare'])
+env.Append(CCFLAGS = ['-Wall', '-Werror', '-Wno-write-strings', '-Wno-sign-compare'])
 
 if os.environ.has_key('PLATFORM'):
   env.Replace(PLATFORM = os.environ['PLATFORM'])
@@ -191,8 +195,9 @@ else:
       env['LOGO'] = 0
       print 'Did not find libgd, you won\'t be able to create a logo screen for your avis.'
    
-  if env['OPENGL'] and conf.CheckLibWithHeader('GL', 'GL/gl.h', 'c', autoadd=1):
+  if env['OPENGL'] and (env['EMSCRIPTEN'] or conf.CheckLibWithHeader('GL', 'GL/gl.h', 'c', autoadd=1)):
     conf.env.Append(CCFLAGS = "-DOPENGL")
+        
   conf.env.Append(CPPDEFINES = ['PSS_STYLE=1'])
   
   env = conf.Finish()

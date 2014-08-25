@@ -177,7 +177,12 @@ InitConfig()
 	config->addOption("showfps", "SDL.ShowFPS", 0);
 
 	// OpenGL options
+#if defined(EMSCRIPTEN) && defined(OPENGL)
+// tsone: need to automatically set opengl in this case
+	config->addOption("opengl", "SDL.OpenGL", 1);
+#else
 	config->addOption("opengl", "SDL.OpenGL", 0);
+#endif
 	config->addOption("openglip", "SDL.OpenGLip", 0);
 	config->addOption("SDL.SpecialFilter", 0);
 	config->addOption("SDL.SpecialFX", 0);

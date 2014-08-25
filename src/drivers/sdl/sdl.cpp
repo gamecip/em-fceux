@@ -572,8 +572,10 @@ int main(int argc, char *argv[])
 		return(-1);
 	}
 
+#ifndef EMSCRIPTEN
 #ifdef OPENGL
 	SDL_GL_LoadLibrary(0);
+#endif
 #endif
 
 	// Initialize the configuration system
