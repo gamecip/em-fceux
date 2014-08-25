@@ -528,6 +528,7 @@ static void KeyboardCommands ()
 		}
 	}
 
+#ifndef EMSCRIPTEN
 	// Alt-Enter to toggle full-screen
 	if (keyonly (ENTER) && is_alt)
 	{
@@ -549,6 +550,7 @@ static void KeyboardCommands ()
 	{
 		FCEUD_MovieRecordTo ();
 	}
+#endif
 
 	// Save a state from a file
 	if (keyonly (S) && is_alt)
@@ -574,11 +576,12 @@ static void KeyboardCommands ()
 			FCEUI_FDSInsert ();
 		}
 	}
-
+#ifndef EMSCRIPTEN
 	if (_keyonly (Hotkeys[HK_SCREENSHOT]))
 	{
 		FCEUI_SaveSnapshot ();
 	}
+#endif
 
 	// if not NES Sound Format
 	if (gametype != GIT_NSF)
@@ -591,6 +594,7 @@ static void KeyboardCommands ()
 		// f5 (default) save key, hold shift to save movie
 		if (_keyonly (Hotkeys[HK_SAVE_STATE]))
 		{
+#ifndef EMSCRIPT
 			if (is_shift)
 			{
 				movie_fname =
@@ -599,6 +603,7 @@ static void KeyboardCommands ()
 				FCEUI_SaveMovie (movie_fname, MOVIE_FLAG_NONE, L"");
 			}
 			else
+#endif
 			{
 				FCEUI_SaveState (NULL);
 			}
@@ -607,6 +612,7 @@ static void KeyboardCommands ()
 		// f7 to load state, Shift-f7 to load movie
 		if (_keyonly (Hotkeys[HK_LOAD_STATE]))
 		{
+#ifndef EMSCRIPTEN
 			if (is_shift)
 			{
 				FCEUI_StopMovie ();
@@ -631,6 +637,7 @@ static void KeyboardCommands ()
 				}
 			}
 			else
+#endif
 			{
 				FCEUI_LoadState(NULL);
 			}
@@ -648,10 +655,12 @@ static void KeyboardCommands ()
 		IncreaseEmulationSpeed ();
 	}
 
+#ifndef EMSCRIPTEN
 	if (_keyonly (Hotkeys[HK_TOGGLE_FRAME_DISPLAY]))
 	{
 		FCEUI_MovieToggleFrameDisplay ();
 	}
+#endif
 
 	if (_keyonly (Hotkeys[HK_TOGGLE_INPUT_DISPLAY]))
 	{
@@ -660,10 +669,12 @@ static void KeyboardCommands ()
 		g_config->setOption ("SDL.InputDisplay", input_display);
 	}
 
+#ifndef EMSCRIPTEN
 	if (_keyonly (Hotkeys[HK_MOVIE_TOGGLE_RW]))
 	{
 		FCEUI_SetMovieToggleReadOnly (!FCEUI_GetMovieToggleReadOnly ());
 	}
+#endif
 
 #ifdef CREATE_AVI
 	if (_keyonly (Hotkeys[HK_MUTE_CAPTURE]))
@@ -776,6 +787,7 @@ static void KeyboardCommands ()
 		lagCounterDisplay ^= 1;
 	}
 
+#ifndef EMSCRIPTEN
 	if (_keyonly (Hotkeys[HK_TOGGLE_SUBTITLE]))
 	{
 		extern int movieSubtitles;
@@ -783,6 +795,7 @@ static void KeyboardCommands ()
 		FCEUI_DispMessage ("Movie subtitles o%s.", 0,
 		movieSubtitles ? "n" : "ff");
 	}
+#endif
 
 	// VS Unisystem games
 	if (gametype == GIT_VSUNI)
@@ -884,9 +897,11 @@ GetMouseData (uint32 (&d)[3])
 	int x, y;
 	uint32 t;
 
+#ifndef EMSCRIPTEN
 	// Don't get input when a movie is playing back
 	if (FCEUMOV_Mode (MOVIEMODE_PLAY))
 		return;
+#endif
 
 	// retrieve the state of the mouse from SDL
 	t = SDL_GetMouseState (&x, &y);
@@ -1126,11 +1141,13 @@ ButtConfig GamePadConfig[4][10] = {
 static void
 UpdateGamepad(void)
 {
+#ifndef EMSCRIPTEN
 	// don't update during movie playback
 	if (FCEUMOV_Mode (MOVIEMODE_PLAY))
 	{
 		return;
 	 }
+#endif
 
 	static int rapid = 0;
 	uint32 JS = 0;
@@ -1226,11 +1243,13 @@ static uint32 powerpadbuf[2] = { 0, 0 };
 static uint32
 UpdatePPadData (int w)
 {
+#ifndef EMSCRIPTEN
 	// don't update if a movie is playing
 	if (FCEUMOV_Mode (MOVIEMODE_PLAY))
 	{
 		return 0;
 	}
+#endif
 
 	uint32 r = 0;
 	ButtConfig *ppadtsc = powerpadsc[w];
@@ -1630,13 +1649,13 @@ const char * ButtonName (const ButtConfig * bc, int which)
 				inputValue = bc->ButtonNum[which] & 0xF;
 
 				if (inputValue & SDL_HAT_UP)
-					strncat (direction, "Up ", sizeof (direction));
+					strncat (direction, "Up ", sizeof (direction) - 1);
 				if (inputValue & SDL_HAT_DOWN)
-					strncat (direction, "Down ", sizeof (direction));
+					strncat (direction, "Down ", sizeof (direction) - 1);
 				if (inputValue & SDL_HAT_LEFT)
-					strncat (direction, "Left ", sizeof (direction));
+					strncat (direction, "Left ", sizeof (direction) - 1);
 				if (inputValue & SDL_HAT_RIGHT)
-					strncat (direction, "Right ", sizeof (direction));
+					strncat (direction, "Right ", sizeof (direction) - 1);
 
 				if (direction[0])
 					inputDirection = direction;
