@@ -34,6 +34,10 @@
 #include "gui.h"
 #endif
 
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
+
 #include <unistd.h>
 #include <csignal>
 #include <cstring>
@@ -294,6 +298,12 @@ static void DoFun(int frameskip, int periodic_saves)
 	}
 }
 
+#ifdef EMSCRIPTEN
+static void EmscriptenDoFun()
+{
+	DoFun(0, 0);
+}
+#endif
 
 /**
  * Initialize all of the subsystem drivers: video, audio, and joystick.
@@ -932,6 +942,8 @@ int main(int argc, char *argv[])
 		while(GameInfo)
 			DoFun(frameskip, periodic_saves);
 	}
+#elif defined(EMSCRIPTEN)
+    emscripten_set_main_loop(EmscriptenDoFun, 0, true);
 #else
 	while(GameInfo)
 	{
