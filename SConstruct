@@ -51,7 +51,7 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['LOGO'] = 0
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
   env.Replace(PROGSUFFIX = [".html"])
-  env.Append(LINKFLAGS = ['--preload-file', 'src/popeye.nes', '--pre-js', 'pre.js'])
+  env.Append(LINKFLAGS = ['--preload-file', 'src/test.nes', '--pre-js', 'pre.js'])
 else:
   env['EMSCRIPTEN'] = 0
 
