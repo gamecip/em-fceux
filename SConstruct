@@ -211,8 +211,13 @@ print "base CCFLAGS:",env['CCFLAGS']
 if env['DEBUG']:
   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
 else:
-  env.Append(CCFLAGS = ['-O2'])
-  env.Append(LINKFLAGS = ['-O2'])
+  if env['EMSCRIPTEN']:
+    flags = ['-O3', '--llvm-lto', '1', '-s', 'AGGRESSIVE_VARIABLE_ELIMINATION=1', '-s', 'NO_EXIT_RUNTIME=1']
+    env.Append(CCFLAGS = flags)
+    env.Append(LINKFLAGS = flags)
+  else:
+    env.Append(CCFLAGS = ['-O2'])
+    env.Append(LINKFLAGS = ['-O2'])
 
 if env['PLATFORM'] != 'win32' and env['PLATFORM'] != 'cygwin' and env['CREATE_AVI']:
   env.Append(CPPDEFINES=["CREATE_AVI"])
