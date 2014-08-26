@@ -51,11 +51,6 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
   env.Replace(PROGSUFFIX = [".html"])
   env.Append(LINKFLAGS = '--preload-file src/test.nes --pre-js pre.js')
-  if env['OPENGL']:
-    env.Append(CCFLAGS = "-s LEGACY_GL_EMULATION=1 -s GL_FFP_ONLY=1")
-    env.Append(LINKFLAGS = "-s LEGACY_GL_EMULATION=1 -s GL_FFP_ONLY=1")
-    #env.Append(CCFLAGS = "-s LEGACY_GL_EMULATION=1 -s GL_FFP_ONLY=1 -s GL_UNSAFE_OPTS=0")
-    #env.Append(LINKFLAGS = "-s LEGACY_GL_EMULATION=1 -s GL_FFP_ONLY=1 -s GL_UNSAFE_OPTS=0")
 else:
   env['EMSCRIPTEN'] = 0
 

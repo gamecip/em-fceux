@@ -22,7 +22,11 @@
 /// \brief Handles the graphical game display for the SDL implementation.
 
 #include "sdl.h"
+#ifndef EMSCRIPTEN
 #include "sdl-opengl.h"
+#else
+#include "sdl-es2.h"
+#endif
 #include "../common/vidblit.h"
 #include "../../fceu.h"
 #include "../../version.h"
@@ -243,8 +247,10 @@ InitVideo(FCEUGI *gi)
 		flags |= SDL_NOFRAME;
 	}
 
+#if !defined(OPENGL) || !defined(EMSCRIPTEN)
 	// gives the SDL exclusive palette control... ensures the requested colors
 	flags |= SDL_HWPALETTE;
+#endif
 
 	// enable double buffering if requested and we have hardware support
 #ifdef OPENGL
@@ -477,6 +483,7 @@ InitVideo(FCEUGI *gi)
 
 	// XXX soules - can't SDL do this for us?
 	 // if using more than 8bpp, initialize the conversion routines
+
 	if(s_curbpp > 8) {
 	InitBlitToHigh(s_curbpp >> 3,
 						s_screen->format->Rmask,
