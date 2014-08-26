@@ -120,6 +120,7 @@ static void UpdateTopRider (void);
 
 static uint32 JSreturn = 0;
 
+#ifndef NOCHEAT
 /**
  * Configure cheat devices (game genie, etc.).  Restarts the keyboard
  * and video subsystems.
@@ -134,6 +135,7 @@ DoCheatSeq ()
 	InitVideo (GameInfo);
 	SilenceSound (0);
 }
+#endif
 
 #include "keyscan.h"
 static uint8 *g_keyState = 0;
@@ -586,10 +588,12 @@ static void KeyboardCommands ()
 	// if not NES Sound Format
 	if (gametype != GIT_NSF)
 	{
+#ifndef NOCHEAT
 		if (_keyonly (Hotkeys[HK_CHEAT_MENU]))
 		{
 			DoCheatSeq ();
 		}
+#endif
 
 		// f5 (default) save key, hold shift to save movie
 		if (_keyonly (Hotkeys[HK_SAVE_STATE]))
@@ -660,7 +664,6 @@ static void KeyboardCommands ()
 	{
 		FCEUI_MovieToggleFrameDisplay ();
 	}
-#endif
 
 	if (_keyonly (Hotkeys[HK_TOGGLE_INPUT_DISPLAY]))
 	{
@@ -669,7 +672,6 @@ static void KeyboardCommands ()
 		g_config->setOption ("SDL.InputDisplay", input_display);
 	}
 
-#ifndef EMSCRIPTEN
 	if (_keyonly (Hotkeys[HK_MOVIE_TOGGLE_RW]))
 	{
 		FCEUI_SetMovieToggleReadOnly (!FCEUI_GetMovieToggleReadOnly ());

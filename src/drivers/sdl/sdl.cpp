@@ -76,6 +76,10 @@ int mutecapture;
 #endif
 static int noconfig;
 
+// global configuration object
+Config *g_config;
+
+#ifndef EMSCRIPTEN
 // -Video Modes Tag- : See --special
 static const char *DriverUsage=
 "Option         Value   Description\n"
@@ -155,8 +159,6 @@ static const char *DriverUsage=
 //--slstart	{0-239}   Sets the first drawn emulated scanline.\n
 //--clipsides	{0|1}   Clips left and rightmost 8 columns of pixels.\n
 
-// global configuration object
-Config *g_config;
 
 static void ShowUsage(char *prog)
 {
@@ -184,6 +186,7 @@ static void ShowUsage(char *prog)
 #endif
 	
 }
+#endif
 
 /**
  * Loads a game, given a full path/filename.  The driver code must be
@@ -544,6 +547,7 @@ void FCEUD_TraceInstruction() {
  */
 int main(int argc, char *argv[])
 {
+#ifndef EMSCRIPTEN
   // this is a hackish check for the --help arguemnts
   // these are normally processed by the config parser, but SDL_Init
   // must be run before the config parser: so if even SDL_Init fails,
@@ -556,6 +560,7 @@ int main(int argc, char *argv[])
 			return 0;
 		}
 	}
+#endif
 
 	int error, frameskip;
 
@@ -586,6 +591,7 @@ int main(int argc, char *argv[])
 
 	// initialize the infrastructure
 	error = FCEUI_Initialize();
+#ifndef EMSCRIPTEN
 	if(error != 1) {
 		ShowUsage(argv[0]);
 		SDL_Quit();
@@ -610,8 +616,6 @@ int main(int argc, char *argv[])
 #endif
 	}
 	int romIndex = g_config->parse(argc, argv);
-// tsone: just fake we have a game now
-    romIndex = 1;
 
 	// This is here so that a default fceux.cfg will be created on first
 	// run, even without a valid ROM to play.
@@ -622,6 +626,7 @@ int main(int argc, char *argv[])
 	g_config->getOption("SDL.NoConfig", &noconfig);
 	if (!noconfig)
 		g_config->save();
+#endif
 	
 	std::string s;
 
@@ -631,6 +636,8 @@ int main(int argc, char *argv[])
 	InitVideo(GameInfo);
 	InputCfg(s);
 	}
+
+#ifndef EMSCRIPTEN
 	// set the FAMICOM PAD 2 Mic thing 
 	{
 	int t;
@@ -638,10 +645,12 @@ int main(int argc, char *argv[])
 		if(t)
 			replaceP2StartWithMicrophone = t;
 	}
+#endif
 
     // update the input devices
 	UpdateInput(g_config);
 
+#ifndef EMSCRIPTEN
 	// check for a .fcm file to convert to .fm2
 	g_config->getOption ("SDL.FCMConvert", &s);
 	g_config->setOption ("SDL.FCMConvert", "");
@@ -676,6 +685,7 @@ int main(int argc, char *argv[])
 	  SDL_Quit();
 	  return 0;
 	}
+#endif
 
 	// If x/y res set to 0, store current display res in SDL.LastX/YRes
 	int yres, xres;
@@ -717,6 +727,7 @@ int main(int argc, char *argv[])
 	}
 #endif
 	
+#ifndef EMSCRIPTEN
 	int autoResume;
 	g_config->getOption("SDL.AutoResume", &autoResume);
 	if(autoResume)
@@ -824,12 +835,13 @@ int main(int argc, char *argv[])
 	}
 #endif
 	
+#endif // EMSCRIPTEN
 
 	// update the emu core
 	UpdateEMUCore(g_config);
 
 	
-	#ifdef CREATE_AVI
+#ifdef CREATE_AVI
 	g_config->getOption("SDL.VideoLog", &s);
 	g_config->setOption("SDL.VideoLog", "");
 	if(!s.empty())
@@ -840,7 +852,7 @@ int main(int argc, char *argv[])
 	} else {
 		mutecapture = 0;
 	}
-	#endif
+#endif
 
 	{
 		int id;
@@ -866,23 +878,27 @@ int main(int argc, char *argv[])
 	}
 #endif
 
+#ifndef EMSCRIPTEN
   if(romIndex >= 0)
 	{
-// tsone: override rom with test.nes
 		// load the specified game
-//		error = LoadGame(argv[romIndex]);
-		error = LoadGame("src/test.nes");
+		error = LoadGame(argv[romIndex]);
 		if(error != 1) {
 			DriverKill();
 			SDL_Quit();
 			return -1;
 		}
-//		g_config->setOption("SDL.LastOpenFile", argv[romIndex]);
-		g_config->setOption("SDL.LastOpenFile", "src/test.nes");
+		g_config->setOption("SDL.LastOpenFile", argv[romIndex]);
 		g_config->save();
-
 	}
+#else
+// tsone: override rom with test.nes
+	error = LoadGame("src/test.nes");
+	g_config->setOption("SDL.LastOpenFile", "src/test.nes");
+	g_config->save();
+#endif
 	
+#ifndef EMSCRIPTEN
 	// movie playback
 	g_config->getOption("SDL.Movie", &s);
 	g_config->setOption("SDL.Movie", "");
@@ -921,7 +937,8 @@ int main(int argc, char *argv[])
 		FCEU_LoadLuaCode(s.c_str());
 	}
 #endif
-	
+#endif // EMSCRIPTEN
+
 	{
 		int id;
 		g_config->getOption("SDL.NewPPU", &id);
@@ -930,6 +947,7 @@ int main(int argc, char *argv[])
 	}
 
 	g_config->getOption("SDL.Frameskip", &frameskip);
+
 	// loop playing the game
 #ifdef _GTK
 	if(noGui == 0)
