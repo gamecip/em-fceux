@@ -17,7 +17,7 @@
 * along with this program; if not, write to the Free Software
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
-
+#ifndef NOCHEAT
 
 #include "types.h"
 #include "x6502.h"
@@ -962,3 +962,5 @@ void UpdateFrozenList(void)
 	}
 	//FCEUI_DispMessage("FrozenCount: %d",0,FrozenAddressCount);//Debug
 }
+
+#endif // NOCHEAT

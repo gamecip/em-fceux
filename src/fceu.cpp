@@ -790,7 +790,6 @@ void PowerNES(void) {
 
 	FCEU_CheatResetRAM();
 	FCEU_CheatAddRAM(2, 0, RAM);
-
 	FCEU_GeniePower();
 
 	//dont do this, it breaks some games: Cybernoid; Minna no Taabou no Nakayoshi Daisakusen; and maybe mechanized attack

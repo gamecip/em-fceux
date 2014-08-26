@@ -29,7 +29,8 @@ opts.AddVariables(
   BoolVariable('SYSTEM_MINIZIP', 'Use system minizip instead of static minizip provided with fceux', 0),
   BoolVariable('LSB_FIRST', 'Least signficant byte first (non-PPC)', 1),
   BoolVariable('CLANG', 'Compile with llvm-clang instead of gcc', 0),
-  BoolVariable('SDL2', 'Compile using SDL2 instead of SDL 1.2 (experimental/non-functional)', 0)
+  BoolVariable('SDL2', 'Compile using SDL2 instead of SDL 1.2 (experimental/non-functional)', 0),
+  BoolVariable('NOCHEAT',   'Completely disable all cheats', 0)
 )
 AddOption('--prefix', dest='prefix', type='string', nargs=1, action='store', metavar='DIR', help='installation prefix')
 
@@ -48,6 +49,7 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['NEWPPU'] = 0 # Not strictly necessary, but faster.
   env['CREATE_AVI'] = 0
   env['LOGO'] = 0
+  env['NOCHEAT'] = 1
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
   env.Replace(PROGSUFFIX = [".html"])
   env.Append(LINKFLAGS = '--preload-file src/test.nes --pre-js pre.js')
@@ -101,6 +103,9 @@ if env['PLATFORM'] == 'cygwin':
   env.Append(CCFLAGS = " -mno-cygwin")
   env.Append(LINKFLAGS = " -mno-cygwin")
   env['LIBS'] = ['wsock32'];
+
+if env['NOCHEAT']:
+  env.Append(CPPDEFINES=["NOCHEAT"])
 
 if env['PLATFORM'] == 'win32':
   env.Append(CPPPATH = [".", "drivers/win/", "drivers/common/", "drivers/", "drivers/win/zlib", "drivers/win/directx", "drivers/win/lua/include"])

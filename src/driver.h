@@ -182,6 +182,7 @@ void FCEUI_SaveSnapshotAs(void);
 void FCEU_DispMessage(char *format, int disppos, ...);
 #define FCEUI_DispMessage FCEU_DispMessage
 
+#ifndef NOCHEAT
 int FCEUI_DecodePAR(const char *code, int *a, int *v, int *c, int *type);
 int FCEUI_DecodeGG(const char *str, int *a, int *v, int *c);
 int FCEUI_AddCheat(const char *name, uint32 addr, uint8 val, int compare, int type);
@@ -200,6 +201,26 @@ int FCEUI_SetCheat(uint32 which, const char *name, int32 a, int32 v, int compare
 
 void FCEUI_CheatSearchShowExcluded(void);
 void FCEUI_CheatSearchSetCurrentAsOriginal(void);
+
+#else
+#define FCEUI_DecodePAR(...) (1)
+#define FCEUI_DecodeGG(...) (1)
+#define FCEUI_AddCheat(...) (1)
+#define FCEUI_DelCheat(...) (1)
+#define FCEUI_ToggleCheat(...) (-1)
+#define FCEUI_CheatSearchGetCount() (0)
+#define FCEUI_CheatSearchGetRange(...)
+#define FCEUI_CheatSearchGet(...)
+#define FCEUI_CheatSearchBegin()
+#define FCEUI_CheatSearchEnd(...)
+#define FCEUI_ListCheats(...)
+
+#define FCEUI_GetCheat(...) (0)
+#define FCEUI_SetCheat(...) (0)
+
+#define FCEUI_CheatSearchShowExcluded()
+#define FCEUI_CheatSearchSetCurrentAsOriginal()
+#endif
 
 //.rom
 #define FCEUIOD_ROMS    0	//Roms

@@ -21,8 +21,6 @@ if env['LUA']:
 
 if env['CREATE_AVI']:
   subdirs.append('drivers/videolog')
-  
-
 
 for dir in subdirs:
   subdir_files = SConscript('%s/SConscript' % dir)
