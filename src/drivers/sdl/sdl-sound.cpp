@@ -48,6 +48,7 @@ fillaudio(void *udata,
 			uint8 *stream,
 			int len)
 {
+#if 0
 	int16 *tmps = (int16*)stream;
 	len >>= 1;
 	while(len) {
@@ -64,6 +65,37 @@ fillaudio(void *udata,
 		tmps++;
 		len--;
 	}
+#elif 1
+	len >>= 1;
+	for (int i = 0; i < len; i++) {
+		int16 sample = 0;
+		if(s_BufferIn) {
+			sample = s_Buffer[s_BufferRead];
+			s_BufferRead = (s_BufferRead + 1) % s_BufferSize;
+			s_BufferIn--;
+		} else {
+			sample = 0;
+		}
+
+		((int16*)stream)[i] = sample;
+	}
+#else
+// tsone: attempt at optimization
+	int16 *tmps = (int16*)stream;
+    len >>= 1;
+	while(s_BufferIn && len) {
+		*tmps = s_Buffer[s_BufferRead];
+		tmps++;
+		s_BufferRead = (s_BufferRead + 1) % s_BufferSize;
+		s_BufferIn--;
+		len--;
+	}
+	while(len) {
+		*tmps = 0;
+		tmps++;
+		len--;
+	}
+#endif
 }
 
 /**
@@ -158,6 +190,10 @@ GetMaxSound(void)
 uint32
 GetWriteSound(void)
 {
+    if (s_BufferSize < s_BufferIn)
+    {
+        printf("!!!! GetWriteSound: %4d < %4d\n", s_BufferSize, s_BufferIn);
+    }
 	return(s_BufferSize - s_BufferIn);
 }
 
@@ -170,6 +206,11 @@ WriteSound(int32 *buf,
 {
 	extern int EmulationPaused;
 	if (EmulationPaused == 0)
+    {
+        if (Count < 0)
+        {
+            printf("!!!! WriteSound Count < 0: %4d\n", Count);
+        }
 		while(Count)
 		{
 			while(s_BufferIn == s_BufferSize) 
@@ -189,6 +230,7 @@ WriteSound(int32 *buf,
             
 			buf++;
 		}
+    }
 }
 
 /**
