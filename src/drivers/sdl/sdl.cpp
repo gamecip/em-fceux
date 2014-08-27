@@ -395,7 +395,7 @@ FCEUD_Update(uint8 *XBuf,
 	 }
 	#endif
 	
-	int ocount = Count;
+//	int ocount = Count;
 	// apply frame scaling to Count
 	Count = (int)(Count / g_fpsScale);
 	if(Count) {
@@ -431,6 +431,8 @@ FCEUD_Update(uint8 *XBuf,
 					#endif
 					  WriteSound(Buffer,Count);
 				} else {
+// tsone: for some reason causes hang on chrome...?
+#if 0
 					while(Count>0) {
 						#ifdef CREATE_AVI
 						if (!mutecapture)
@@ -438,6 +440,7 @@ FCEUD_Update(uint8 *XBuf,
 						  WriteSound(Buffer,(Count<ocount) ? Count : ocount);
 						Count -= ocount;
 					}
+#endif
 				}
 			}
 		} //else puts("Skipped");
