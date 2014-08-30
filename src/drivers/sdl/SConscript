@@ -12,24 +12,26 @@ source_list = Split(
     """
     input.cpp
     config.cpp
-    sdl.cpp
     sdl-joystick.cpp
     sdl-sound.cpp
     sdl-throttle.cpp
     sdl-video.cpp
-    unix-netplay.cpp
     """)
 
 Import('env')
-if env['OPENGL'] and env['EMSCRIPTEN']:
-  source_list.append('sdl-es2.cpp')
-elif 'GL' in env['LIBS']:
-  source_list.append('sdl-opengl.cpp')
-
-if env['GTK'] or env['GTK3']:
-  source_list.append('gui.cpp')
+if env['EMSCRIPTEN']:
+  source_list.append('sdl-emscripten.cpp') # Emscripten main.
+  if env['OPENGL']:
+    source_list.append('sdl-es2.cpp')
+else:
+  source_list += ['sdl.cpp', 'unix-netplay.cpp']
+  if 'GL' in env['LIBS']:
+    source_list.append('sdl-opengl.cpp')
+  if env['GTK'] or env['GTK3']:
+    source_list.append('gui.cpp') 
 
 source_list = ['drivers/sdl/' + source for source in source_list]
+
 if env['EMSCRIPTEN']:
     # Need to include zlib functions.
     zlib_source_list = Split(

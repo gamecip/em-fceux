@@ -51,8 +51,8 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['LOGO'] = 0
   env['NOCHEAT'] = 1
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
-  env.Replace(PROGSUFFIX = [".html"])
-  env.Append(LINKFLAGS = '--preload-file src/test.nes --pre-js pre.js')
+  env.Replace(PROGSUFFIX = [".js"])
+  env.Append(LINKFLAGS = '--preload-file src/test.nes')
 else:
   env['EMSCRIPTEN'] = 0
 
@@ -134,8 +134,6 @@ else:
       Exit(1)
     env.Append(CPPDEFINES=["_SDL2"])
     env.ParseConfig('pkg-config sdl2 --cflags --libs')
-  elif env['EMSCRIPTEN']:
-    pass # Skip configuring SDL.
   else:
     if not conf.CheckLib('SDL'):
       print 'Did not find libSDL or SDL.lib, exiting!'
