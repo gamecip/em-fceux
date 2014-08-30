@@ -134,7 +134,7 @@ else:
       Exit(1)
     env.Append(CPPDEFINES=["_SDL2"])
     env.ParseConfig('pkg-config sdl2 --cflags --libs')
-  else:
+  elif not env['EMSCRIPTEN']:
     if not conf.CheckLib('SDL'):
       print 'Did not find libSDL or SDL.lib, exiting!'
       Exit(1)
