@@ -1705,8 +1705,10 @@ int DWaitButton (const uint8 * text, ButtConfig * bc, int wb)
 		}
 	}
 
+#ifndef EMSCRIPTEN
 	while (1)
 	{
+#endif
 		int done = 0;
 #ifdef _GTK
 		while (gtk_events_pending ())
@@ -1771,9 +1773,11 @@ int DWaitButton (const uint8 * text, ButtConfig * bc, int wb)
 					done--;
 			}
 		}
+#ifndef EMSCRIPTEN
 		if (done)
 			break;
 	}
+#endif
 
 	return (0);
 }

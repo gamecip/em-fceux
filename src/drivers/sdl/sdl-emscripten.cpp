@@ -215,18 +215,21 @@ FCEUD_Update(uint8 *XBuf,
 	if(Count) {
 		int32 can=GetWriteSound();
 		static int uflow=0;
-		int32 tmpcan;
 
+// tsone: disabled throttling support for now
+#ifndef EMSCRIPTEN
 		// don't underflow when scaling fps
 		if(can >= GetMaxSound() && g_fpsScale==1.0) uflow=1;	/* Go into massive underflow mode. */
-
+#endif
 		if(can > Count) can=Count;
 		else uflow=0;
 
 		WriteSound(Buffer,can);
 
+// tsone: disabled throttling support for now
+#ifndef EMSCRIPTEN
 		//if(uflow) puts("Underflow");
-		tmpcan = GetWriteSound();
+		int32 tmpcan = GetWriteSound();
 		// don't underflow when scaling fps
 		if(g_fpsScale>1.0 || ((tmpcan < Count*0.90) && !uflow)) {
 			if(XBuf && (inited&4) && !(NoWaiting & 2))
@@ -240,7 +243,7 @@ FCEUD_Update(uint8 *XBuf,
 					WriteSound(Buffer,Count);
 				} else {
 // tsone: for some reason causes hang on chrome...?
-#if 0
+#ifndef EMSCRIPTEN
 					while(Count>0) {
 						WriteSound(Buffer,(Count<ocount) ? Count : ocount);
 						Count -= ocount;
@@ -257,12 +260,14 @@ FCEUD_Update(uint8 *XBuf,
 				tmpcan -= Count;
 			}
 		}
+#ifdef EMSCRIPTEN
 // tsone: not yet clear why this is needed
 		else {
 			if(XBuf && (inited&4)) {
 				BlitScreen(XBuf);
 			}
 		}
+#endif
 
 	} else {
 		if(!NoWaiting && (!(eoptions&EO_NOTHROTTLE) || FCEUI_EmulationPaused()))
@@ -284,6 +289,17 @@ FCEUD_Update(uint8 *XBuf,
 	//if(Count)
 	// WriteSound(Buffer,Count,NoWaiting);
 	//FCEUD_UpdateInput();
+
+#else // EMSCRIPTEN
+    }
+
+    FCEUD_UpdateInput();
+
+    if (XBuf && (inited&4))
+    {
+        BlitScreen(XBuf);
+    }
+#endif
 }
 
 /**

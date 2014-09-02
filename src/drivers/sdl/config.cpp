@@ -137,7 +137,11 @@ InitConfig()
 	config->addOption("soundrate", "SDL.Sound.Rate", 44100);
 	config->addOption("soundq", "SDL.Sound.Quality", 1);
 	config->addOption("soundrecord", "SDL.Sound.RecordFile", "");
+#ifndef EMSCRIPTEN
 	config->addOption("soundbufsize", "SDL.Sound.BufSize", 128);
+#else
+	config->addOption("soundbufsize", "SDL.Sound.BufSize", 256); // tsone: need larger buffer in browser
+#endif
 	config->addOption("lowpass", "SDL.Sound.LowPass", 0);
     
 	config->addOption('g', "gamegenie", "SDL.GameGenie", 0);

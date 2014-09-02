@@ -140,7 +140,15 @@ InitSound()
 	spec.freq = soundrate;
 	spec.format = AUDIO_S16SYS;
 	spec.channels = 1;
+#ifndef EMSCRIPTEN
 	spec.samples = 512;
+#else
+	// tsone: With 512 samples sound buffer update frequency is 44100Hz / 512 = ~86Hz.
+	// This is higher than presumed 60Hz emulation update frequency meaning emulator
+	// never provides enough samples. With 1024 samples we require ~43Hz update rate
+	// which is OK.
+	spec.samples = 1024;
+#endif
 	spec.callback = fillaudio;
 	spec.userdata = 0;
 
