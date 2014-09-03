@@ -136,6 +136,14 @@ static void DoFun(int frameskip, int periodic_saves)
 	FCEUI_Emulate(&gfx, &sound, &ssize, fskipc);
 	FCEUD_Update(gfx, sound, ssize);
 
+#ifdef EMSCRIPTEN
+// tsone: need some extra sound samples in the buffering
+    if (GetWriteSound() > 3 * ssize) {
+	    FCEUI_Emulate(&gfx, &sound, &ssize, fskipc);
+	    FCEUD_Update(gfx, sound, ssize);
+    }
+#endif
+
 	if(opause!=FCEUI_EmulationPaused()) {
 		opause=FCEUI_EmulationPaused();
 		SilenceSound(opause);
@@ -211,7 +219,7 @@ FCEUD_Update(uint8 *XBuf,
 {
 //	int ocount = Count;
 	// apply frame scaling to Count
-	Count = (int)(Count / g_fpsScale);
+//	Count = (int)(Count / g_fpsScale);
 	if(Count) {
 		int32 can=GetWriteSound();
 		static int uflow=0;
@@ -220,6 +228,11 @@ FCEUD_Update(uint8 *XBuf,
 #ifndef EMSCRIPTEN
 		// don't underflow when scaling fps
 		if(can >= GetMaxSound() && g_fpsScale==1.0) uflow=1;	/* Go into massive underflow mode. */
+#else
+        if (can > GetMaxSound()) {
+            printf("More than max: %d (max: %d)\n", can, GetMaxSound());
+            can = GetMaxSound();
+        }
 #endif
 		if(can > Count) can=Count;
 		else uflow=0;
@@ -447,9 +460,6 @@ int main(int argc, char *argv[])
 
 // tsone: override rom with test.nes
 //    ReloadGame();
-//	error = LoadGame("src/test.nes");
-//	g_config->setOption("SDL.LastOpenFile", "src/test.nes");
-//	g_config->save();
 	
 	{
 		int id;
@@ -462,14 +472,6 @@ int main(int argc, char *argv[])
 
 	// loop playing the game
     emscripten_set_main_loop(EmscriptenDoFun, 0, true);
-// tsone: emscripten will never exit
-/*
-	CloseGame();
-
-	// exit the infrastructure
-	FCEUI_Kill();
-	SDL_Quit();
-*/
 	return 0;
 }
 

@@ -75,11 +75,9 @@ SpeedThrottle()
 	else
 		InFrame = 0;
     
-#ifndef EMSCRIPTEN
 	/*fprintf(stderr, "attempting to sleep %Ld ms, frame complete=%s\n",
 		time_left, InFrame?"no":"yes");*/
 	SDL_Delay(time_left);
-#endif
     
 	if(!InFrame)
 	{

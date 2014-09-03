@@ -48,7 +48,7 @@ fillaudio(void *udata,
 			uint8 *stream,
 			int len)
 {
-#if 0
+#ifndef EMSCRIPTEN
 	int16 *tmps = (int16*)stream;
 	len >>= 1;
 	while(len) {
@@ -65,7 +65,7 @@ fillaudio(void *udata,
 		tmps++;
 		len--;
 	}
-#elif 1
+#elif 0
 	len >>= 1;
 	for (int i = 0; i < len; i++) {
 		int16 sample = 0;
@@ -80,20 +80,19 @@ fillaudio(void *udata,
 		((int16*)stream)[i] = sample;
 	}
 #else
-// tsone: attempt at optimization
-	int16 *tmps = (int16*)stream;
     len >>= 1;
-	while(s_BufferIn && len) {
-		*tmps = s_Buffer[s_BufferRead];
-		tmps++;
+    int i = 0;
+    int d = (s_BufferIn > len) ? len : s_BufferIn;
+	for (; i < d; i++) {
+		((int16*) stream)[i] = s_Buffer[s_BufferRead];
 		s_BufferRead = (s_BufferRead + 1) % s_BufferSize;
-		s_BufferIn--;
-		len--;
 	}
-	while(len) {
-		*tmps = 0;
-		tmps++;
-		len--;
+    s_BufferIn -= d;
+    if (s_BufferIn == 0) {
+        printf("Sound buffer exhausted (needed %d samples).\n", len);
+    }
+	for (; i < len; i++) {
+		((int16*) stream)[i] = 0;
 	}
 #endif
 }
@@ -140,23 +139,18 @@ InitSound()
 	spec.freq = soundrate;
 	spec.format = AUDIO_S16SYS;
 	spec.channels = 1;
-#ifndef EMSCRIPTEN
 	spec.samples = 512;
-#else
-	// tsone: With 512 samples sound buffer update frequency is 44100Hz / 512 = ~86Hz.
-	// This is higher than presumed 60Hz emulation update frequency meaning emulator
-	// never provides enough samples. With 1024 samples we require ~43Hz update rate
-	// which is OK.
-	spec.samples = 1024;
-#endif
 	spec.callback = fillaudio;
 	spec.userdata = 0;
 
-	s_BufferSize = soundbufsize * soundrate / 1000;
+	s_BufferSize = (soundbufsize * soundrate) / 1000;
 
 	// For safety, set a bare minimum:
 	if (s_BufferSize < spec.samples * 2)
 	s_BufferSize = spec.samples * 2;
+
+    printf("Sound buffersize: %d (requested: %d, HW: %d)\n", 
+        s_BufferSize, (soundbufsize * soundrate) / 1000, spec.samples);
 
 	s_Buffer = (int *)FCEU_dmalloc(sizeof(int) * s_BufferSize);
 	if (!s_Buffer)
@@ -215,17 +209,12 @@ WriteSound(int32 *buf,
 	extern int EmulationPaused;
 	if (EmulationPaused == 0)
     {
-        if (Count < 0)
-        {
-            printf("!!!! WriteSound Count < 0: %4d\n", Count);
-        }
+#ifndef EMSCRIPTEN
 		while(Count)
 		{
 			while(s_BufferIn == s_BufferSize) 
 			{
-#ifndef EMSCRIPTEN
 				SDL_Delay(1);
-#endif
 			}
 
 			s_Buffer[s_BufferWrite] = *buf;
@@ -238,6 +227,22 @@ WriteSound(int32 *buf,
             
 			buf++;
 		}
+#else
+        if (Count > s_BufferSize - s_BufferIn)
+        {
+            printf("Had to limit sound: %d (got: %d)\n", s_BufferSize - s_BufferIn, Count);
+            Count = s_BufferSize - s_BufferIn;
+        }
+//        printf("Bufsize: %5d, Count: %5d\n", s_BufferSize - s_BufferIn, Count);
+        for (int i = 0; i < Count; i++)
+        {
+			s_Buffer[s_BufferWrite] = buf[i];
+			s_BufferWrite = (s_BufferWrite + 1) % s_BufferSize;
+        }
+		SDL_LockAudio();
+        s_BufferIn += Count;
+		SDL_UnlockAudio();
+#endif
     }
 }
 
