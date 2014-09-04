@@ -14,13 +14,16 @@ utils
 Import('env')
 Export('env')
 
+if env['EMSCRIPTEN']:
+  file_list.remove('netplay.cpp')
+
 if env['LUA']:
   file_list.append('lua-engine.cpp')
   if env['SYSTEM_LUA'] == 0:
     subdirs.append('lua')
 
 if env['CREATE_AVI']:
-  subdirs.append('drivers/videolog')
+  subdirs.append('drivers/videolog')  
 
 for dir in subdirs:
   subdir_files = SConscript('%s/SConscript' % dir)

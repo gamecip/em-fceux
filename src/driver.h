@@ -55,7 +55,11 @@ void FCEUI_NetplayText(uint8 *text);
 //Called when a fatal error occurred and network play can't continue.  This function
 //should call FCEUI_NetplayStop() after it has deinitialized the network on the driver
 //side.
+#ifndef EMSCRIPTEN
 void FCEUD_NetworkClose(void);
+#else
+#define FCEUD_NetworkClose()
+#endif
 
 bool FCEUI_BeginWaveRecord(const char *fn);
 int FCEUI_EndWaveRecord(void);
