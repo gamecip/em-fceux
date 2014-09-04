@@ -353,6 +353,11 @@ static uint8 CycTable[256] =
 /*0xF0*/ 2,5,2,8,4,4,6,6,2,4,2,7,4,4,7,7,
 };
 
+#ifdef EMSCRIPTEN
+#include "opsfunc.inc"
+#include "opstab.inc"
+#endif
+
 void X6502_IRQBegin(int w)
 {
  _IRQlow|=w;
@@ -383,6 +388,10 @@ void X6502_Reset(void)
 void X6502_Init(void)
 {
 	unsigned int i;
+
+#ifdef EMSCRIPTEN
+	opsinit();
+#endif
 
 	// Initialize the CPU structure
 	memset((void *)&X,0,sizeof(X));
@@ -498,10 +507,14 @@ extern int test; test++;
    CallRegisteredLuaMemHook(_PC, 1, 0, LUAMEMHOOK_EXEC);
    #endif
    _PC++;
+#ifndef EMSCRIPTEN
    switch(b1)
    {
     #include "ops.inc"
    }
+#else
+   opstab[b1]();
+#endif
   }
 }
 
