@@ -139,7 +139,11 @@ InitSound()
 	spec.freq = soundrate;
 	spec.format = AUDIO_S16SYS;
 	spec.channels = 1;
+#ifndef EMSCRIPTEN
 	spec.samples = 512;
+#else
+	spec.samples = 1024;
+#endif
 	spec.callback = fillaudio;
 	spec.userdata = 0;
 

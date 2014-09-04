@@ -576,6 +576,7 @@ void DrawNSF(uint8 *XBuf)
 	DrawTextTrans(ClipSidesOffset+XBuf+42*256+4+(((31-strlen((char*)NSFHeader.Copyright))<<2)), 256,NSFHeader.Copyright, 6);
 
 	DrawTextTrans(ClipSidesOffset+XBuf+70*256+4+(((31-strlen("Song:"))<<2)), 256, (uint8*)"Song:", 6);
+	// tsone: sprintf here slows down emscripten rendering quite a lot!
 	sprintf(snbuf,"<%d/%d>",CurrentSong,NSFHeader.TotalSongs);
 	DrawTextTrans(XBuf+82*256+4+(((31-strlen(snbuf))<<2)), 256, (uint8*)snbuf, 6);
 

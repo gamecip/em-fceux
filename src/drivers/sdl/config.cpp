@@ -135,7 +135,12 @@ InitConfig()
 	config->addOption("noisevol", "SDL.Sound.NoiseVolume", 256);
 	config->addOption("pcmvol", "SDL.Sound.PCMVolume", 256);
 	config->addOption("soundrate", "SDL.Sound.Rate", 44100);
+#ifndef EMSCRIPTEN
 	config->addOption("soundq", "SDL.Sound.Quality", 1);
+#else
+	// tsone: set for slower javascript VM
+	config->addOption("soundq", "SDL.Sound.Quality", 0);
+#endif
 	config->addOption("soundrecord", "SDL.Sound.RecordFile", "");
 	config->addOption("soundbufsize", "SDL.Sound.BufSize", 128);
 	config->addOption("lowpass", "SDL.Sound.LowPass", 0);
