@@ -213,7 +213,9 @@ InitVideo(FCEUGI *gi)
 	s_inited = 1;
 
 	// shows the cursor within the display window
+#ifndef EMSCRIPTEN // tsone: for some reason this can cause exception
 	SDL_ShowCursor(1);
+#endif
 
 	// determine if we can allocate the display on the video card
 	vinf = SDL_GetVideoInfo();
@@ -237,10 +239,14 @@ InitVideo(FCEUGI *gi)
 		int no_cursor;
 		g_config->getOption("SDL.NoFullscreenCursor", &no_cursor);
 		flags |= SDL_FULLSCREEN;
+#ifndef EMSCRIPTEN // tsone: for some reason this can cause exception
 		SDL_ShowCursor(!no_cursor);
+#endif
 	}
 	else {
+#ifndef EMSCRIPTEN // tsone: for some reason this can cause exception
 		SDL_ShowCursor(1);
+#endif
 	}
     
 	if(noframe) {

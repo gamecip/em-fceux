@@ -103,8 +103,8 @@
         if (f) {
           var r = new FileReader();
           r.onload = function(e) { 
-            var opts = {'encoding':'binary'};
-            FS.writeFile('src/test.nes', new Uint8Array(e.target.result), opts);
+            var opts = {encoding:'binary'};
+            FS.writeFile('rom.nes', new Uint8Array(e.target.result), opts);
             Module.reloadROM = 1;
           }
           r.readAsArrayBuffer(f);
@@ -1314,6 +1314,13 @@
     <script type="text/javascript">
       Module['preRun'].push(function() {
         SDL.defaults.copyOnLock = false;
+        FS.mkdir('/sav')
+        FS.mount(IDBFS, {}, '/sav');
+        console.log('!!!! initial sync started');
+        FS.syncfs(true, function (err) {
+          assert(!err);
+          console.log('!!!! initial sync success');
+        });
       });
     </script>
     <script async type="text/javascript" src="fceux.js"></script>

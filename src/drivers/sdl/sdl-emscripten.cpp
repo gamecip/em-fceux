@@ -157,9 +157,9 @@ static void EmscriptenDoFun()
     {
         EM_ASM({ Module.reloadROM = 0; });
         CloseGame();
-        LoadGame("src/test.nes");
+        LoadGame("rom.nes");
     }
-    if (GameInfo)
+    else if (GameInfo)
     {
 	    DoFun(0, 0);
     }
@@ -394,6 +394,9 @@ int main(int argc, char *argv[])
 	// initialize the infrastructure
 	error = FCEUI_Initialize();
 	std::string s;
+
+    // override savegame directory, 'sav/' is mounted with IndexedDB
+    FCEUI_SetDirOverride(FCEUIOD_NV, "sav");
 
 	g_config->getOption("SDL.InputCfg", &s);
 	if(s.size() != 0)

@@ -38,6 +38,10 @@
 #include <cstdio>
 #include <climits>
 
+#ifdef EMSCRIPTEN // tsone: for savegames (IndexedDB sync)
+#include <emscripten.h>
+#endif
+
 uint8 *Page[32], *VPage[8];
 uint8 **VPageR = VPage;
 uint8 *VPageG[8];
@@ -528,7 +532,6 @@ void FCEU_GeniePower(void) {
 		geniestage = 2;
 }
 
-
 void FCEU_SaveGameSave(CartInfo *LocalHWInfo) {
 	if (LocalHWInfo->battery && LocalHWInfo->SaveGame[0]) {
 		FILE *sp;
@@ -537,11 +540,22 @@ void FCEU_SaveGameSave(CartInfo *LocalHWInfo) {
 		if ((sp = FCEUD_UTF8fopen(soot, "wb")) == NULL) {
 			FCEU_PrintError("WRAM file \"%s\" cannot be written to.\n", soot.c_str());
 		} else {
+            printf("!!!! sav: %s\n", soot.c_str());
 			for (int x = 0; x < 4; x++)
 				if (LocalHWInfo->SaveGame[x]) {
 					fwrite(LocalHWInfo->SaveGame[x], 1,
 						   LocalHWInfo->SaveGameLen[x], sp);
 				}
+#ifdef EMSCRIPTEN // tsone: sync IndexedDB for savegames
+// TODO: tsone: what to do on success/fail? pause emulation until sync is done?
+            EM_ASM({
+                console.log('!!!! save sync started');
+                FS.syncfs(function (err) {
+                    assert(!err);
+                    console.log('!!!! save sync success');
+                });
+            });
+#endif
 		}
 	}
 }

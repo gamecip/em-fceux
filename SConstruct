@@ -52,7 +52,6 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['NOCHEAT'] = 1
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
   env.Replace(PROGSUFFIX = [".js"])
-  env.Append(LINKFLAGS = '--preload-file src/test.nes')
 else:
   env['EMSCRIPTEN'] = 0
 

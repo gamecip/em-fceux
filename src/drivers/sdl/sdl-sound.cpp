@@ -88,9 +88,9 @@ fillaudio(void *udata,
 		s_BufferRead = (s_BufferRead + 1) % s_BufferSize;
 	}
     s_BufferIn -= d;
-    if (s_BufferIn == 0) {
-        printf("Sound buffer exhausted (needed %d samples).\n", len);
-    }
+//    if (s_BufferIn == 0) {
+//        printf("Sound buffer exhausted (needed %d samples).\n", len);
+//    }
 	for (; i < len; i++) {
 		((int16*) stream)[i] = 0;
 	}
