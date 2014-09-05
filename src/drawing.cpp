@@ -395,21 +395,21 @@ static int FixJoedChar(uint8 ch)
 	int c = ch - 32;
 	return (c < 0 || c > 98) ? 0 : c;
 }
-// tsone: unused, remove
-/*
-static int JoedCharWidth(uint8 ch)
-{
-	return Font6x7[FixJoedChar(ch)*8];
-}
-*/
 
+#ifndef EMSCRIPTEN
 char target[64][256];
+#else
+static char (*target)[256] = 0;
+#endif
 
 void DrawTextTransWH(uint8 *dest, int width, uint8 *textmsg, uint8 fgcolor, int max_w, int max_h, int border)
 {
 	int beginx=2, x=beginx;
 	int y=2;
 
+    if (!target) {
+        target = (char (*)[256]) malloc(256 * 64);
+    }
 	memset(target, 0, 64 * 256);
 
 	assert(width==256);
