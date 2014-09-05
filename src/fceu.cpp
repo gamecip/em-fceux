@@ -212,8 +212,13 @@ FCEUGI *GameInfo = NULL;
 void (*GameInterface)(GI h);
 void (*GameStateRestore)(int version);
 
+#ifndef EMSCRIPTEN
 readfunc ARead[0x10000];
 writefunc BWrite[0x10000];
+#else
+readfunc* ARead = 0;
+writefunc* BWrite = 0;
+#endif
 static readfunc *AReadG;
 static writefunc *BWriteG;
 static int RWWrap = 0;
@@ -785,6 +790,9 @@ void hand(X6502 *X, int type, uint32 A) {
 }
 
 void PowerNES(void) {
+    FCEU_ARRAY_EM(ARead, readfunc, 0x10000);
+    FCEU_ARRAY_EM(BWrite, writefunc, 0x10000);
+
 	FCEUMOV_AddCommand(FCEUNPCMD_POWER);
 	if (!GameInfo) return;
 

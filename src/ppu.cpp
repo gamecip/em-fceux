@@ -1668,6 +1668,10 @@ void FCEUPPU_Reset(void) {
 void FCEUPPU_Power(void) {
 	int x;
 
+    // tsone: where to init this? really really twisted...
+    FCEU_ARRAY_EM(ARead, readfunc, 0x10000);
+    FCEU_ARRAY_EM(BWrite, writefunc, 0x10000);
+
 	memset(NTARAM, 0x00, 0x800);
 	memset(PALRAM, 0x00, 0x20);
 	memset(UPALRAM, 0x00, 0x03);

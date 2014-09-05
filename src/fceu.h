@@ -55,8 +55,13 @@ extern int EmulationPaused;
 
 uint8 FCEU_ReadRomByte(uint32 i);
 
+#ifndef EMSCRIPTEN
 extern readfunc ARead[0x10000];
 extern writefunc BWrite[0x10000];
+#else
+extern readfunc* ARead;
+extern writefunc* BWrite;
+#endif
 
 enum GI {
 	GI_RESETM2	=1,

@@ -1,8 +1,10 @@
 
-static void (*opstab[256])(void);
+typedef void (*ops_func_ptr)(void);
+static ops_func_ptr *opstab = 0;
 
 static void opsinit(void)
 { 
+    FCEU_ARRAY_EM(opstab, ops_func_ptr, 256);
     opstab[0x00] = ops00;
     opstab[0x40] = ops40;
     opstab[0x60] = ops60;

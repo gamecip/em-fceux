@@ -27,17 +27,28 @@
 #include "state.h"
 #include "wave.h"
 #include "debug.h"
+#include "utils/memory.h"
 
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
 
+#ifndef EMSCRIPTEN
 static uint32 wlookup1[32];
 static uint32 wlookup2[203];
 
-int32 Wave[2048+512];
-int32 WaveHi[40000];
-int32 WaveFinal[2048+512];
+int32 Wave[WAVE_NUM];
+int32 WaveHi[WAVEHI_NUM];
+int32 WaveFinal[WAVE_NUM];
+
+#else
+static uint32* wlookup1 = 0;
+static uint32* wlookup2 = 0;
+
+int32* Wave = 0;
+int32* WaveHi = 0;
+int32* WaveFinal = 0;
+#endif
 
 EXPSOUND GameExpSound={0,0,0};
 
@@ -1067,7 +1078,7 @@ int FlushEmulateSound(void)
    end=NeoFilterSound(WaveHi,WaveFinal,SOUNDTS,&left);
 
    memmove(WaveHi,WaveHi+SOUNDTS-left,left*sizeof(uint32));
-   memset(WaveHi+left,0,sizeof(WaveHi)-left*sizeof(uint32));
+   memset(WaveHi+left,0,WAVEHI_SIZE-left*sizeof(uint32));
 
    if(GameExpSound.HiSync) GameExpSound.HiSync(left);
    for(x=0;x<5;x++)
@@ -1196,12 +1207,18 @@ void FCEUSND_Power(void)
 {
         int x;
 
+    FCEU_ARRAY_EM(wlookup1, uint32, 32);
+    FCEU_ARRAY_EM(wlookup2, uint32, 203);
+    FCEU_ARRAY_EM(Wave, int32, WAVE_NUM);
+    FCEU_ARRAY_EM(WaveFinal, int32, WAVE_NUM);
+    FCEU_ARRAY_EM(WaveHi, int32, WAVEHI_NUM);
+
         SetNESSoundMap();
         memset(PSG,0x00,sizeof(PSG));
 	FCEUSND_Reset();
 
-	memset(Wave,0,sizeof(Wave));
-        memset(WaveHi,0,sizeof(WaveHi));
+	memset(Wave,0,WAVE_SIZE);
+        memset(WaveHi,0,WAVEHI_SIZE);
 	memset(&EnvUnits,0,sizeof(EnvUnits));
 
         for(x=0;x<5;x++)

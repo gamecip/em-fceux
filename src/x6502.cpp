@@ -354,6 +354,7 @@ static uint8 CycTable[256] =
 };
 
 #ifdef EMSCRIPTEN
+#include "utils/memory.h"
 #include "opsfunc.inc"
 #include "opstab.inc"
 #endif
