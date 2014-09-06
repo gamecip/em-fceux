@@ -212,9 +212,11 @@ if env['DEBUG']:
   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
 else:
   if env['EMSCRIPTEN']:
-    flags = ['-O3', '--llvm-lto', '1', '-s', 'AGGRESSIVE_VARIABLE_ELIMINATION=1', '-s', 'NO_EXIT_RUNTIME=1']
-    env.Append(CCFLAGS = flags)
-    env.Append(LINKFLAGS = flags)
+    #flags = ['-O3', '--llvm-lto', '1', '-s', 'AGGRESSIVE_VARIABLE_ELIMINATION=1', '-s', 'NO_EXIT_RUNTIME=1']
+    #env.Append(CCFLAGS = flags)
+    #env.Append(LINKFLAGS = flags)
+    env.Append(CCFLAGS = '-Oz -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1')
+    env.Append(LINKFLAGS = '-O3 -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1')
   else:
     env.Append(CCFLAGS = ['-O2'])
     env.Append(LINKFLAGS = ['-O2'])

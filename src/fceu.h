@@ -8,7 +8,9 @@ extern int newppu;
 void ResetGameLoaded(void);
 
 extern bool AutoResumePlay;
+#ifndef EMSCRIPTEN
 extern char romNameWhenClosingEmulator[];
+#endif
 
 #define DECLFR(x) uint8 x (uint32 A)
 #define DECLFW(x) void x (uint32 A, uint8 V)

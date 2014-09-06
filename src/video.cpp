@@ -66,7 +66,11 @@ GUIMESSAGE subtitleMessage;
 
 //for input display
 extern int input_display;
+#ifndef EMSCRIPTEN
 extern uint32 cur_input_display;
+#else
+#define cur_input_display 0
+#endif
 
 bool oldInputDisplay = false;
 
@@ -225,6 +229,7 @@ void FCEU_PutImage(void)
 	if(FCEUD_ShouldDrawInputAids())
 		FCEU_DrawInput(XBuf);
 
+#ifndef EMSCRIPTEN
 	//Fancy input display code
 	if(input_display)
 	{
@@ -405,6 +410,7 @@ void FCEU_PutImage(void)
 			}
 		}
 	}
+#endif
 
 	if (FCEUI_AviEnableHUDrecording())
 	{

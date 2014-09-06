@@ -91,6 +91,10 @@ static uint8 LastStrobe;
 
 bool replaceP2StartWithMicrophone = false;
 
+#ifdef EMSCRIPTEN
+static int currFrameCounter = 0;
+#endif
+
 //This function is a quick hack to get the NSF player to use emulated gamepad input.
 uint8 FCEU_GetJoyJoy(void)
 {
@@ -594,7 +598,9 @@ void FCEUI_VSUniCoin(void)
 //Resets the frame counter if movie inactive and rom is reset or power-cycle
 void ResetFrameCounter()
 {
+#ifndef EMSCRIPTEN
 extern EMOVIEMODE movieMode;
+#endif
 	if(movieMode == MOVIEMODE_INACTIVE)
 		currFrameCounter = 0;
 }
@@ -731,6 +737,7 @@ struct EMUCMDTABLE FCEUI_CommandTable[]=
 	{ EMUCMD_LOAD_STATE_SLOT_8,				EMUCMDTYPE_STATE,	CommandStateLoad, 0, 0, "Load State from Slot 8", EMUCMDFLAG_TASEDITOR },
 	{ EMUCMD_LOAD_STATE_SLOT_9,				EMUCMDTYPE_STATE,	CommandStateLoad, 0, 0, "Load State from Slot 9", EMUCMDFLAG_TASEDITOR },
 
+#ifndef EMSCRIPTEN
 	{ EMUCMD_MOVIE_RECORD_TO,				EMUCMDTYPE_MOVIE,	FCEUD_MovieRecordTo, 0, 0, "Record Movie To...", 0 },
 	{ EMUCMD_MOVIE_REPLAY_FROM,				EMUCMDTYPE_MOVIE,	FCEUD_MovieReplayFrom, 0, 0, "Play Movie From...", 0 },
 	{ EMUCMD_MOVIE_PLAY_FROM_BEGINNING,		EMUCMDTYPE_MOVIE,	FCEUI_MoviePlayFromBeginning, 0, 0, "Play Movie From Beginning", EMUCMDFLAG_TASEDITOR },
@@ -740,6 +747,7 @@ struct EMUCMDTABLE FCEUI_CommandTable[]=
 
 	{ EMUCMD_MOVIE_INPUT_DISPLAY_TOGGLE,	EMUCMDTYPE_MISC,	FCEUI_ToggleInputDisplay, 0, 0, "Toggle Input Display", EMUCMDFLAG_TASEDITOR },
 	{ EMUCMD_MOVIE_ICON_DISPLAY_TOGGLE,		EMUCMDTYPE_MISC,	FCEUD_ToggleStatusIcon, 0, 0, "Toggle Status Icon", EMUCMDFLAG_TASEDITOR },
+#endif
 
 	#ifdef _S9XLUA_H
 	{ EMUCMD_SCRIPT_RELOAD,					EMUCMDTYPE_MISC,	FCEU_ReloadLuaCode, 0, 0, "Reload current Lua script", EMUCMDFLAG_TASEDITOR },
@@ -750,8 +758,10 @@ struct EMUCMDTABLE FCEUI_CommandTable[]=
 	{ EMUCMD_SOUND_VOLUME_DOWN,				EMUCMDTYPE_SOUND,	CommandSoundAdjust, 0, 0, "Sound Volume Down", EMUCMDFLAG_TASEDITOR },
 	{ EMUCMD_SOUND_VOLUME_NORMAL,			EMUCMDTYPE_SOUND,	CommandSoundAdjust, 0, 0, "Sound Volume Normal", EMUCMDFLAG_TASEDITOR },
 
+#ifndef EMSCRIPTEN
 	{ EMUCMD_AVI_RECORD_AS,					EMUCMDTYPE_AVI,		FCEUD_AviRecordTo, 0, 0, "Record AVI As...", EMUCMDFLAG_TASEDITOR },
 	{ EMUCMD_AVI_STOP,						EMUCMDTYPE_AVI,		FCEUD_AviStop, 0, 0, "Stop AVI", EMUCMDFLAG_TASEDITOR },
+#endif
 
 	{ EMUCMD_FDS_EJECT_INSERT,				EMUCMDTYPE_FDS,		FCEUI_FDSInsert, 0, 0, "Eject or Insert FDS Disk", EMUCMDFLAG_TASEDITOR },
 	{ EMUCMD_FDS_SIDE_SELECT,				EMUCMDTYPE_FDS,		FCEUI_FDSSelect, 0, 0, "Switch FDS Disk Side", EMUCMDFLAG_TASEDITOR },

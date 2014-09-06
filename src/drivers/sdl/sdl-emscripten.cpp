@@ -447,6 +447,7 @@ int main(int argc, char *argv[])
 	// update the emu core
 	UpdateEMUCore(g_config);
 
+#ifndef EMSCRIPTEN
 	{
 		int id;
 		g_config->getOption("SDL.InputDisplay", &id);
@@ -457,6 +458,7 @@ int main(int argc, char *argv[])
 		extern int movieSubtitles;
 		movieSubtitles = id;
 	}
+#endif
 	
 	// load the hotkeys from the config life
 	setHotKeys();

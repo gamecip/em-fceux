@@ -96,7 +96,9 @@ bool AutoSS = false;        //Flagged true when the first auto-savestate is made
 bool movieSubtitles = true; //Toggle for displaying movie subtitles
 bool DebuggerWasUpdated = false; //To prevent the debugger from updating things without being updated.
 bool AutoResumePlay = false;
+#ifndef EMSCRIPTEN
 char romNameWhenClosingEmulator[2048] = {0};
+#endif
 
 FCEUGI::FCEUGI()
 	: filename(0),
@@ -190,7 +192,9 @@ static void FCEU_CloseGame(void)
 		delete GameInfo;
 		GameInfo = NULL;
 
+#ifndef EMSCRIPTEN
 		currFrameCounter = 0;
+#endif
 
 		//Reset flags for Undo/Redo/Auto Savestating //adelikat: TODO: maybe this stuff would be cleaner as a struct or class
 		lastSavestateMade[0] = 0;

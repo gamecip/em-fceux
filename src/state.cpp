@@ -798,11 +798,13 @@ bool FCEUSS_Load(const char *fname, bool display_message)
 	Update_RAM_Search(); // Update_RAM_Watch() is also called.
 #endif
 
+#ifndef EMSCRIPTEN
 		//Update input display if movie is loaded
 		extern uint32 cur_input_display;
 		extern uint8 FCEU_GetJoyJoy(void);
 
 		cur_input_display = FCEU_GetJoyJoy(); //Input display should show the last buttons pressed (stored in the savestate)
+#endif
 
 		return true;
 	} else
@@ -976,6 +978,7 @@ void FCEUI_LoadState(const char *fname, bool display_message)
 	}
 	if (FCEUSS_Load(fname, display_message))
 	{
+#ifndef EMSCRIPTEN
 		//mbg todo netplay
 #if 0 
 		if(FCEUnetplay)
@@ -1002,6 +1005,7 @@ void FCEUI_LoadState(const char *fname, bool display_message)
 		}
 #endif
 		freshMovie = false;		//The movie has been altered so it is no longer fresh
+#endif // EMSCRIPTEN
 	} else
 	{
 		loadStateFailed = 1;

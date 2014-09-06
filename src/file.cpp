@@ -53,9 +53,14 @@ using namespace std;
 
 bool bindSavestate = true;	//Toggle that determines if a savestate filename will include the movie filename
 static std::string BaseDirectory;
+#ifndef EMSCRIPTEN
 static char FileExt[2048];	//Includes the . character, as in ".nes"
-char FileBase[2048];
 static char FileBaseDirectory[2048];
+#else
+static char* FileExt = 0;	//Includes the . character, as in ".nes"
+static char* FileBaseDirectory = 0;
+#endif
+char FileBase[2048];
 
 
 void ApplyIPS(FILE *ips, FCEUFILE* fp)
@@ -170,6 +175,8 @@ void FCEU_SplitArchiveFilename(std::string src, std::string& archive, std::strin
 }
 
 FileBaseInfo CurrentFileBase() {
+    FCEU_ARRAY_EM(FileExt, char, 2048);
+    FCEU_ARRAY_EM(FileBaseDirectory, char, 2048);
 	return FileBaseInfo(FileBaseDirectory,FileBase,FileExt);
 }
 
@@ -436,6 +443,7 @@ int FCEU_fisarchive(FCEUFILE *fp)
 
 std::string GetMfn() //Retrieves the movie filename from curMovieFilename (for adding to savestate and auto-save files)
 {
+#ifndef EMSCRIPTEN
 	std::string movieFilenamePart;
 	extern char curMovieFilename[512];
 	if(*curMovieFilename)
@@ -445,6 +453,9 @@ std::string GetMfn() //Retrieves the movie filename from curMovieFilename (for a
 		movieFilenamePart = std::string(".") + name;
 		}
 	return movieFilenamePart;
+#else
+    return std::string();
+#endif
 }
 
 /// Updates the base directory
@@ -763,6 +774,7 @@ void GetFileBase(const char *f)
 {
 	FileBaseInfo fbi = DetermineFileBase(f);
 	strcpy(FileBase,fbi.filebase.c_str());
+    FCEU_ARRAY_EM(FileBaseDirectory, char, 2048);
 	strcpy(FileBaseDirectory,fbi.filebasedirectory.c_str());
 }
 
