@@ -874,6 +874,7 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	return 1;
 }
 
+#ifndef EMSCRIPTEN
 // bbit edited: the whole function below was added
 int iNesSave() {
 	FILE *fp;
@@ -944,6 +945,7 @@ int iNesSaveAs(char* name)
 	fclose(fp);
 	return 1;
 }
+#endif
 
 //para edit: added function below
 char *iNesShortFName() {

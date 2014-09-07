@@ -56,11 +56,12 @@ static std::string BaseDirectory;
 #ifndef EMSCRIPTEN
 static char FileExt[2048];	//Includes the . character, as in ".nes"
 static char FileBaseDirectory[2048];
+char FileBase[2048];
 #else
 static char* FileExt = 0;	//Includes the . character, as in ".nes"
 static char* FileBaseDirectory = 0;
+static char* FileBase = 0;
 #endif
-char FileBase[2048];
 
 
 void ApplyIPS(FILE *ips, FCEUFILE* fp)
@@ -175,6 +176,7 @@ void FCEU_SplitArchiveFilename(std::string src, std::string& archive, std::strin
 }
 
 FileBaseInfo CurrentFileBase() {
+    FCEU_ARRAY_EM(FileBase, char, 2048);
     FCEU_ARRAY_EM(FileExt, char, 2048);
     FCEU_ARRAY_EM(FileBaseDirectory, char, 2048);
 	return FileBaseInfo(FileBaseDirectory,FileBase,FileExt);
@@ -607,6 +609,8 @@ std::string FCEU_MakeFName(int type, int id1, const char *cd1)
 	std::string mfnString;
 	const char* mfn;	// the movie filename
 
+    FCEU_ARRAY_EM(FileBase, char, 2048);
+
 	switch(type)
 	{
 		case FCEUMKF_MOVIE:
@@ -702,6 +706,7 @@ std::string FCEU_MakeFName(int type, int id1, const char *cd1)
 					sprintf(ret,"%s" PSS "sav" PSS "%s.%s",BaseDirectory.c_str(),FileBase,cd1);
 			}
 			break;
+#ifndef EMSCRIPTEN
 		case FCEUMKF_AUTOSTATE:
 			mfnString = GetMfn();
 			if (mfnString.length() <= MAX_MOVIEFILENAME_LEN)
@@ -742,6 +747,7 @@ std::string FCEU_MakeFName(int type, int id1, const char *cd1)
 		case FCEUMKF_IPS:
 			strcpy(ret,FCEU_MakeIpsFilename(CurrentFileBase()).c_str());
 			break;
+#endif
 		case FCEUMKF_GGROM:sprintf(ret,"%s" PSS "gg.rom",BaseDirectory.c_str());break;
 		case FCEUMKF_FDSROM:
 			if(odirs[FCEUIOD_FDSROM])
@@ -772,9 +778,10 @@ std::string FCEU_MakeFName(int type, int id1, const char *cd1)
 
 void GetFileBase(const char *f)
 {
+    FCEU_ARRAY_EM(FileBase, char, 2048);
+    FCEU_ARRAY_EM(FileBaseDirectory, char, 2048);
 	FileBaseInfo fbi = DetermineFileBase(f);
 	strcpy(FileBase,fbi.filebase.c_str());
-    FCEU_ARRAY_EM(FileBaseDirectory, char, 2048);
 	strcpy(FileBaseDirectory,fbi.filebasedirectory.c_str());
 }
 

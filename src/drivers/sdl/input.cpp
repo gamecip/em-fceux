@@ -1679,10 +1679,20 @@ const char * ButtonName (const ButtConfig * bc, int which)
  * Waits for a button input and returns the information as to which
  * button was pressed.  Used in button configuration.
  */
+#ifdef EMSCRIPTEN
+#include "../../utils/memory.h"
+static int32 (*LastAx)[64] = 0;
+#endif
 int DWaitButton (const uint8 * text, ButtConfig * bc, int wb)
 {
 	SDL_Event event;
+#ifndef EMSCRIPTEN
 	static int32 LastAx[64][64];
+#else
+    if (!LastAx) {
+        LastAx = (int32 (*)[64]) FCEU_malloc(sizeof(int32)*64*64);
+    }
+#endif
 	int x, y;
 
 	if (text)
