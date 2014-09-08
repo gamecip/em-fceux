@@ -150,14 +150,22 @@ static void DoFun(int frameskip, int periodic_saves)
 	}
 }
 
+static void ReloadROM(void* arg)
+{
+    (void) arg;
+    char *filename = emscripten_run_script_string("Module.romName");
+    CloseGame();
+    LoadGame(filename);
+}
+
 static void EmscriptenDoFun()
 {
-    int reloadROM = EM_ASM_INT_V({ return Module.reloadROM||0; });
-    if (reloadROM)
+// tsone: simple way to communicate with mainloop without "exporting" functions
+    int reload = EM_ASM_INT_V({ return Module.romReload||0; });
+    if (reload)
     {
-        EM_ASM({ Module.reloadROM = 0; });
-        CloseGame();
-        LoadGame("rom.nes");
+        emscripten_push_main_loop_blocker(ReloadROM, 0);
+        EM_ASM({ Module.romReload = 0; });
     }
     else if (GameInfo)
     {
@@ -217,99 +225,22 @@ FCEUD_Update(uint8 *XBuf,
 			 int32 *Buffer,
 			 int Count)
 {
-//	int ocount = Count;
-	// apply frame scaling to Count
-//	Count = (int)(Count / g_fpsScale);
 	if(Count) {
-		int32 can=GetWriteSound();
-		static int uflow=0;
+		int32 can = GetWriteSound();
 
-// tsone: disabled throttling support for now
-#ifndef EMSCRIPTEN
-		// don't underflow when scaling fps
-		if(can >= GetMaxSound() && g_fpsScale==1.0) uflow=1;	/* Go into massive underflow mode. */
-#else
         if (can > GetMaxSound()) {
-            printf("More than max: %d (max: %d)\n", can, GetMaxSound());
             can = GetMaxSound();
         }
-#endif
-		if(can > Count) can=Count;
-		else uflow=0;
+		if(can > Count) {
+            can = Count;
+        }
 
-		WriteSound(Buffer,can);
-
-// tsone: disabled throttling support for now
-#ifndef EMSCRIPTEN
-		//if(uflow) puts("Underflow");
-		int32 tmpcan = GetWriteSound();
-		// don't underflow when scaling fps
-		if(g_fpsScale>1.0 || ((tmpcan < Count*0.90) && !uflow)) {
-			if(XBuf && (inited&4) && !(NoWaiting & 2))
-				BlitScreen(XBuf);
-			Buffer+=can;
-			Count-=can;
-			if(Count) {
-				if(NoWaiting) {
-					can=GetWriteSound();
-					if(Count>can) Count=can;
-					WriteSound(Buffer,Count);
-				} else {
-// tsone: for some reason causes hang on chrome...?
-#ifndef EMSCRIPTEN
-					while(Count>0) {
-						WriteSound(Buffer,(Count<ocount) ? Count : ocount);
-						Count -= ocount;
-					}
-#endif
-				}
-			}
-		} //else puts("Skipped");
-		else if(!NoWaiting && (uflow || tmpcan >= (Count * 1.8))) {
-			if(Count > tmpcan) Count=tmpcan;
-			while(tmpcan > 0) {
-				//	printf("Overwrite: %d\n", (Count <= tmpcan)?Count : tmpcan);
-				WriteSound(Buffer, (Count <= tmpcan)?Count : tmpcan);
-				tmpcan -= Count;
-			}
-		}
-#ifdef EMSCRIPTEN
-// tsone: not yet clear why this is needed
-		else {
-			if(XBuf && (inited&4)) {
-				BlitScreen(XBuf);
-			}
-		}
-#endif
-
-	} else {
-		if(!NoWaiting && (!(eoptions&EO_NOTHROTTLE) || FCEUI_EmulationPaused()))
-		while (SpeedThrottle())
-		{
-			FCEUD_UpdateInput();
-		}
-		if(XBuf && (inited&4)) {
-			BlitScreen(XBuf);
-		}
-	}
-	FCEUD_UpdateInput();
-	//if(!Count && !NoWaiting && !(eoptions&EO_NOTHROTTLE))
-	// SpeedThrottle();
-	//if(XBuf && (inited&4))
-	//{
-	// BlitScreen(XBuf);
-	//}
-	//if(Count)
-	// WriteSound(Buffer,Count,NoWaiting);
-	//FCEUD_UpdateInput();
-
-#else // EMSCRIPTEN
+		WriteSound(Buffer, can);
     }
 
     FCEUD_UpdateInput();
 
-    if (XBuf && (inited&4))
-    {
+    if (XBuf && (inited&4)) {
         BlitScreen(XBuf);
     }
 #endif
@@ -367,6 +298,17 @@ void FCEUD_TraceInstruction() {
 	return;
 }
 
+static void InitEmscriptenStuff()
+{
+    EM_ASM({
+        SDL.defaults.copyOnLock = false;
+        FS.mkdir('/fceux');
+        FS.mount(IDBFS, {}, '/fceux');
+        FS.syncfs(true, function (err) {
+          assert(!err);
+        });
+    });
+}
 
 /**
  * The main loop for the SDL.
@@ -374,6 +316,8 @@ void FCEUD_TraceInstruction() {
 int main(int argc, char *argv[])
 {
 	int error, frameskip;
+
+    InitEmscriptenStuff();
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
@@ -395,8 +339,9 @@ int main(int argc, char *argv[])
 	error = FCEUI_Initialize();
 	std::string s;
 
-    // override savegame directory, 'sav/' is mounted with IndexedDB
-    FCEUI_SetDirOverride(FCEUIOD_NV, "sav");
+    // override savegame and savestate directory with one mounted to IndexedDB
+    FCEUI_SetDirOverride(FCEUIOD_NV, "fceux");
+    FCEUI_SetDirOverride(FCEUIOD_STATES, "fceux");
 
 	g_config->getOption("SDL.InputCfg", &s);
 	if(s.size() != 0)
@@ -463,9 +408,6 @@ int main(int argc, char *argv[])
 	// load the hotkeys from the config life
 	setHotKeys();
 
-// tsone: override rom with test.nes
-//    ReloadGame();
-	
 	{
 		int id;
 		g_config->getOption("SDL.NewPPU", &id);

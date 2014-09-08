@@ -555,10 +555,10 @@ void FCEU_SaveGameSave(CartInfo *LocalHWInfo) {
 #ifdef EMSCRIPTEN // tsone: sync IndexedDB for savegames
 // TODO: tsone: what to do on success/fail? pause emulation until sync is done?
             EM_ASM({
-                console.log('!!!! save sync started');
+                console.log('!!!! write sync started');
                 FS.syncfs(function (err) {
                     assert(!err);
-                    console.log('!!!! save sync success');
+                    console.log('!!!! write sync success');
                 });
             });
 #endif
