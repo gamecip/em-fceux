@@ -41,6 +41,9 @@
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
 
 //TODO - we really need some kind of global platform-specific options api
 #ifdef WIN32
@@ -79,7 +82,11 @@ bool redoLS = false;		  //This will be true if a backupstate was loaded, meaning
 
 bool internalSaveLoad = false;
 
+#ifndef EMSCRIPTEN
 bool backupSavestates = true;
+#else
+bool backupSavestates = false;
+#endif
 bool compressSavestates = true;  //By default FCEUX compresses savestates when a movie is inactive.
 
 // a temp memory stream. We'll be dumping some data here and then compress
@@ -446,6 +453,17 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 	//dump it to the destination file
 	outstream->fwrite((char*)header,16);
 	outstream->fwrite((char*)cbuf,comprlen==-1?totalsize:comprlen);
+
+#ifdef EMSCRIPTEN // tsone: sync IndexedDB for savestates
+// TODO: tsone: what to do on success/fail? pause emulation until sync is done?
+            EM_ASM({
+                console.log('!!!! write sync started');
+                FS.syncfs(function (err) {
+                    assert(!err);
+                    console.log('!!!! write sync success');
+                });
+            });
+#endif
 
 	return error == Z_OK;
 }
