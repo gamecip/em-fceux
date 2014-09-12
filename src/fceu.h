@@ -69,7 +69,8 @@ enum GI {
 	GI_RESETM2	=1,
 	GI_POWER =2,
 	GI_CLOSE =3,
-	GI_RESETSAVE = 4
+	GI_RESETSAVE = 4,
+	GI_SAVE = 5
 };
 
 extern void (*GameInterface)(GI h);

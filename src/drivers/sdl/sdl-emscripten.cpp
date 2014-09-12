@@ -96,6 +96,21 @@ int LoadGame(const char *path)
 	return 1;
 }
 
+extern "C" {
+// Write savegame and synchronize IDBFS contents to IndexedDB. Must be a C-function.
+void EmscriptenSaveGameSync()
+{
+    if (GameInterface) {
+        GameInterface(GI_SAVE);
+    }
+    EM_ASM({
+      FS.syncfs(function (err) {
+        assert(!err);
+      });
+    });
+}
+}
+
 /**
  * Closes a game.  Frees memory, and deinitializes the drivers.
  */
@@ -243,7 +258,6 @@ FCEUD_Update(uint8 *XBuf,
     if (XBuf && (inited&4)) {
         BlitScreen(XBuf);
     }
-#endif
 }
 
 /**
@@ -298,15 +312,19 @@ void FCEUD_TraceInstruction() {
 	return;
 }
 
-static void InitEmscriptenStuff()
+static void EmscriptenInitStuff()
 {
     EM_ASM({
+        // Disable unnecessary SDL surface copy-on-lock feature.
         SDL.defaults.copyOnLock = false;
+        // Mount IndexedDB file system (IDBFS) to /fceux.
         FS.mkdir('/fceux');
         FS.mount(IDBFS, {}, '/fceux');
         FS.syncfs(true, function (err) {
           assert(!err);
         });
+        // Write savegame and synchronize IDBFS in intervals.
+        setInterval(Module.cwrap('EmscriptenSaveGameSync'), 1000);
     });
 }
 
@@ -317,7 +335,7 @@ int main(int argc, char *argv[])
 {
 	int error, frameskip;
 
-    InitEmscriptenStuff();
+    EmscriptenInitStuff();
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 

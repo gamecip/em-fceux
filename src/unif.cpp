@@ -550,6 +550,9 @@ static void UNIFGI(GI h) {
 			UNIFCart.Power();
 		if (UNIFchrrama) memset(UNIFchrrama, 0, 8192);
 		break;
+	case GI_SAVE:
+		FCEU_SaveGameSave(&UNIFCart);
+        break;
 	case GI_CLOSE:
 		FCEU_SaveGameSave(&UNIFCart);
 		if (UNIFCart.Close)

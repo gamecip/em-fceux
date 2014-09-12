@@ -215,8 +215,9 @@ else:
     #flags = ['-O3', '--llvm-lto', '1', '-s', 'AGGRESSIVE_VARIABLE_ELIMINATION=1', '-s', 'NO_EXIT_RUNTIME=1']
     #env.Append(CCFLAGS = flags)
     #env.Append(LINKFLAGS = flags)
-    env.Append(CCFLAGS = '-Oz -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1')
-    env.Append(LINKFLAGS = '-O3 -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1')
+    common = ' -s EXPORTED_FUNCTIONS=\'["_main","_EmscriptenSaveGameSync"]\' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
+    env.Append(CCFLAGS = '-Oz' + common)
+    env.Append(LINKFLAGS = '-O3' + common)
   else:
     env.Append(CCFLAGS = ['-O2'])
     env.Append(LINKFLAGS = ['-O2'])
