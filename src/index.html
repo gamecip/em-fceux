@@ -115,6 +115,11 @@
       function handleInputChange(ev) {
         loadROMFile(ev.target.files);
       }
+      window.onbeforeunload = function (ev) {
+        var msg = 'Do you want to close the FCEUX emulator and the current game? Unsaved game data will be lost.';
+        (ev || window.event).returnValue = msg; 
+        return msg;
+      };
     </script>
   </head>
   <body>
