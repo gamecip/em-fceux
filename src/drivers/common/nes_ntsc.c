@@ -24,7 +24,11 @@ nes_ntsc_setup_t const nes_ntsc_rgb        = { 0, 0, 0, 0,.2,  0,.7, -1, -1,-1, 
 #define alignment_count 3
 #define burst_count     3
 #define rescale_in      8
+#ifndef EMSCRIPTEN
 #define rescale_out     6
+#else
+#define rescale_out     7
+#endif
 
 #define artifacts_mid   1.0f
 #define fringing_mid    1.0f

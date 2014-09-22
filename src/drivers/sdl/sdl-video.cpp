@@ -556,7 +556,11 @@ void ToggleFS()
 		FCEUI_ToggleEmulationPause();
 }
 
+#ifndef EMSCRIPTEN
 static SDL_Color s_psdl[256];
+#else
+static SDL_Color* s_psdl = 0;
+#endif
 
 /**
  * Sets the color for a particular index in the palette.
@@ -567,6 +571,8 @@ FCEUD_SetPalette(uint8 index,
                  uint8 g,
                  uint8 b)
 {
+    FCEU_ARRAY_EM(s_psdl, SDL_Color, 256); 
+
 	s_psdl[index].r = r;
 	s_psdl[index].g = g;
 	s_psdl[index].b = b;
@@ -583,6 +589,11 @@ FCEUD_GetPalette(uint8 index,
 				uint8 *g,
 				uint8 *b)
 {
+#ifdef EMSCRIPTEN
+    if (!s_psdl) {
+        return;
+    }
+#endif
 	*r = s_psdl[index].r;
 	*g = s_psdl[index].g;
 	*b = s_psdl[index].b;
@@ -593,6 +604,11 @@ FCEUD_GetPalette(uint8 index,
  */
 static void RedoPalette()
 {
+#ifdef EMSCRIPTEN
+    if (!s_psdl) {
+        return;
+    }
+#endif
 #ifdef OPENGL
 	if(s_useOpenGL)
 		SetOpenGLPalette((uint8*)s_psdl);

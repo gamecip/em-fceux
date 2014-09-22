@@ -159,6 +159,12 @@ static void DoFun(int frameskip, int periodic_saves)
     }
 #endif
 
+    FCEUD_UpdateInput();
+
+    if (gfx && (inited&4)) {
+        BlitScreen(gfx);
+    }
+
 	if(opause!=FCEUI_EmulationPaused()) {
 		opause=FCEUI_EmulationPaused();
 		SilenceSound(opause);
@@ -251,12 +257,6 @@ FCEUD_Update(uint8 *XBuf,
         }
 
 		WriteSound(Buffer, can);
-    }
-
-    FCEUD_UpdateInput();
-
-    if (XBuf && (inited&4)) {
-        BlitScreen(XBuf);
     }
 }
 
