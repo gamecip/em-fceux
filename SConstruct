@@ -52,6 +52,9 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['NOCHEAT'] = 1
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
   env.Replace(PROGSUFFIX = [".js"])
+  exports = '-s EXPORTED_FUNCTIONS=\'["_main","_EmscriptenSaveGameSync"]\''
+  env.Append(CCFLAGS = exports)
+  env.Append(LINKFLAGS = exports)
 else:
   env['EMSCRIPTEN'] = 0
 
@@ -212,10 +215,8 @@ if env['DEBUG']:
   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
 else:
   if env['EMSCRIPTEN']:
-    #flags = ['-O3', '--llvm-lto', '1', '-s', 'AGGRESSIVE_VARIABLE_ELIMINATION=1', '-s', 'NO_EXIT_RUNTIME=1']
-    #env.Append(CCFLAGS = flags)
-    #env.Append(LINKFLAGS = flags)
-    common = ' -s EXPORTED_FUNCTIONS=\'["_main","_EmscriptenSaveGameSync"]\' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
+    #common = '--llvm-lto 1'
+    common = ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
     env.Append(CCFLAGS = '-Oz' + common)
     env.Append(LINKFLAGS = '-O3' + common)
   else:

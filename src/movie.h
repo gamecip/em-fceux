@@ -274,15 +274,18 @@ extern int currFrameCounter;
 #endif
 extern char curMovieFilename[512];
 extern bool subtitlesOnAVI;
-extern bool freshMovie;
-extern bool movie_readonly;
-extern bool autoMovieBackup;
 extern bool fullSaveStateLoads;
 //--------------------------------------------------
 #ifndef EMSCRIPTEN
+extern bool freshMovie;
+extern bool movie_readonly;
+extern bool autoMovieBackup;
 void FCEUI_MakeBackupMovie(bool dispMessage);
 void FCEUI_SaveMovie(const char *fname, EMOVIE_FLAG flags, std::wstring author);
 #else
+#define freshMovie false
+#define movie_readonly true
+#define autoMovieBackup false
 #define FCEUI_MakeBackupMovie(dispMessage_)
 #define FCEUI_SaveMovie(fname_, flags_, author_)
 #endif
