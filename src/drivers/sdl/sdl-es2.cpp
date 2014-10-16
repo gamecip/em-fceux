@@ -22,21 +22,29 @@
 static GLuint s_baseTex = 0;
 static GLuint s_kernelTex = 0;
 #if NTSC_EMULATION 
-static uint8* s_tempXBuf = 0;
+static uint16* s_tempXBuf = 0;
 #endif
 static GLuint quadbuf = 0;
 static GLuint prog = 0;
 
-//#include "testpixels.inc"
-
 #if NTSC_EMULATION
 
+#define STR(s_) _STR(s_)
+#define _STR(s_) #s_
+
 #define NUM_CYCLES 3
-#define NUM_COLORS 64
+#define NUM_COLORS 512 
 #define NUM_CYCLES_TEXTURE 4
 
 // Source code modified from:
 // http://wiki.nesdev.com/w/index.php/NTSC_video
+
+// Bounds for signal level normalization
+#define ATTENUATION 0.746
+#define LOWEST      (0.350 * ATTENUATION)
+#define HIGHEST     1.962
+#define BLACK       0.518
+#define WHITE       HIGHEST
 
 // Generate the square wave
 static bool InColorPhase(int color, int phase)
@@ -48,7 +56,6 @@ static bool InColorPhase(int color, int phase)
 // phase = Signal phase. It is a variable that increases by 8 each pixel.
 static double NTSCsignal(int pixel, int phase)
 {
-//    static const double attenuation = 0.7460;
     // Voltage levels, relative to synch voltage
     const double levels[8] = {
         0.350, 0.518, 0.962, 1.550, // Signal low
@@ -58,27 +65,29 @@ static double NTSCsignal(int pixel, int phase)
     // Decode the NES color.
     int color = (pixel & 0x0F);    // 0..15 "cccc"
     int level = (pixel >> 4) & 3;  // 0..3  "ll"
-//    int emphasis = (pixel >> 6);   // 0..7  "eee"
-    if(color > 13) { level = 1;  } // For colors 14..15, level 1 is forced.
+    int emphasis = (pixel >> 6);   // 0..7  "eee"
+    if (color > 0x0D) { level = 1; } // Level 1 forced for colors $0E..$0F
 
     // The square wave for this color alternates between these two voltages:
     float low  = levels[0 + level];
     float high = levels[4 + level];
-    if(color == 0) { low = high; } // For color 0, only high level is emitted
-    if(color > 12) { high = low; } // For colors 13..15, only low level is emitted
+    if (color == 0) { low = high; } // For color 0, only high level is emitted
+    if (color > 0x0C) { high = low; } // For colors $0D..$0F, only low level is emitted
 
     double signal = InColorPhase(color, phase) ? high : low;
 
     // When de-emphasis bits are set, some parts of the signal are attenuated:
-//    if( ((emphasis & 1) && InColorPhase(0, phase))
-//    ||  ((emphasis & 2) && InColorPhase(4, phase))
-//    ||  ((emphasis & 4) && InColorPhase(8, phase)) ) signal = signal * attenuation;
+    if ((color < 0x0E) && ( // Not for colors $0E..$0F (Wiki sample code doesn't have this)
+        ((emphasis & 1) && InColorPhase(0, phase))
+        || ((emphasis & 2) && InColorPhase(4, phase))
+        || ((emphasis & 4) && InColorPhase(8, phase)))) {
+        signal = signal * ATTENUATION;
+    }
 
     return signal;
 }
 
 #if NTSC_LEVELS
-static const double sc_low = 0.350, sc_high = 1.962;
 static GLuint s_ntscTex;
 #else
 static float s_mins[3];
@@ -99,8 +108,8 @@ static void GenKernelTex()
 				double signal;
 
 				signal = (NTSCsignal(color, 2*p + phase) + NTSCsignal(color, 2*p + phase+1)) / 2.0;
-				signal = (signal-sc_low) / (sc_high-sc_low);
-				result[4 * (cycle*NUM_COLORS + color) + p] = 255.0 * signal;
+				signal = (signal-LOWEST) / (HIGHEST-LOWEST);
+				result[4 * (cycle*NUM_COLORS + color) + p] = 0.5 + 255.0 * signal;
 			}
 		}
 	}
@@ -132,8 +141,7 @@ static void GenKernelTex()
 			{
 				double signal = NTSCsignal(color, phase + p);
 
-				static const double black = 0.518, white = 1.962;
-				signal = (signal-black) / (white-black);
+				signal = (signal-BLACK) / (WHITE-BLACK);
 
 				const double level = signal / 8.0;
 				yiq[0] += level;
@@ -185,16 +193,17 @@ void SetOpenGLPalette(uint8 *data)
 	SetPaletteBlitToHigh((uint8*)data);
 }
 
+extern uint8 deempScan[240];
 void BlitOpenGL(uint8 *buf)
 {
 #if NTSC_EMULATION
-//    buf = s_testPixels;
-    for (size_t i = 0; i < 256 * 256; i++) {
-//       s_tempXBuf[i] = (uint8) (((buf[i] & 63) * 255.0f) / 63.0f);
-       s_tempXBuf[i] = buf[i] & 63;
+    for (size_t y = 0, i = 0; y < 240; y++) {
+        for (size_t x = 0; x < 256; x++) {
+            s_tempXBuf[i] = buf[i] | (deempScan[y] << 8);
+            i++;
+        }
     }
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 256, GL_LUMINANCE, GL_UNSIGNED_BYTE, s_tempXBuf);
-//    buf = s_testPixels;
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 256, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, s_tempXBuf);
 #else
 	Blit8ToHigh(buf, (uint8*)HiBuffer, 256, 240, 256*4, 1, 1);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 256, GL_RGBA, GL_UNSIGNED_BYTE, HiBuffer);
@@ -265,7 +274,7 @@ int InitOpenGL(int left,
 		SDL_Surface *screen)
 {
 #if NTSC_EMULATION
-    s_tempXBuf = (uint8*) FCEU_malloc(256 * 256);
+    s_tempXBuf = (uint16*) FCEU_malloc(sizeof(uint16) * 256*256);
 #else
 	HiBuffer = FCEU_malloc(4*256*256);
 	memset(HiBuffer,0x00,4*256*256);
@@ -302,7 +311,7 @@ int InitOpenGL(int left,
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,ipolate?GL_LINEAR:GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 256, 256, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, 0);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA, 256, 256, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, 0);
 
 #if NTSC_EMULATION
     GenKernelTex();
@@ -355,11 +364,13 @@ int InitOpenGL(int left,
 		"    1.0,        1.0,        1.0,       // Y\n"
 		"    0.946882,   -0.274788,  -1.108545, // I\n"
 		"    0.623557,   -0.635691,  1.709007   // Q\n"
-		");                                                                                                  \n"
+		");\n"
 		"\n"
-		"const float c_low = 0.350;\n"
-		"const float c_black = 0.518;\n"
-		"const float c_white = 1.962;\n"
+        "#define LOWEST  " STR(LOWEST) "\n"
+        "#define HIGHEST " STR(HIGHEST) "\n"
+        "#define BLACK   " STR(BLACK) "\n"
+        "#define WHITE   " STR(WHITE) "\n"
+        "#define clamp01(v) clamp(v, 0.0, 1.0)\n"
 		"\n"
 		"const vec3 c_gamma = vec3(GAMMA);\n"
     	"const vec4 ones = vec4(1.0);\n"
@@ -367,11 +378,12 @@ int InitOpenGL(int left,
 		"\n"
 		"vec4 sampleRaw(in vec2 p)\n"
 		"{\n"
+        "    vec2 la = texture2D(u_baseTex, p / (IN_SIZE-1.0)).ra;\n"
 		"    vec2 uv = vec2(\n"
-		"        texture2D(u_baseTex, p / (IN_SIZE-1.0)).r * 255.0 / 63.0,\n" // color
+		"        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
 		"        mod(p.x - p.y, 3.0) / 3.0\n" // phase
 		"    );\n"
-		"	 return (texture2D(u_ntscTex, uv) * (c_white-c_low) + c_low - c_black) / (c_white-c_black);\n"
+		"	 return texture2D(u_ntscTex, uv) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK));\n"
 		"}\n"
 		"vec3 sample(in vec2 p, in vec4 yMask, in vec4 iMask, in vec4 qMask)\n"
 		"{\n"
@@ -384,7 +396,6 @@ int InitOpenGL(int left,
         "    );\n"
     	"}\n"
 		"\n"
-        "#define clamp01(v) clamp(v, 0.0, 1.0)\n"
 		"void main(void)\n"
 		"{\n"
     	"    vec2 coord = floor(gl_FragCoord.xy - 0.5);\n"
@@ -465,9 +476,6 @@ int InitOpenGL(int left,
 			"    0.623557,   -0.635691,  1.709007    // Q\n"
 			");\n"
 			"\n"
-			"const float c_black = 0.518;\n"
-			"const float c_white = 1.962;\n"
-			"\n"
 			"const vec3 c_gamma = vec3(2.2 / 2.0);\n"
 			"\n"
     		"vec3 sampel(in vec2 p)\n"
@@ -488,8 +496,8 @@ int InitOpenGL(int left,
     		"    yiq += sampel(p + vec2(-1.0, 0.0));\n"
     		"    yiq += sampel(p + vec2(1.0, 0.0));\n"
             "    yiq /= vec3(3.0);\n"
-			//"    yiq.gb *= u_mousePos.x;\n"
-    		//"    yiq.r *= u_mousePos.y;\n"
+//			"    yiq.gb *= u_mousePos.x;\n"
+//   		"    yiq.r *= u_mousePos.y;\n"
             "    vec3 result = c_convMat * yiq;\n"
 			"    gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
 			"}\n"

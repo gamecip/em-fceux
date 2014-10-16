@@ -329,6 +329,9 @@ uint8 PPUCHRRAM = 0;
 //Color deemphasis emulation.  Joy...
 static uint8 deemp = 0;
 static int deempcnt[8];
+#ifdef EMSCRIPTEN
+uint8 deempScan[240];
+#endif
 
 void (*GameHBIRQHook)(void), (*GameHBIRQHook2)(void);
 void (*PPU_hook)(uint32 A);
@@ -1219,6 +1222,13 @@ static void DoLine(void) {
 	int x;
 	uint8 *target = XBuf + (scanline << 8);
 
+#ifdef EMSCRIPTEN
+    // For Emscripten, store the deemphasis bits per scanline.
+    if (scanline < 240) {
+        deempScan[scanline] = PPU[1] >> 5;
+    }
+#endif
+
 	if (MMC5Hack && (ScreenON || SpriteON)) MMC5_hb(scanline);
 
 	X6502_Run(256);
@@ -1244,6 +1254,7 @@ static void DoLine(void) {
 				*(uint32*)&target[x << 2] = (*(uint32*)&target[x << 2]) & 0x30303030;
 		}
 	}
+#ifndef EMSCRIPTEN
 	if ((PPU[1] >> 5) == 0x7) {
 		for (x = 63; x >= 0; x--)
 			*(uint32*)&target[x << 2] = ((*(uint32*)&target[x << 2]) & 0x3f3f3f3f) | 0xc0c0c0c0;
@@ -1253,7 +1264,12 @@ static void DoLine(void) {
 	else
 		for (x = 63; x >= 0; x--)
 			*(uint32*)&target[x << 2] = ((*(uint32*)&target[x << 2]) & 0x3f3f3f3f) | 0x80808080;
-
+#else
+    // For Emscripten, clear top 2 deemphasis flag bits.
+	for (x = 63; x >= 0; x--) {
+		*(uint32*)&target[x << 2] &= 0x3f3f3f3f;
+    }
+#endif
 	sphitx = 0x100;
 
 	if (ScreenON || SpriteON)
