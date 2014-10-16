@@ -16,8 +16,8 @@
 #define APIENTRY
 #endif
 
-#define NTSC_EMULATION 1
-#define NTSC_LEVELS 1
+#define NTSC_EMULATION      1
+#define NTSC_LEVELS         1
 
 static GLuint s_baseTex = 0;
 static GLuint s_kernelTex = 0;
@@ -79,7 +79,7 @@ static double NTSCsignal(int pixel, int phase)
 
 #if NTSC_LEVELS
 static const double sc_low = 0.350, sc_high = 1.962;
-static GLuint s_ntscTex[2];
+static GLuint s_ntscTex;
 #else
 static float s_mins[3];
 static float s_maxs[3];
@@ -88,10 +88,7 @@ static float s_maxs[3];
 static void GenKernelTex()
 {
 #if NTSC_LEVELS
-	unsigned char *results[2] = {
-		(unsigned char*) calloc(4 * NUM_CYCLES_TEXTURE * NUM_COLORS, sizeof(unsigned char)),
-		(unsigned char*) calloc(4 * NUM_CYCLES_TEXTURE * NUM_COLORS, sizeof(unsigned char))
-	};
+	unsigned char *result = (unsigned char*) calloc(4 * NUM_CYCLES_TEXTURE * NUM_COLORS, sizeof(GLubyte));
 
 	for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
 		const int phase = cycle * 8;
@@ -101,38 +98,24 @@ static void GenKernelTex()
 			for (int p = 0; p < 4; p++) {
 				double signal;
 
-				signal = NTSCsignal(color, phase + p);
+				signal = (NTSCsignal(color, 2*p + phase) + NTSCsignal(color, 2*p + phase+1)) / 2.0;
 				signal = (signal-sc_low) / (sc_high-sc_low);
-				results[0][4 * (cycle*NUM_COLORS + color) + p] = 255.0 * signal;
-
-				signal = NTSCsignal(color, phase + p + 4);
-				signal = (signal-sc_low) / (sc_high-sc_low);
-				results[1][4 * (cycle*NUM_COLORS + color) + p] = 255.0 * signal;
+				result[4 * (cycle*NUM_COLORS + color) + p] = 255.0 * signal;
 			}
 		}
 	}
 
 	glActiveTexture(GL_TEXTURE1);
-	glGenTextures(2, s_ntscTex);
-	glBindTexture(GL_TEXTURE_2D, s_ntscTex[0]);
+	glGenTextures(1, &s_ntscTex);
+	glBindTexture(GL_TEXTURE_2D, s_ntscTex);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, NUM_COLORS, NUM_CYCLES_TEXTURE, 0, GL_RGBA, GL_UNSIGNED_BYTE, results[0]);
-
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_2D, s_ntscTex[1]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, NUM_COLORS, NUM_CYCLES_TEXTURE, 0, GL_RGBA, GL_UNSIGNED_BYTE, results[1]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, NUM_COLORS, NUM_CYCLES_TEXTURE, 0, GL_RGBA, GL_UNSIGNED_BYTE, result);
 
 	glActiveTexture(GL_TEXTURE0);
-
-	free(results[0]);
-	free(results[1]);
+	free(result);
 #else
 	double *yiqs = (double*) calloc(3 * NUM_CYCLES * NUM_COLORS, sizeof(double));
 
@@ -362,12 +345,12 @@ int InitOpenGL(int left,
 #if NTSC_LEVELS
 		"precision highp float;\n"
 		"uniform sampler2D u_baseTex;\n"
-		"uniform sampler2D u_ntscTex0;\n"
-    	"uniform sampler2D u_ntscTex1;\n"
+		"uniform sampler2D u_ntscTex;\n"
 		"uniform vec2 u_mousePos;\n"
   		"#define PIC (3.1415926535 / 6.0)\n"
 		"#define IN_SIZE 256.0\n"
-		"#define WINDOW_SCALER 2.0\n"
+		"#define WINDOW_SCALER 4.0\n"
+		"#define GAMMA (2.2 / 2.0)\n"
 		"const mat3 c_convMat = mat3(\n"
 		"    1.0,        1.0,        1.0,       // Y\n"
 		"    0.946882,   -0.274788,  -1.108545, // I\n"
@@ -378,48 +361,92 @@ int InitOpenGL(int left,
 		"const float c_black = 0.518;\n"
 		"const float c_white = 1.962;\n"
 		"\n"
-		"const vec3 u_gammaExp = vec3(2.2/2.0);\n"
+		"const vec3 c_gamma = vec3(GAMMA);\n"
     	"const vec4 ones = vec4(1.0);\n"
+    	"const vec4 zeros = vec4(0.0);\n"
 		"\n"
-		"vec3 sampel(in vec4 chromaMask0, in vec4 chromaMask1, in vec4 lumaMask0, in vec4 lumaMask1, in vec2 p)\n"
+		"vec4 sampleRaw(in vec2 p)\n"
 		"{\n"
-		"    vec4 a = PIC * (vec4(0.0, 1.0, 2.0, 3.0) + 3.9 + p.x*8.0 + mod(p.y*8.0, 12.0));\n"
 		"    vec2 uv = vec2(\n"
 		"        texture2D(u_baseTex, p / (IN_SIZE-1.0)).r * 255.0 / 63.0,\n" // color
-		"        mod(p.x + p.y, 3.0) / 3.0\n" // phase
+		"        mod(p.x - p.y, 3.0) / 3.0\n" // phase
 		"    );\n"
-		"	 vec4 v0 = (texture2D(u_ntscTex0, uv) * (c_white-c_low) + c_low - c_black) / (c_white-c_black);\n"
-		"	 vec4 v1 = (texture2D(u_ntscTex1, uv) * (c_white-c_low) + c_low - c_black) / (c_white-c_black);\n"
-    	"    vec3 yiq;\n"
-		"    yiq.r = dot(lumaMask0, v0) + dot(lumaMask1, v1);\n"
-		"    yiq.g = dot(chromaMask0, v0*cos(a)) + dot(chromaMask1, v1*cos(PIC*4.0+a));\n"
-		"    yiq.b = dot(chromaMask0, v0*sin(a)) + dot(chromaMask1, v1*sin(PIC*4.0+a));\n"
-    	"    return yiq;\n"
+		"	 return (texture2D(u_ntscTex, uv) * (c_white-c_low) + c_low - c_black) / (c_white-c_black);\n"
 		"}\n"
+		"vec3 sample(in vec2 p, in vec4 yMask, in vec4 iMask, in vec4 qMask)\n"
+		"{\n"
+        "    vec4 v = sampleRaw(p);\n"
+		"    vec4 a = PIC * (vec4(0.5, 2.5, 4.5, 6.5) + 3.9 + p.x*8.0 - mod(p.y*8.0, 12.0));\n"
+		"    return vec3(\n"
+        "        dot(yMask, v),\n"
+		"        dot(iMask, v*cos(a)),\n"
+		"        dot(qMask, v*sin(a))\n"
+        "    );\n"
+    	"}\n"
 		"\n"
-		"void main(void)                                                                                     \n"
-		"{                                                                                                   \n"
-    	"    vec2 coord = gl_FragCoord.xy - 0.5;\n"
+        "#define clamp01(v) clamp(v, 0.0, 1.0)\n"
+		"void main(void)\n"
+		"{\n"
+    	"    vec2 coord = floor(gl_FragCoord.xy - 0.5);\n"
 		"    vec2 p = floor(coord / WINDOW_SCALER);\n"
-		"    p.y = 224.0 - p.y;\n"
+		"    p.y = 232.0 - p.y;\n"
+        "    vec4 phase = vec4(mod(coord.x, 4.0));\n"
+#if 0 // bleed to right
+        "    vec4 yedge0 = clamp01(vec4(0.0, 0.0, 1.0, 2.0) - phase);\n"
+        "    vec4 yedge1 = clamp01(vec4(3.0, 4.0, 4.0, 4.0) - phase);\n"
+        "    vec4 yedge2 = clamp01(vec4(0.0,-1.0,-2.0,-3.0) + phase);\n"
+        "    vec4 iqedge = clamp01(vec4(1.0, 2.0, 3.0, 4.0) - phase);\n"
 		"    vec3 yiq;\n"
-    	"    yiq =  sampel(vec4(1.0,1.0,1.0,1.0), vec4(1.0,1.0,1.0,1.0), vec4(1.0,1.0,1.0,1.0), vec4(1.0,1.0,1.0,1.0), p);\n"
-#if 1
-    	// 24 samples chroma, 12 samples luma
-		"    yiq += sampel(vec4(1.0,1.0,1.0,1.0), vec4(1.0,1.0,1.0,1.0), vec4(0.0,0.0,0.0,0.0), vec4(0.0,0.0,1.0,1.0), p + vec2(-1.0, 0.0));\n"
-		"    yiq += sampel(vec4(1.0,1.0,1.0,1.0), vec4(1.0,1.0,1.0,1.0), vec4(1.0,1.0,0.0,0.0), vec4(0.0,0.0,0.0,0.0), p + vec2(1.0, 0.0));\n"
-    	// 24+12 samples chroma, 12 samples luma
-//		"    yiq += sampel(vec4(0.0,0.0,1.0,1.0), vec4(1.0,1.0,1.0,1.0), vec4(0.0,0.0,0.0,0.0), vec4(0.0,0.0,0.0,0.0), p + vec2(-2.0, 0.0));\n"
-//		"    yiq += sampel(vec4(1.0,1.0,1.0,1.0), vec4(1.0,1.0,0.0,0.0), vec4(0.0,0.0,0.0,0.0), vec4(0.0,0.0,0.0,0.0), p + vec2(2.0, 0.0));\n"
-#else
-    	// 12 samples chroma & luma
-    	"    yiq += sampel(vec4(0.0,0.0,0.0,0.0), vec4(0.0,0.0,1.0,1.0), vec4(0.0,0.0,0.0,0.0), vec4(0.0,0.0,1.0,1.0), p + vec2(-1.0, 0.0));\n"
-    	"    yiq += sampel(vec4(1.0,1.0,0.0,0.0), vec4(0.0,0.0,0.0,0.0), vec4(1.0,1.0,0.0,0.0), vec4(0.0,0.0,0.0,0.0), p + vec2(1.0, 0.0));\n"
+#if 0
+    	"    yiq  = sample(p + vec2(-2.0, 0.0), zeros,  iqedge, iqedge);\n"
+    	"    yiq += sample(p + vec2(-1.0, 0.0), yedge0,   ones,   ones);\n"
+    	"    yiq += sample(p,                   yedge1,   ones,   ones);\n"
+    	"    yiq += sample(p + vec2( 1.0, 0.0), yedge2, yedge2, yedge2);\n"
+        "    yiq /= vec3(6.0, 12.0, 12.0);\n"
+#else // large bleed
+    	"    yiq  = sample(p + vec2(-5.0, 0.0), zeros,   zeros, iqedge);\n"
+    	"    yiq += sample(p + vec2(-4.0, 0.0), zeros,   zeros,   ones);\n"
+    	"    yiq += sample(p + vec2(-3.0, 0.0), zeros,   zeros,   ones);\n"
+    	"    yiq += sample(p + vec2(-2.0, 0.0), zeros,  iqedge,   ones);\n"
+    	"    yiq += sample(p + vec2(-1.0, 0.0), yedge0,   ones,   ones);\n"
+    	"    yiq += sample(p,                   yedge1,   ones,   ones);\n"
+    	"    yiq += sample(p + vec2( 1.0, 0.0), yedge2, yedge2, yedge2);\n"
+        "    yiq /= vec3(6.0, 12.0, 24.0);\n"
 #endif
-   		"    yiq.r *= 0.25 * u_mousePos.y;\n"
-		"    yiq.gb *= 0.1 * u_mousePos.x;\n"
-    	"    float scan = 1.0 - (7.0/256.0) * mod(coord.y, WINDOW_SCALER) / (WINDOW_SCALER-1.0);\n"
-		"    gl_FragColor = vec4(c_convMat * yiq * scan, 1.0);\n"
+#else // bleed evenly
+        "    vec4 yedge0 = clamp01(vec4( 0.0, 0.0, 1.0, 2.0) - phase);\n"
+        "    vec4 yedge1 = clamp01(vec4( 3.0, 4.0, 4.0, 4.0) - phase);\n"
+        "    vec4 yedge2 = clamp01(vec4( 0.0,-1.0,-2.0,-3.0) + phase);\n"
+        "    vec4 iedge0 = clamp01(vec4( 0.0, 0.0, 0.0, 1.0) - phase);\n"
+        "    vec4 iedge1 = clamp01(vec4( 2.0, 3.0, 4.0, 4.0) - phase);\n"
+        "    vec4 iedge2 = clamp01(vec4( 1.0, 1.0, 1.0, 0.0) + phase);\n"
+        "    vec4 iedge3 = clamp01(vec4(-1.0,-2.0,-3.0,-3.0) + phase);\n"
+		"    vec3 yiq;\n"
+#if 0 // q: 24 samples
+    	"    yiq += sample(p + vec2(-2.0, 0.0), zeros,  iedge0, iedge0);\n"
+    	"    yiq += sample(p + vec2(-1.0, 0.0), yedge0, iedge1, iedge1);\n"
+    	"    yiq += sample(p,                   yedge1,   ones,   ones);\n"
+    	"    yiq += sample(p + vec2( 1.0, 0.0), yedge2, iedge2, iedge2);\n"
+    	"    yiq += sample(p + vec2( 2.0, 0.0), zeros,  iedge3, iedge3);\n"
+        "    yiq /= vec3(6.0, 12.0, 12.0);\n"
+#else // q: 48 samples
+        "    vec4 qedge0 = clamp01(vec4( 0.0, 1.0, 2.0, 3.0) - phase);\n"
+        "    vec4 qedge1 = clamp01(vec4( 1.0, 0.0,-1.0,-2.0) + phase);\n"
+    	"    yiq += sample(p + vec2(-3.0, 0.0), zeros,   zeros, qedge0);\n"
+    	"    yiq += sample(p + vec2(-2.0, 0.0), zeros,  iedge0,   ones);\n"
+    	"    yiq += sample(p + vec2(-1.0, 0.0), yedge0, iedge1,   ones);\n"
+    	"    yiq += sample(p,                   yedge1,   ones,   ones);\n"
+    	"    yiq += sample(p + vec2( 1.0, 0.0), yedge2, iedge2,   ones);\n"
+    	"    yiq += sample(p + vec2( 2.0, 0.0), zeros,  iedge3,   ones);\n"
+    	"    yiq += sample(p + vec2( 3.0, 0.0), zeros,   zeros, qedge1);\n"
+        "    yiq /= vec3(6.0, 12.0, 24.0);\n"
+#endif
+#endif
+//        "    yiq.r *= 2.0 * u_mousePos.y;\n"
+//        "    yiq.gb *= 2.0 * u_mousePos.x;\n"
+        "    vec3 result = c_convMat * yiq;\n"
+    	"    float scan = 1.0 - (13.0 / (256.0 * (WINDOW_SCALER-1.0)/2.0)) * distance(mod(coord.y, WINDOW_SCALER), (WINDOW_SCALER-1.0)/2.0);\n"
+		"    gl_FragColor = vec4(pow(result, c_gamma) * scan, 1.0);\n"
 		"}\n"
 		;
 #elif 1
@@ -431,7 +458,7 @@ int InitOpenGL(int left,
     		"uniform vec3 u_levelMaxs;\n"
 			"\n"
 			"#define IN_SIZE 256.0\n"
-			"#define WINDOW_SCALER 2.0\n"
+			"#define WINDOW_SCALER 4.0\n"
 			"const mat3 c_convMat = mat3(\n"
 			"    1.0,        1.0,        1.0,        // Y\n"
 			"    0.946882,   -0.274788,  -1.108545,  // I\n"
@@ -441,13 +468,13 @@ int InitOpenGL(int left,
 			"const float c_black = 0.518;\n"
 			"const float c_white = 1.962;\n"
 			"\n"
-			"const vec3 u_gammaExp = vec3(2.2/2.0);\n"
+			"const vec3 c_gamma = vec3(2.2 / 2.0);\n"
 			"\n"
     		"vec3 sampel(in vec2 p)\n"
 			"{\n"
     		"	vec2 uv = vec2(\n"
     		"		texture2D(u_baseTex, p / (IN_SIZE-1.0)).r * 255.0 / 63.0,\n" // color
-    		"		mod(p.x + p.y, 3.0) / 3.0\n" // phase
+    		"		mod(p.x - p.y, 3.0) / 3.0\n" // phase
     		"	);\n"
     		"	return texture2D(u_kernelTex, uv).rgb * (u_levelMaxs-u_levelMins) + u_levelMins;\n"
     		"}\n"
@@ -455,99 +482,18 @@ int InitOpenGL(int left,
 			"void main(void)\n"
 			"{\n"
 			"    vec2 p = floor((gl_FragCoord.xy - 0.5) / WINDOW_SCALER);\n"
-			"    p.y = 224.0 - p.y;\n"
+			"    p.y = 232.0 - p.y;\n"
     		"    vec3 yiq = vec3(0.0);\n"
     		"    yiq += sampel(p);\n"
     		"    yiq += sampel(p + vec2(-1.0, 0.0));\n"
     		"    yiq += sampel(p + vec2(1.0, 0.0));\n"
-			"    yiq.gb *= u_mousePos.x;\n"
-    		"    yiq.r *= u_mousePos.y;\n"
-			"    gl_FragColor = vec4(c_convMat * yiq, 1.0);\n"
+            "    yiq /= vec3(3.0);\n"
+			//"    yiq.gb *= u_mousePos.x;\n"
+    		//"    yiq.r *= u_mousePos.y;\n"
+            "    vec3 result = c_convMat * yiq;\n"
+			"    gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
 			"}\n"
 			;
-#else
-    		"precision highp float;                                                                              \n"
-            "uniform sampler2D u_baseTex;\n"
-            "uniform sampler2D u_kernelTex;\n"
-            "uniform vec2 u_mousePos;\n"
-    		"                                                                                                    \n"
-    		"#define HALF_SAMPLES 6.0                                                                   \n"
-    		"#define SAMPLES (2.0*HALF_SAMPLES)                                                                  \n"
-    		"#define IN_SIZE 256.0                                                                  \n"
-    		"#define WINDOW_SCALER 2.0                                                                  \n"
-    		"#define PI 3.1415926535                                                                             \n"
-
-    		"const mat3 c_convMat = mat3(                                                                        \n"
-    		"    1.0,        1.0,        1.0,        // Y multiplier                                             \n"
-    		"    0.946882,   -0.274788,  -1.108545,  // I '                                                      \n"
-    		"    0.623557,   -0.635691,  1.709007    // Q '                                                      \n"
-    		");                                                                                                  \n"
-
-    		"                                                                                                    \n"
-    		"const float c_black = 0.518;                                                                        \n"
-    		"const float c_white = 1.962;                                                                        \n"
-    		"                                                                                                    \n"
-    		"const vec3 u_gammaExp = vec3(2.2/2.0);                                                              \n"
-    		"                                                                                                    \n"
-    		"// pixel = Pixel color (9-bit) given as input. Bitmask format: 'eeellcccc'.                         \n"
-    		"// phase = Signal phase (0..11). It is a variable that increases by 8 each pixel.                   \n"
-    		"float NTSCsignal(in float pixel, in float phase)                                                    \n"
-    		"{                                                                                                   \n"
-    		"    vec4 levelsLow = vec4(0.350, 0.518, 0.962, 1.550);                                              \n"
-    		"    vec4 levelsHigh = vec4(1.094, 1.506, 1.962, 1.962);                                             \n"
-    		"                                                                                                    \n"
-    		"    // Decode the NES color.                                                                        \n"
-    		"    float color = mod(floor(pixel * 256.0), 16.0);                                           \n"
-    		"    float level = mod(floor(pixel * 16.0), 4.0);                                             \n"
-    		//"    int emphasis = (pixel >> 6);                                                                  \n"
-    		"    if (color >= 14.0) { level = 1.0; }                                                             \n"
-    		"    if (color >= 13.0) { levelsHigh = levelsLow; }                                                  \n"
-    		"    if (color == 0.0) { levelsLow = levelsHigh; }                                                   \n"
-    		//"    vec4 result = (mod(color + phase, 12.0) < 6.0) ? levelsHigh : levelsLow;\n"
-    		"    vec4 result = mix(levelsLow, levelsHigh, step(mod(color + phase, 12.0), 6.0));\n"
-    		"    if (level >= 3.0) { return result[3]; }                                                      \n"
-    		"    else if (level >= 2.0) { return result[2]; }                                                 \n"
-    		"    else if (level >= 1.0) { return result[1]; }                                                 \n"
-    		"    else { return result[0]; }                                                                   \n"
-    		"                                                                                                    \n"
-    		"    // When de-emphasis bits are set, some parts of the signal are attenuated:                      \n"
-    		//"   if( ((emphasis & 1) && InColorPhase(0))                                                        \n"
-    		//"    ||  ((emphasis & 2) && InColorPhase(4))                                                       \n"
-    		//"    ||  ((emphasis & 4) && InColorPhase(8)) ) signal = signal * attenuation;                      \n"
-    		"}                                                                                                   \n"
-    		"                                                                                                    \n"
-    		"float signalLevel(in float phase, in float cycle, in float y)                                       \n"
-    		"{                                                                                                   \n"
-    		"    vec2 uv = vec2(cycle/8.0, y) / (IN_SIZE-1.0);                                                   \n"
-    		"    vec4 pixel = texture2D(u_baseTex, uv);                                                          \n"
-    		"    float signal = NTSCsignal(pixel.r, phase);                                                      \n"
-    		"    return (signal-c_black) / (c_white-c_black);                                                    \n"
-    		//"    return signal;\n"
-    		"}                                                                                                   \n"
-    		"                                                                                                    \n"
-    		"void main(void)                                                                                     \n"
-    		"{                                                                                                   \n"
-    		"    vec2 p = floor((gl_FragCoord.xy - 0.5) / WINDOW_SCALER);                                \n"
-    		"    p.y = 224.0 - p.y;                                                                          \n"
-    		"    float begin = p.x * 8.0;\n"
-    		"    vec3 yiq = vec3(0.0);                                                                           \n"
-//    		"    float phase = mod(8.0 * (p.x + mod(p.y, 3.0)), 12.0);                                           \n"
-    		"    float phase = mod(begin, 12.0);                                           \n"
-    		"    for (float s = -HALF_SAMPLES; s < HALF_SAMPLES; s += 1.0)                                       \n"
-    		"    {                                                                                               \n"
-    		//"        float cycle = begin + s;                                                                    \n"
-    		"        float level = signalLevel(phase, begin + s, p.y) / SAMPLES;                                     \n"
-    		"        float a = PI * (phase+begin + s) / 6.0;                                                     \n"
-    		"        yiq += level * vec3(1.0, cos(a), sin(a));                                                   \n"
-    		"    }                                                                                               \n"
-    		"    yiq.gb *= 4.0 * u_mousePos.x;\n"
-    		"    gl_FragColor = vec4(                                                                            \n"
-    		//"        clamp(pow(max(c_convMat * yiq, 0.0), u_gammaExp), 0.0, 1.0),                                \n"
-    		"        clamp(max(c_convMat * yiq, 0.0), 0.0, 1.0),                                \n"
-    		"        1.0                                                                                         \n"
-    		"    );                                                                                              \n"
-    		"}                                                                                                   \n"
-    		;
 #endif
 #else
         "precision lowp float;\n"
@@ -572,10 +518,8 @@ int InitOpenGL(int left,
     GLint uBaseTexLoc = glGetUniformLocation(prog, "u_baseTex");
     glUniform1i(uBaseTexLoc, 0);
 #if NTSC_LEVELS
-    GLint uNtscTexLoc = glGetUniformLocation(prog, "u_ntscTex0");
+    GLint uNtscTexLoc = glGetUniformLocation(prog, "u_ntscTex");
     glUniform1i(uNtscTexLoc, 1);
-    uNtscTexLoc = glGetUniformLocation(prog, "u_ntscTex1");
-    glUniform1i(uNtscTexLoc, 2);
 #else
     GLint uKernelTexLoc = glGetUniformLocation(prog, "u_kernelTex");
     glUniform1i(uKernelTexLoc, 1);

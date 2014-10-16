@@ -174,8 +174,8 @@ InitConfig()
 	config->addOption("autoscale", "SDL.AutoScale", 1);
 	config->addOption("keepratio", "SDL.KeepRatio", 1);
 //	config->addOption("xscale", "SDL.XScale", (602.0/256.0)); // stretched for nes_ntsc
-	config->addOption("xscale", "SDL.XScale", 2.0);
-	config->addOption("yscale", "SDL.YScale", 2.0);
+	config->addOption("xscale", "SDL.XScale", 4.0);
+	config->addOption("yscale", "SDL.YScale", 4.0);
 	config->addOption("xstretch", "SDL.XStretch", 0);
 	config->addOption("ystretch", "SDL.YStretch", 0);
 	config->addOption("noframe", "SDL.NoFrame", 0);
