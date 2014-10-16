@@ -213,7 +213,7 @@ void BlitOpenGL(uint8 *buf)
     {
         int x, y;
         SDL_GetMouseState(&x, &y);
-        GLfloat mousePos[2] = { x / 602.0f, y / 448.0f };
+        GLfloat mousePos[2] = { x / (4*256.0f), y / (4*224.0f) };
         GLint uMousePosLoc = glGetUniformLocation(prog, "u_mousePos");
         glUniform2fv(uMousePosLoc, 1, mousePos);
 
@@ -356,7 +356,8 @@ int InitOpenGL(int left,
 		"uniform sampler2D u_baseTex;\n"
 		"uniform sampler2D u_ntscTex;\n"
 		"uniform vec2 u_mousePos;\n"
-  		"#define PIC (3.1415926535 / 6.0)\n"
+  		"#define PI 3.1415926535\n"
+  		"#define PIC (PI / 6.0)\n"
 		"#define IN_SIZE 256.0\n"
 		"#define WINDOW_SCALER 4.0\n"
 		"#define GAMMA (2.2 / 2.0)\n"
@@ -385,14 +386,24 @@ int InitOpenGL(int left,
 		"    );\n"
 		"	 return texture2D(u_ntscTex, uv) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK));\n"
 		"}\n"
-		"vec3 sample(in vec2 p, in vec4 yMask, in vec4 iMask, in vec4 qMask)\n"
+        "#define YW 3.0\n"
+        "#define IW 6.0\n"
+        "#define QW 6.0\n"
+		"vec4 k(in vec4 d, in float w)\n"
+		"{\n"
+        "    return step(d, vec4(w));\n"
+		"}\n"
+        "vec4 scanphase;\n"
+		"vec3 sampleK(in vec2 p, in float t)\n"
 		"{\n"
         "    vec4 v = sampleRaw(p);\n"
-		"    vec4 a = PIC * (vec4(0.5, 2.5, 4.5, 6.5) + 3.9 + p.x*8.0 - mod(p.y*8.0, 12.0));\n"
+		"    vec4 a = 8.0*PIC*p.x + scanphase;\n"
+        "    vec4 d = abs(vec4(0.5, 1.5, 2.5, 3.5) + t);\n"
 		"    return vec3(\n"
-        "        dot(yMask, v),\n"
-		"        dot(iMask, v*cos(a)),\n"
-		"        dot(qMask, v*sin(a))\n"
+//        "        dot(mix(k(d, YW), 0.5*k(d, IW), u_mousePos.x), v),\n"
+        "        dot(mix(k(d, YW), 0.5*k(d, IW), 1.0/16.0), v),\n"
+		"        dot(k(d, IW), v*cos(a)),\n"
+		"        dot(k(d, QW), v*sin(a))\n"
         "    );\n"
     	"}\n"
 		"\n"
@@ -402,20 +413,15 @@ int InitOpenGL(int left,
 		"    vec2 p = floor(coord / WINDOW_SCALER);\n"
 		"    p.y = 232.0 - p.y;\n"
         "    vec4 phase = vec4(mod(coord.x, 4.0));\n"
-#if 0 // bleed to right
+		"    scanphase = PIC * (3.9+vec4(0.5, 2.5, 4.5, 6.5) - mod(p.y*8.0, 12.0));\n"
+		"    vec3 yiq = vec3(0.0);\n"
+/*
+        // fringe all to the right, q=48
         "    vec4 yedge0 = clamp01(vec4(0.0, 0.0, 1.0, 2.0) - phase);\n"
         "    vec4 yedge1 = clamp01(vec4(3.0, 4.0, 4.0, 4.0) - phase);\n"
         "    vec4 yedge2 = clamp01(vec4(0.0,-1.0,-2.0,-3.0) + phase);\n"
         "    vec4 iqedge = clamp01(vec4(1.0, 2.0, 3.0, 4.0) - phase);\n"
-		"    vec3 yiq;\n"
-#if 0
-    	"    yiq  = sample(p + vec2(-2.0, 0.0), zeros,  iqedge, iqedge);\n"
-    	"    yiq += sample(p + vec2(-1.0, 0.0), yedge0,   ones,   ones);\n"
-    	"    yiq += sample(p,                   yedge1,   ones,   ones);\n"
-    	"    yiq += sample(p + vec2( 1.0, 0.0), yedge2, yedge2, yedge2);\n"
-        "    yiq /= vec3(6.0, 12.0, 12.0);\n"
-#else // large bleed
-    	"    yiq  = sample(p + vec2(-5.0, 0.0), zeros,   zeros, iqedge);\n"
+    	"    yiq += sample(p + vec2(-5.0, 0.0), zeros,   zeros, iqedge);\n"
     	"    yiq += sample(p + vec2(-4.0, 0.0), zeros,   zeros,   ones);\n"
     	"    yiq += sample(p + vec2(-3.0, 0.0), zeros,   zeros,   ones);\n"
     	"    yiq += sample(p + vec2(-2.0, 0.0), zeros,  iqedge,   ones);\n"
@@ -423,8 +429,9 @@ int InitOpenGL(int left,
     	"    yiq += sample(p,                   yedge1,   ones,   ones);\n"
     	"    yiq += sample(p + vec2( 1.0, 0.0), yedge2, yedge2, yedge2);\n"
         "    yiq /= vec3(6.0, 12.0, 24.0);\n"
-#endif
-#else // bleed evenly
+*/
+/*
+        // even fringing to both sides, q=48
         "    vec4 yedge0 = clamp01(vec4( 0.0, 0.0, 1.0, 2.0) - phase);\n"
         "    vec4 yedge1 = clamp01(vec4( 3.0, 4.0, 4.0, 4.0) - phase);\n"
         "    vec4 yedge2 = clamp01(vec4( 0.0,-1.0,-2.0,-3.0) + phase);\n"
@@ -432,15 +439,6 @@ int InitOpenGL(int left,
         "    vec4 iedge1 = clamp01(vec4( 2.0, 3.0, 4.0, 4.0) - phase);\n"
         "    vec4 iedge2 = clamp01(vec4( 1.0, 1.0, 1.0, 0.0) + phase);\n"
         "    vec4 iedge3 = clamp01(vec4(-1.0,-2.0,-3.0,-3.0) + phase);\n"
-		"    vec3 yiq;\n"
-#if 0 // q: 24 samples
-    	"    yiq += sample(p + vec2(-2.0, 0.0), zeros,  iedge0, iedge0);\n"
-    	"    yiq += sample(p + vec2(-1.0, 0.0), yedge0, iedge1, iedge1);\n"
-    	"    yiq += sample(p,                   yedge1,   ones,   ones);\n"
-    	"    yiq += sample(p + vec2( 1.0, 0.0), yedge2, iedge2, iedge2);\n"
-    	"    yiq += sample(p + vec2( 2.0, 0.0), zeros,  iedge3, iedge3);\n"
-        "    yiq /= vec3(6.0, 12.0, 12.0);\n"
-#else // q: 48 samples
         "    vec4 qedge0 = clamp01(vec4( 0.0, 1.0, 2.0, 3.0) - phase);\n"
         "    vec4 qedge1 = clamp01(vec4( 1.0, 0.0,-1.0,-2.0) + phase);\n"
     	"    yiq += sample(p + vec2(-3.0, 0.0), zeros,   zeros, qedge0);\n"
@@ -451,16 +449,22 @@ int InitOpenGL(int left,
     	"    yiq += sample(p + vec2( 2.0, 0.0), zeros,  iedge3,   ones);\n"
     	"    yiq += sample(p + vec2( 3.0, 0.0), zeros,   zeros, qedge1);\n"
         "    yiq /= vec3(6.0, 12.0, 24.0);\n"
-#endif
-#endif
+*/
+        "    float ph = -phase[0];\n"
+    	"    yiq += sampleK(p-vec2(2.0, 0.0), ph-8.0);\n"
+    	"    yiq += sampleK(p-vec2(1.0, 0.0), ph-4.0);\n"
+    	"    yiq += sampleK(p,                ph);\n"
+    	"    yiq += sampleK(p+vec2(1.0, 0.0), ph+4.0);\n"
+    	"    yiq += sampleK(p+vec2(2.0, 0.0), ph+8.0);\n"
+        "    yiq /= 2.0 * vec3(YW, IW, QW);\n"
 //        "    yiq.r *= 2.0 * u_mousePos.y;\n"
 //        "    yiq.gb *= 2.0 * u_mousePos.x;\n"
         "    vec3 result = c_convMat * yiq;\n"
-    	"    float scan = 1.0 - (13.0 / (256.0 * (WINDOW_SCALER-1.0)/2.0)) * distance(mod(coord.y, WINDOW_SCALER), (WINDOW_SCALER-1.0)/2.0);\n"
+    	"    float scan = 1.0 - (13.0/256.0 * (WINDOW_SCALER-1.0)/2.0) * distance(mod(coord.y, WINDOW_SCALER), (WINDOW_SCALER-1.0)/2.0);\n"
 		"    gl_FragColor = vec4(pow(result, c_gamma) * scan, 1.0);\n"
 		"}\n"
 		;
-#elif 1
+#else // !NTSC_LEVELS
     		"precision highp float;\n"
 			"uniform sampler2D u_baseTex;\n"
 			"uniform sampler2D u_kernelTex;\n"
@@ -503,7 +507,7 @@ int InitOpenGL(int left,
 			"}\n"
 			;
 #endif
-#else
+#else // !NTSC_EMULATION
         "precision lowp float;\n"
         "uniform sampler2D u_baseTex;\n"
         "varying vec2 v_uv;\n"
