@@ -17,7 +17,7 @@
 #endif
 
 #define NTSC_EMULATION      1
-#define NTSC_LEVELS         1
+#define NTSC_LEVELS         0
 
 static GLuint s_baseTex = 0;
 static GLuint s_kernelTex = 0;
@@ -126,51 +126,56 @@ static void GenKernelTex()
 	glActiveTexture(GL_TEXTURE0);
 	free(result);
 #else
-	double *yiqs = (double*) calloc(3 * NUM_CYCLES * NUM_COLORS, sizeof(double));
+#define NUM_TAPS 3
+#define NUM_TAPS_TEXTURE 4
+	double *yiqs = (double*) calloc(3 * NUM_TAPS*NUM_CYCLES * NUM_COLORS, sizeof(double));
 
  	s_mins[0] = s_mins[1] = s_mins[2] = 0.0f;
  	s_maxs[0] = s_maxs[1] = s_maxs[2] = 0.0f;
 
-	for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
-		for (int color = 0; color < NUM_COLORS; color++) {
-			const int phase = cycle * 8;
-			const double shift = phase + 3.9;
+	for (int tap = 0; tap < NUM_TAPS; tap++) {
+	    for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
+	    	for (int color = 0; color < NUM_COLORS; color++) {
+	    		const int phase = cycle * 8;
+	    		const double shift = phase + 3.9;
 
-			float yiq[3] = {0.0f, 0.0f, 0.0f};
-			for (int p = 0; p < 8; p++)
-			{
-				double signal = NTSCsignal(color, phase + p);
+	    		float yiq[3] = {0.0f, 0.0f, 0.0f};
+	    		for (int p = 0; p < 8; p++)
+	    		{
+	    			double signal = NTSCsignal(color, phase + p);
+	    			signal = (signal-BLACK) / (WHITE-BLACK);
 
-				signal = (signal-BLACK) / (WHITE-BLACK);
+	    			const double level = signal / 8.0;
+	    			yiq[0] += ((tap==0 && p>=6) || (tap==2 && p<2) || (tap==1)) ? level : 0.0;
+	    			yiq[1] += level * cos(M_PI * (shift+p) / 6.0);
+	    			yiq[2] += level * sin(M_PI * (shift+p) / 6.0);
+	    		}
 
-				const double level = signal / 8.0;
-				yiq[0] += level;
-				yiq[1] += level * cos(M_PI * (shift+p) / 6.0);
-				yiq[2] += level * sin(M_PI * (shift+p) / 6.0);
-			}
+	    		for (int i = 0; i < 3; i++) {
+	    			s_mins[i] = fmin(s_mins[i], yiq[i]);
+	    			s_maxs[i] = fmax(s_maxs[i], yiq[i]);
+	    		}
 
-			for (int i = 0; i < 3; i++) {
-				s_mins[i] = fmin(s_mins[i], yiq[i]);
-				s_maxs[i] = fmax(s_maxs[i], yiq[i]);
-			}
+	    		const int k = 3 * ((cycle*NUM_TAPS + tap) * NUM_COLORS + color);
+	    		yiqs[k+0] = yiq[0];
+	    		yiqs[k+1] = yiq[1];
+	    		yiqs[k+2] = yiq[2];
+	    	}
+	    }
+    }
 
-			const int k = 3 * (cycle * NUM_COLORS + color);
-			yiqs[k+0] = yiq[0];
-			yiqs[k+1] = yiq[1];
-			yiqs[k+2] = yiq[2];
-		}
-	}
-
-	unsigned char *result = (unsigned char*) calloc(3 * NUM_CYCLES_TEXTURE * NUM_COLORS, sizeof(unsigned char));
-	for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
-		for (int color = 0; color < NUM_COLORS; color++) {
-			const int k = 3 * (cycle*NUM_COLORS + color);
-			for (int i = 0; i < 3; i++) {
-				const double clamped = (yiqs[k+i]-s_mins[i]) / (s_maxs[i]-s_mins[i]);
-				result[k+i] = (unsigned char) (255.0f * clamped);
-			}
-		}
-	}
+	unsigned char *result = (unsigned char*) calloc(3 * NUM_TAPS_TEXTURE*NUM_CYCLES_TEXTURE * NUM_COLORS, sizeof(unsigned char));
+	for (int tap = 0; tap < NUM_TAPS; tap++) {
+	    for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
+	    	for (int color = 0; color < NUM_COLORS; color++) {
+	    		const int k = 3 * ((cycle*NUM_TAPS + tap) * NUM_COLORS + color);
+	    		for (int i = 0; i < 3; i++) {
+	    			const double clamped = (yiqs[k+i]-s_mins[i]) / (s_maxs[i]-s_mins[i]);
+	    			result[k+i] = (unsigned char) (255.0 * clamped + 0.5);
+	    		}
+	    	}
+	    }
+    }
 
 	glActiveTexture(GL_TEXTURE1);
 	glGenTextures(1, &s_kernelTex);
@@ -179,7 +184,7 @@ static void GenKernelTex()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, NUM_COLORS, NUM_CYCLES_TEXTURE, 0, GL_RGB, GL_UNSIGNED_BYTE, result);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, NUM_COLORS, NUM_TAPS_TEXTURE*NUM_CYCLES_TEXTURE, 0, GL_RGB, GL_UNSIGNED_BYTE, result);
 	glActiveTexture(GL_TEXTURE0);
 
 	free(yiqs);
@@ -374,8 +379,8 @@ int InitOpenGL(int left,
         "#define clamp01(v) clamp(v, 0.0, 1.0)\n"
 		"\n"
 		"const vec3 c_gamma = vec3(GAMMA);\n"
-    	"const vec4 ones = vec4(1.0);\n"
-    	"const vec4 zeros = vec4(0.0);\n"
+    	"const vec4 one = vec4(1.0);\n"
+    	"const vec4 nil = vec4(0.0);\n"
 		"\n"
 		"vec4 sampleRaw(in vec2 p)\n"
 		"{\n"
@@ -394,6 +399,29 @@ int InitOpenGL(int left,
         "    return step(d, vec4(w));\n"
 		"}\n"
         "vec4 scanphase;\n"
+#if 1
+		"vec3 sample(in vec2 p, in vec4 k)\n"
+		"{\n"
+        "    vec4 v = sampleRaw(p);\n"
+		"    vec4 a = 8.0*PIC*p.x + scanphase;\n"
+		"    return vec3(\n"
+        "        dot(k, v),\n"
+		"        dot(k, v*cos(a)),\n"
+		"        dot(k, v*sin(a))\n"
+        "    );\n"
+    	"}\n"
+#elif 0
+		"vec3 sample(in vec2 p, in vec4 yk, in vec4 ik, in vec4 qk)\n"
+		"{\n"
+        "    vec4 v = sampleRaw(p);\n"
+		"    vec4 a = 8.0*PIC*p.x + scanphase;\n"
+		"    return vec3(\n"
+        "        dot(yk, v),\n"
+		"        dot(ik, v*cos(a)),\n"
+		"        dot(qk, v*sin(a))\n"
+        "    );\n"
+    	"}\n"
+#else
 		"vec3 sampleK(in vec2 p, in float t)\n"
 		"{\n"
         "    vec4 v = sampleRaw(p);\n"
@@ -406,7 +434,7 @@ int InitOpenGL(int left,
 		"        dot(k(d, QW), v*sin(a))\n"
         "    );\n"
     	"}\n"
-		"\n"
+#endif
 		"void main(void)\n"
 		"{\n"
     	"    vec2 coord = floor(gl_FragCoord.xy - 0.5);\n"
@@ -415,21 +443,70 @@ int InitOpenGL(int left,
         "    vec4 phase = vec4(mod(coord.x, 4.0));\n"
 		"    scanphase = PIC * (3.9+vec4(0.5, 2.5, 4.5, 6.5) - mod(p.y*8.0, 12.0));\n"
 		"    vec3 yiq = vec3(0.0);\n"
-/*
+#if 1
         // fringe all to the right, q=48
-        "    vec4 yedge0 = clamp01(vec4(0.0, 0.0, 1.0, 2.0) - phase);\n"
-        "    vec4 yedge1 = clamp01(vec4(3.0, 4.0, 4.0, 4.0) - phase);\n"
-        "    vec4 yedge2 = clamp01(vec4(0.0,-1.0,-2.0,-3.0) + phase);\n"
-        "    vec4 iqedge = clamp01(vec4(1.0, 2.0, 3.0, 4.0) - phase);\n"
-    	"    yiq += sample(p + vec2(-5.0, 0.0), zeros,   zeros, iqedge);\n"
-    	"    yiq += sample(p + vec2(-4.0, 0.0), zeros,   zeros,   ones);\n"
-    	"    yiq += sample(p + vec2(-3.0, 0.0), zeros,   zeros,   ones);\n"
-    	"    yiq += sample(p + vec2(-2.0, 0.0), zeros,  iqedge,   ones);\n"
-    	"    yiq += sample(p + vec2(-1.0, 0.0), yedge0,   ones,   ones);\n"
-    	"    yiq += sample(p,                   yedge1,   ones,   ones);\n"
-    	"    yiq += sample(p + vec2( 1.0, 0.0), yedge2, yedge2, yedge2);\n"
-        "    yiq /= vec3(6.0, 12.0, 24.0);\n"
-*/
+#if 1
+        "    vec4 c0 = clamp01(vec4(1.0, 0.0,-1.0,-2.0) + phase);\n"
+        "    vec4 c1 = clamp01(vec4(2.0, 3.0, 4.0, 4.0) - phase);\n"
+        "    vec4 c2 = clamp01(vec4(0.0, 0.0, 0.0, 1.0) - phase);\n"
+
+//        "    const float m = 2.0 / 3.0;\n"
+#if 1
+        "    vec3 s[4];\n"
+        "    float m = 1.0/16.0;\n"
+        "    float n = 0.0;//u_mousePos.x;\n"
+
+        "    s[3]  = sample(p + vec2(-4.0, 0.0), one-c0);\n"
+    	"    s[3] += sample(p + vec2(-3.0, 0.0), one-c2);\n"
+    	"    s[3] += sample(p + vec2(-2.0, 0.0), one-c1);\n"
+
+        "    s[2]  = sample(p + vec2(-3.0, 0.0), c2);\n"
+    	"    s[2] += sample(p + vec2(-2.0, 0.0), c1);\n"
+    	"    s[2] += sample(p + vec2(-1.0, 0.0), c0);\n"
+
+        "    s[1]  = sample(p + vec2(-1.0, 0.0), one-c0);\n"
+    	"    s[1] += sample(p + vec2( 0.0, 0.0), one-c2);\n"
+    	"    s[1] += sample(p + vec2( 1.0, 0.0), one-c1);\n"
+
+    	"    s[0]  = sample(p + vec2( 0.0, 0.0), c2);\n"
+    	"    s[0] += sample(p + vec2( 1.0, 0.0), c1);\n"
+    	"    s[0] += sample(p + vec2( 2.0, 0.0), c0);\n"
+
+        "    yiq.r = (m*s[0].r + s[1].r + m*s[2].r) / (6.0 * (1.0+m+m));\n"
+        "    yiq.g = (n*s[0].g + s[1].g + s[2].g + n*s[3].g) / (6.0 * (2.0+n+n));\n"
+        "    yiq.b = (s[0].b + s[1].b + s[2].b + s[3].b) / (6.0 * (4.0));\n"
+#else
+        "    vec3 s[3];\n"
+        "    float m = 1.0;//u_mousePos.y;\n"
+        "    float yt = m*0.1;//u_mousePos.x;\n"
+        "    float it = m*m*0.1;//u_mousePos.x;\n"
+
+        "    s[2]  = sample(p + vec2(-4.0, 0.0), c2);\n"
+    	"    s[2] += sample(p + vec2(-3.0, 0.0), c1);\n"
+    	"    s[2] += sample(p + vec2(-2.0, 0.0), c0);\n"
+
+        "    s[1]  = sample(p + vec2(-2.0, 0.0), one-c0);\n"
+    	"    s[1] += sample(p + vec2(-1.0, 0.0), one-c2);\n"
+    	"    s[1] += sample(p,                   one-c1);\n"
+
+    	"    s[0]  = sample(p + vec2(-1.0, 0.0), c2);\n"
+    	"    s[0] += sample(p,                   c1);\n"
+    	"    s[0] += sample(p + vec2( 1.0, 0.0), c0);\n"
+
+        "    yiq.r = (s[0].r + yt*s[1].r + yt*yt*s[2].r) / (6.0 * (1.0+yt+yt*yt));\n"
+        "    yiq.g = (s[0].g + m*s[1].g + it*s[2].g) / (6.0 * (1.0+m+it));\n"
+        "    yiq.b = (s[0].b + m*s[1].b + m*m*s[2].b) / (6.0 * (1.0+m+m*m));\n"
+#endif
+
+#else
+        "    vec4 ye0 = clamp01(vec4(1.0, 0.0,-1.0,-2.0) + phase);\n"
+        "    vec4 ye1 = clamp01(vec4(2.0, 3.0, 4.0, 4.0) - phase);\n"
+        "    vec4 ye2 = clamp01(vec4(0.0, 0.0, 0.0, 1.0) - phase);\n"
+    	"    yiq += sample(p + vec2(-1.0, 0.0), ye2, ye2, ye2);\n"
+    	"    yiq += sample(p,                   ye1, ye1, ye1);\n"
+    	"    yiq += sample(p + vec2( 1.0, 0.0), ye0, ye0, ye0);\n"
+        "    yiq /= 2.0 * vec3(3.0);\n"
+#endif
 /*
         // even fringing to both sides, q=48
         "    vec4 yedge0 = clamp01(vec4( 0.0, 0.0, 1.0, 2.0) - phase);\n"
@@ -450,6 +527,7 @@ int InitOpenGL(int left,
     	"    yiq += sample(p + vec2( 3.0, 0.0), zeros,   zeros, qedge1);\n"
         "    yiq /= vec3(6.0, 12.0, 24.0);\n"
 */
+#else
         "    float ph = -phase[0];\n"
     	"    yiq += sampleK(p-vec2(2.0, 0.0), ph-8.0);\n"
     	"    yiq += sampleK(p-vec2(1.0, 0.0), ph-4.0);\n"
@@ -457,11 +535,13 @@ int InitOpenGL(int left,
     	"    yiq += sampleK(p+vec2(1.0, 0.0), ph+4.0);\n"
     	"    yiq += sampleK(p+vec2(2.0, 0.0), ph+8.0);\n"
         "    yiq /= 2.0 * vec3(YW, IW, QW);\n"
+#endif
 //        "    yiq.r *= 2.0 * u_mousePos.y;\n"
 //        "    yiq.gb *= 2.0 * u_mousePos.x;\n"
         "    vec3 result = c_convMat * yiq;\n"
-    	"    float scan = 1.0 - (13.0/256.0 * (WINDOW_SCALER-1.0)/2.0) * distance(mod(coord.y, WINDOW_SCALER), (WINDOW_SCALER-1.0)/2.0);\n"
-		"    gl_FragColor = vec4(pow(result, c_gamma) * scan, 1.0);\n"
+//    	"    float scan = 1.0 - (5.0/256.0 * (WINDOW_SCALER-1.0)/2.0) * distance(mod(coord.y, WINDOW_SCALER), (WINDOW_SCALER-1.0)/2.0);\n"
+//		"    gl_FragColor = vec4(clamp01(pow(result, c_gamma)) * scan, 1.0);\n"
+		"    gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
 		"}\n"
 		;
 #else // !NTSC_LEVELS
@@ -482,13 +562,15 @@ int InitOpenGL(int left,
 			"\n"
 			"const vec3 c_gamma = vec3(2.2 / 2.0);\n"
 			"\n"
-    		"vec3 sampel(in vec2 p)\n"
+    		"vec3 sample(in vec2 p, in float offs)\n"
 			"{\n"
-    		"	vec2 uv = vec2(\n"
-    		"		texture2D(u_baseTex, p / (IN_SIZE-1.0)).r * 255.0 / 63.0,\n" // color
-    		"		mod(p.x - p.y, 3.0) / 3.0\n" // phase
-    		"	);\n"
-    		"	return texture2D(u_kernelTex, uv).rgb * (u_levelMaxs-u_levelMins) + u_levelMins;\n"
+            "    p += vec2(offs, 0.0);\n"
+            "    vec2 la = texture2D(u_baseTex, p / (IN_SIZE-1.0)).ra;\n"
+		    "    vec2 uv = vec2(\n"
+		    "        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
+		    "        (mod(p.x - p.y, 3.0)*3.0 + offs+1.0) / (16.0-1.0)\n" // phase
+		    "    );\n"
+    		"    return texture2D(u_kernelTex, uv).rgb * (u_levelMaxs-u_levelMins) + u_levelMins;\n"
     		"}\n"
     		"\n"
 			"void main(void)\n"
@@ -496,10 +578,10 @@ int InitOpenGL(int left,
 			"    vec2 p = floor((gl_FragCoord.xy - 0.5) / WINDOW_SCALER);\n"
 			"    p.y = 232.0 - p.y;\n"
     		"    vec3 yiq = vec3(0.0);\n"
-    		"    yiq += sampel(p);\n"
-    		"    yiq += sampel(p + vec2(-1.0, 0.0));\n"
-    		"    yiq += sampel(p + vec2(1.0, 0.0));\n"
-            "    yiq /= vec3(3.0);\n"
+    		"    yiq += sample(p, -1.0);\n"
+    		"    yiq += sample(p, 0.0);\n"
+    		"    yiq += sample(p, 1.0);\n"
+            "    yiq /= vec3(12.0/8.0, 24.0/8.0, 24.0/8.0);\n"
 //			"    yiq.gb *= u_mousePos.x;\n"
 //   		"    yiq.r *= u_mousePos.y;\n"
             "    vec3 result = c_convMat * yiq;\n"
