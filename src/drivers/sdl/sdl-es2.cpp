@@ -17,7 +17,7 @@
 #endif
 
 #define NTSC_EMULATION      1
-#define NTSC_LEVELS         0
+#define NTSC_LEVELS         1
 
 static GLuint s_baseTex = 0;
 static GLuint s_kernelTex = 0;
@@ -128,40 +128,48 @@ static void GenKernelTex()
 #else
 #define NUM_TAPS 3
 #define NUM_TAPS_TEXTURE 4
-	double *yiqs = (double*) calloc(3 * NUM_TAPS*NUM_CYCLES * NUM_COLORS, sizeof(double));
+#define NUM_OFFS 1
+	double *yiqs = (double*) calloc(3 * NUM_TAPS*NUM_OFFS*NUM_CYCLES * NUM_COLORS, sizeof(double));
+
+#define DST(tap_, p_) abs(8.0*(tap_)+(p_)-((8.0*NUM_TAPS-1.0)/2.0))
+#define YK(tap_, p_) (DST(tap_, p_) < 6.0)
+#define IK(tap_, p_) (DST(tap_, p_) < 12.0)
+#define QK(tap_, p_) (DST(tap_, p_) < 12.0)
 
  	s_mins[0] = s_mins[1] = s_mins[2] = 0.0f;
  	s_maxs[0] = s_maxs[1] = s_maxs[2] = 0.0f;
 
 	for (int tap = 0; tap < NUM_TAPS; tap++) {
-	    for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
-	    	for (int color = 0; color < NUM_COLORS; color++) {
-	    		const int phase = cycle * 8;
-	    		const double shift = phase + 3.9;
-
-	    		float yiq[3] = {0.0f, 0.0f, 0.0f};
-	    		for (int p = 0; p < 8; p++)
-	    		{
-	    			double signal = NTSCsignal(color, phase + p);
-	    			signal = (signal-BLACK) / (WHITE-BLACK);
-
-	    			const double level = signal / 8.0;
-	    			yiq[0] += ((tap==0 && p>=6) || (tap==2 && p<2) || (tap==1)) ? level : 0.0;
-	    			yiq[1] += level * cos(M_PI * (shift+p) / 6.0);
-	    			yiq[2] += level * sin(M_PI * (shift+p) / 6.0);
-	    		}
-
-	    		for (int i = 0; i < 3; i++) {
-	    			s_mins[i] = fmin(s_mins[i], yiq[i]);
-	    			s_maxs[i] = fmax(s_maxs[i], yiq[i]);
-	    		}
-
-	    		const int k = 3 * ((cycle*NUM_TAPS + tap) * NUM_COLORS + color);
-	    		yiqs[k+0] = yiq[0];
-	    		yiqs[k+1] = yiq[1];
-	    		yiqs[k+2] = yiq[2];
-	    	}
-	    }
+//    	for (int offs = 0; offs < NUM_OFFS; offs++) {
+	        for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
+	        	for (int color = 0; color < NUM_COLORS; color++) {
+    	    		const int phase = cycle * 8;
+    	    		const double shift = phase + 3.9;
+    
+    	    		float yiq[3] = {0.0f, 0.0f, 0.0f};
+    	    		for (int p = 0; p < 8; p++)
+    	    		{
+    	    			double signal = NTSCsignal(color, phase + p);
+    	    			signal = (signal-BLACK) / (WHITE-BLACK);
+    
+    	    			const double level = signal / 8.0;
+    	    			yiq[0] += YK(tap, p) * level;
+    	    			yiq[1] += IK(tap, p) * level * cos(M_PI * (shift+p) / 6.0);
+    	    			yiq[2] += QK(tap, p) * level * sin(M_PI * (shift+p) / 6.0);
+    	    		}
+    
+    	    		for (int i = 0; i < 3; i++) {
+    	    			s_mins[i] = fmin(s_mins[i], yiq[i]);
+    	    			s_maxs[i] = fmax(s_maxs[i], yiq[i]);
+    	    		}
+    
+    	    		const int k = 3 * ((cycle*NUM_TAPS + tap) * NUM_COLORS + color);
+    	    		yiqs[k+0] = yiq[0];
+    	    		yiqs[k+1] = yiq[1];
+    	    		yiqs[k+2] = yiq[2];
+    	    	}
+    	    }
+//        }
     }
 
 	unsigned char *result = (unsigned char*) calloc(3 * NUM_TAPS_TEXTURE*NUM_CYCLES_TEXTURE * NUM_COLORS, sizeof(unsigned char));
@@ -345,11 +353,18 @@ int InitOpenGL(int left,
 
 	// Create shaders and program.
     const char* vert_src =
-        "precision mediump float;\n"
+        "precision highp float;\n"
         "attribute vec4 vert;\n"
-        "varying vec2 v_uv;\n"
+        "varying vec2 v_uv[7];\n"
+        "#define S vec2(1.0/256.0, 0.0)\n"
         "void main() {\n"
-        "v_uv = vec2(602.0, 240.0) * vert.zw;\n"
+        "v_uv[0] = vert.zw-4.0*S;\n"
+        "v_uv[1] = vert.zw-3.0*S;\n"
+        "v_uv[2] = vert.zw-2.0*S;\n"
+        "v_uv[3] = vert.zw-1.0*S;\n"
+        "v_uv[4] = vert.zw+0.0*S;\n"
+        "v_uv[5] = vert.zw+1.0*S;\n"
+        "v_uv[6] = vert.zw+2.0*S;\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
 	GLuint vert_shader = CompileShader(GL_VERTEX_SHADER, vert_src);
@@ -361,6 +376,7 @@ int InitOpenGL(int left,
 		"uniform sampler2D u_baseTex;\n"
 		"uniform sampler2D u_ntscTex;\n"
 		"uniform vec2 u_mousePos;\n"
+        "varying vec2 v_uv[7];\n"
   		"#define PI 3.1415926535\n"
   		"#define PIC (PI / 6.0)\n"
 		"#define IN_SIZE 256.0\n"
@@ -382,9 +398,8 @@ int InitOpenGL(int left,
     	"const vec4 one = vec4(1.0);\n"
     	"const vec4 nil = vec4(0.0);\n"
 		"\n"
-		"vec4 sampleRaw(in vec2 p)\n"
+		"vec4 sampleRaw(in vec2 p, in vec2 la)\n"
 		"{\n"
-        "    vec2 la = texture2D(u_baseTex, p / (IN_SIZE-1.0)).ra;\n"
 		"    vec2 uv = vec2(\n"
 		"        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
 		"        mod(p.x - p.y, 3.0) / 3.0\n" // phase
@@ -394,15 +409,17 @@ int InitOpenGL(int left,
         "#define YW 3.0\n"
         "#define IW 6.0\n"
         "#define QW 6.0\n"
+/*
 		"vec4 k(in vec4 d, in float w)\n"
 		"{\n"
         "    return step(d, vec4(w));\n"
 		"}\n"
+*/
         "vec4 scanphase;\n"
 #if 1
-		"vec3 sample(in vec2 p, in vec4 k)\n"
+		"vec3 sample(in vec2 p, in vec2 la, in vec4 k)\n"
 		"{\n"
-        "    vec4 v = sampleRaw(p);\n"
+        "    vec4 v = sampleRaw(p, la);\n"
 		"    vec4 a = 8.0*PIC*p.x + scanphase;\n"
 		"    return vec3(\n"
         "        dot(k, v),\n"
@@ -437,9 +454,8 @@ int InitOpenGL(int left,
 #endif
 		"void main(void)\n"
 		"{\n"
-    	"    vec2 coord = floor(gl_FragCoord.xy - 0.5);\n"
+    	"    vec2 coord = floor(WINDOW_SCALER*IN_SIZE*v_uv[4]);\n"
 		"    vec2 p = floor(coord / WINDOW_SCALER);\n"
-		"    p.y = 232.0 - p.y;\n"
         "    vec4 phase = vec4(mod(coord.x, 4.0));\n"
 		"    scanphase = PIC * (3.9+vec4(0.5, 2.5, 4.5, 6.5) - mod(p.y*8.0, 12.0));\n"
 		"    vec3 yiq = vec3(0.0);\n"
@@ -456,21 +472,30 @@ int InitOpenGL(int left,
         "    float m = 1.0/16.0;\n"
         "    float n = 0.0;//u_mousePos.x;\n"
 
-        "    s[3]  = sample(p + vec2(-4.0, 0.0), one-c0);\n"
-    	"    s[3] += sample(p + vec2(-3.0, 0.0), one-c2);\n"
-    	"    s[3] += sample(p + vec2(-2.0, 0.0), one-c1);\n"
+        "    vec2 la[7];\n"
+        "    la[0] = texture2D(u_baseTex, v_uv[0]).ra;\n"
+        "    la[1] = texture2D(u_baseTex, v_uv[1]).ra;\n"
+        "    la[2] = texture2D(u_baseTex, v_uv[2]).ra;\n"
+        "    la[3] = texture2D(u_baseTex, v_uv[3]).ra;\n"
+        "    la[4] = texture2D(u_baseTex, v_uv[4]).ra;\n"
+        "    la[5] = texture2D(u_baseTex, v_uv[5]).ra;\n"
+        "    la[6] = texture2D(u_baseTex, v_uv[6]).ra;\n"
 
-        "    s[2]  = sample(p + vec2(-3.0, 0.0), c2);\n"
-    	"    s[2] += sample(p + vec2(-2.0, 0.0), c1);\n"
-    	"    s[2] += sample(p + vec2(-1.0, 0.0), c0);\n"
+        "    s[3]  = sample(p + vec2(-4.0, 0.0), la[0], one-c0);\n"
+    	"    s[3] += sample(p + vec2(-3.0, 0.0), la[1], one-c2);\n"
+    	"    s[3] += sample(p + vec2(-2.0, 0.0), la[2], one-c1);\n"
 
-        "    s[1]  = sample(p + vec2(-1.0, 0.0), one-c0);\n"
-    	"    s[1] += sample(p + vec2( 0.0, 0.0), one-c2);\n"
-    	"    s[1] += sample(p + vec2( 1.0, 0.0), one-c1);\n"
+        "    s[2]  = sample(p + vec2(-3.0, 0.0), la[1], c2);\n"
+    	"    s[2] += sample(p + vec2(-2.0, 0.0), la[2], c1);\n"
+    	"    s[2] += sample(p + vec2(-1.0, 0.0), la[3], c0);\n"
 
-    	"    s[0]  = sample(p + vec2( 0.0, 0.0), c2);\n"
-    	"    s[0] += sample(p + vec2( 1.0, 0.0), c1);\n"
-    	"    s[0] += sample(p + vec2( 2.0, 0.0), c0);\n"
+        "    s[1]  = sample(p + vec2(-1.0, 0.0), la[3], one-c0);\n"
+    	"    s[1] += sample(p + vec2( 0.0, 0.0), la[4], one-c2);\n"
+    	"    s[1] += sample(p + vec2( 1.0, 0.0), la[5], one-c1);\n"
+
+    	"    s[0]  = sample(p + vec2( 0.0, 0.0), la[4], c2);\n"
+    	"    s[0] += sample(p + vec2( 1.0, 0.0), la[5], c1);\n"
+    	"    s[0] += sample(p + vec2( 2.0, 0.0), la[6], c0);\n"
 
         "    yiq.r = (m*s[0].r + s[1].r + m*s[2].r) / (6.0 * (1.0+m+m));\n"
         "    yiq.g = (n*s[0].g + s[1].g + s[2].g + n*s[3].g) / (6.0 * (2.0+n+n));\n"
