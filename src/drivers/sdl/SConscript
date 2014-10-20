@@ -23,6 +23,7 @@ if env['EMSCRIPTEN']:
   source_list.append('sdl-emscripten.cpp') # Emscripten main.
   if env['OPENGL']:
     source_list.append('sdl-es2.cpp')
+    source_list.append('es2n.cpp')
 else:
   source_list += ['sdl.cpp', 'unix-netplay.cpp']
   if 'GL' in env['LIBS']:
