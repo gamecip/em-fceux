@@ -7,11 +7,15 @@
 
 typedef struct t_es2n
 {
-    GLuint ntscTex;
     GLuint quadbuf;
-    GLuint prog;
-    GLuint baseTex;
-    GLuint kernelTex;
+    GLuint rgb_prog;
+
+    GLuint base_tex;
+    GLuint ntsc_tex;
+    GLuint lvl_tex;  // Framebuffer texture for voltage levels (256x256x4).
+
+    GLuint lvl_fb;   // FB for levels texture generation.
+    GLuint lvl_prog; // Level FB shader.
 } es2n;
 
 void es2nInit(es2n *p, int left, int right, int top, int bottom);

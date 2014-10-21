@@ -81,8 +81,8 @@ static void genKernelTex(es2n *p)
     }
 
     glActiveTexture(GL_TEXTURE1);
-    glGenTextures(1, &p->ntscTex);
-    glBindTexture(GL_TEXTURE_2D, p->ntscTex);
+    glGenTextures(1, &p->ntsc_tex);
+    glBindTexture(GL_TEXTURE_2D, p->ntsc_tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -123,14 +123,82 @@ GLuint buildShader(const char *vert_src, const char *frag_src)
     return result;
 }
 
+void makeFBTex(GLuint *tex, GLuint *fb, int w, int h)
+{
+    glGenTextures(1, tex);
+    glBindTexture(GL_TEXTURE_2D, *tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+
+    glGenFramebuffers(1, fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, *fb);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *tex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+//    if (GL_FRAMEBUFFER_COMPLETE != glCheckFramebufferStatus(GL_FRAMEBUFFER)) {
+//        glog("not complete\n");
+//  }
+}
+
+static void setUniforms(GLuint prog)
+{
+    GLint k;
+    k = glGetUniformLocation(prog, "u_baseTex");
+    glUniform1i(k, 0);
+    k = glGetUniformLocation(prog, "u_ntscTex");
+    glUniform1i(k, 1);
+    k = glGetUniformLocation(prog, "u_lvlTex");
+    glUniform1i(k, 2);
+}
+
 // TODO: reformat inputs to something more meaningful
 void es2nInit(es2n *p, int left, int right, int top, int bottom)
 {
     memset(p, 0, sizeof(es2n));
 
+    // Configure levels FB.
+    makeFBTex(&p->lvl_tex, &p->lvl_fb, 256, 256);
+    const char* lvl_vert_src =
+        "precision highp float;\n"
+        "attribute vec4 vert;\n"
+        "varying vec2 v_uv;\n"
+        "void main() {\n"
+        "v_uv = vert.zw;\n"
+        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
+        "}\n";
+    const char* lvl_frag_src =
+        "precision highp float;\n"
+        "uniform sampler2D u_baseTex;\n"
+        "uniform sampler2D u_ntscTex;\n"
+        "varying vec2 v_uv;\n"
+        "#define IN_SIZE 256.0\n"
+        "\n"
+        "#define LOWEST  " STR(LOWEST) "\n"
+        "#define HIGHEST " STR(HIGHEST) "\n"
+        "#define BLACK   " STR(BLACK) "\n"
+        "#define WHITE   " STR(WHITE) "\n"
+        "\n"
+        "void main(void)\n"
+        "{\n"
+        "    vec2 la = texture2D(u_baseTex, v_uv).ra;\n"
+        "    vec2 p = floor(IN_SIZE*v_uv);\n"
+        "    vec2 uv = vec2(\n"
+        "        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
+        "        mod(p.x - p.y, 3.0) / 3.0\n" // phase
+        "    );\n"
+        "    vec4 result = texture2D(u_ntscTex, uv) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK));\n"
+        "    gl_FragColor = result;\n"
+        "}\n";
+    p->lvl_prog = buildShader(lvl_vert_src, lvl_frag_src);
+    setUniforms(p->lvl_prog);
+
+    // Set base texture to 0.
     glActiveTexture(GL_TEXTURE0);
-    glGenTextures(1, &p->baseTex);
-    glBindTexture(GL_TEXTURE_2D, p->baseTex);
+    glGenTextures(1, &p->base_tex);
+    glBindTexture(GL_TEXTURE_2D, p->base_tex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -376,33 +444,34 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "}\n"
         ;
 
-    p->prog = buildShader(vert_src, frag_src);
-
-    GLint uBaseTexLoc = glGetUniformLocation(p->prog, "u_baseTex");
-    glUniform1i(uBaseTexLoc, 0);
-    GLint uNtscTexLoc = glGetUniformLocation(p->prog, "u_ntscTex");
-    glUniform1i(uNtscTexLoc, 1);
+    p->rgb_prog = buildShader(vert_src, frag_src);
+    setUniforms(p->rgb_prog);
 
 // TODO: remove from final
+/*
     GLfloat mousePos[2] = { 0.0f, 0.0f };
-    GLint uMousePosLoc = glGetUniformLocation(p->prog, "u_mousePos");
+    GLint uMousePosLoc = glGetUniformLocation(p->rgb_prog, "u_mousePos");
     glUniform2fv(uMousePosLoc, 1, mousePos);
+*/
 }
 
 void es2nDeinit(es2n *p)
 {
-    if (p->baseTex) {
-        glDeleteTextures(1, &p->baseTex);
-        p->baseTex = 0;
+// TODO: is cleanup needed?
+/*
+    if (p->base_tex) {
+        glDeleteTextures(1, &p->base_tex);
+        p->base_tex = 0;
     }
-    if (p->kernelTex) {
-        glDeleteTextures(1, &p->kernelTex);
-        p->kernelTex = 0;
+    if (p->ntsc_tex) {
+        glDeleteTextures(1, &p->ntsc_tex);
+        p->ntsc_tex = 0;
     }
-    if (p->prog) {
-        glDeleteProgram(p->prog);
-        p->prog = 0;
+    if (p->rgb_prog) {
+        glDeleteProgram(p->rgb_prog);
+        p->rgb_prog = 0;
     }
+*/
 }
 
 void es2nRender(es2n *p, GLushort *pixels)
