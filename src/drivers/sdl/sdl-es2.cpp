@@ -4,8 +4,6 @@
 #include "../../utils/memory.h"
 #include "es2n.h"
 
-#include <cstring>
-
 #ifndef APIENTRY
 #define APIENTRY
 #endif
@@ -13,9 +11,8 @@
 static es2n s_es2n;
 static uint16* s_tempXBuf;
 
-void SetOpenGLPalette(uint8 *data)
+void SetOpenGLPalette(uint8*)
 {
-	SetPaletteBlitToHigh((uint8*)data);
 }
 
 extern uint8 deempScan[240];

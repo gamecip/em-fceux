@@ -7,8 +7,11 @@
 #define _STR(s_) #s_
 
 #define NUM_CYCLES 3
-#define NUM_COLORS 512 
 #define NUM_CYCLES_TEXTURE 4
+#define NUM_COLORS (64 * 8) // 64 palette colors, 8 color de-emphasis settings.
+#define PERSISTENCE_R 0.16  // Red phosphor persistence.
+#define PERSISTENCE_G 0.20  // Green "
+#define PERSISTENCE_B 0.22  // Blue "
 
 // Source code modified from:
 // http://wiki.nesdev.com/w/index.php/NTSC_video
@@ -83,11 +86,11 @@ static void genKernelTex(es2n *p)
     glActiveTexture(GL_TEXTURE1);
     glGenTextures(1, &p->ntsc_tex);
     glBindTexture(GL_TEXTURE_2D, p->ntsc_tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, NUM_COLORS, NUM_CYCLES_TEXTURE, 0, GL_RGBA, GL_UNSIGNED_BYTE, result);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, NUM_COLORS, NUM_CYCLES_TEXTURE, 0, GL_RGBA, GL_UNSIGNED_BYTE, result);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     glActiveTexture(GL_TEXTURE0);
     free(result);
@@ -123,24 +126,20 @@ GLuint buildShader(const char *vert_src, const char *frag_src)
     return result;
 }
 
-void makeFBTex(GLuint *tex, GLuint *fb, int w, int h)
+void makeFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filter)
 {
     glGenTextures(1, tex);
     glBindTexture(GL_TEXTURE_2D, *tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
 
     glGenFramebuffers(1, fb);
     glBindFramebuffer(GL_FRAMEBUFFER, *fb);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *tex, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
-//    if (GL_FRAMEBUFFER_COMPLETE != glCheckFramebufferStatus(GL_FRAMEBUFFER)) {
-//        glog("not complete\n");
-//  }
 }
 
 static void setUniforms(GLuint prog)
@@ -152,6 +151,8 @@ static void setUniforms(GLuint prog)
     glUniform1i(k, 1);
     k = glGetUniformLocation(prog, "u_lvlTex");
     glUniform1i(k, 2);
+    k = glGetUniformLocation(prog, "u_rgbTex");
+    glUniform1i(k, 3);
 }
 
 // TODO: reformat inputs to something more meaningful
@@ -159,60 +160,14 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 {
     memset(p, 0, sizeof(es2n));
 
-    // Configure levels FB.
-    makeFBTex(&p->lvl_tex, &p->lvl_fb, 256, 256);
-    const char* lvl_vert_src =
-        "precision highp float;\n"
-        "attribute vec4 vert;\n"
-        "varying vec2 v_uv;\n"
-        "void main() {\n"
-        "v_uv = vert.zw;\n"
-        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
-        "}\n";
-    const char* lvl_frag_src =
-        "precision highp float;\n"
-        "uniform sampler2D u_baseTex;\n"
-        "uniform sampler2D u_ntscTex;\n"
-        "varying vec2 v_uv;\n"
-        "#define IN_SIZE 256.0\n"
-        "\n"
-        "#define LOWEST  " STR(LOWEST) "\n"
-        "#define HIGHEST " STR(HIGHEST) "\n"
-        "#define BLACK   " STR(BLACK) "\n"
-        "#define WHITE   " STR(WHITE) "\n"
-        "\n"
-        "void main(void)\n"
-        "{\n"
-        "    vec2 la = texture2D(u_baseTex, v_uv).ra;\n"
-        "    vec2 p = floor(IN_SIZE*v_uv);\n"
-        "    vec2 uv = vec2(\n"
-        "        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
-        "        mod(p.x - p.y, 3.0) / 3.0\n" // phase
-        "    );\n"
-        "    vec4 result = texture2D(u_ntscTex, uv) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK));\n"
-        "    gl_FragColor = result;\n"
-        "}\n";
-    p->lvl_prog = buildShader(lvl_vert_src, lvl_frag_src);
-    setUniforms(p->lvl_prog);
-
-    // Set base texture to 0.
-    glActiveTexture(GL_TEXTURE0);
-    glGenTextures(1, &p->base_tex);
-    glBindTexture(GL_TEXTURE_2D, p->base_tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA, 256, 256, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, 0);
-
-    genKernelTex(p);
+    glGetIntegerv(GL_VIEWPORT, p->viewport);
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
+    // Quad vertices, packed as: x, y, u, v
     const GLfloat quadverts[4 * 4] = {
-        // Packed vertices: x, y, u, v
         -1.0f, -1.0f, left / 256.0f, bottom / 256.0f,
          1.0f, -1.0f, right / 256.0f, bottom / 256.0f,
         -1.0f,  1.0f, left / 256.0f, top / 256.0f, 
@@ -228,38 +183,89 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    // Create shaders and program.
-    const char* vert_src =
+    // Setup input texture.
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1, &p->base_tex);
+    glBindTexture(GL_TEXTURE_2D, p->base_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA, 256, 256, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    genKernelTex(p);
+
+    // Configure levels framebuffer.
+    glActiveTexture(GL_TEXTURE2);
+    makeFBTex(&p->lvl_tex, &p->lvl_fb, 256, 256, GL_RGBA, GL_NEAREST);
+    const char* lvl_vert_src =
         "precision highp float;\n"
         "attribute vec4 vert;\n"
-        "varying vec2 v_uv[7];\n"
-        "#define S vec2(1.0/256.0, 0.0)\n"
+        "varying vec2 v_uv;\n"
         "void main() {\n"
-        "v_uv[0] = vert.zw-4.0*S;\n"
-        "v_uv[1] = vert.zw-3.0*S;\n"
-        "v_uv[2] = vert.zw-2.0*S;\n"
-        "v_uv[3] = vert.zw-1.0*S;\n"
-        "v_uv[4] = vert.zw+0.0*S;\n"
-        "v_uv[5] = vert.zw+1.0*S;\n"
-        "v_uv[6] = vert.zw+2.0*S;\n"
+        "v_uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
-    
-    const char* frag_src =
+    const char* lvl_frag_src =
         "precision highp float;\n"
         "uniform sampler2D u_baseTex;\n"
         "uniform sampler2D u_ntscTex;\n"
+        "varying vec2 v_uv;\n"
+        "#define LOWEST  " STR(LOWEST) "\n"
+        "#define HIGHEST " STR(HIGHEST) "\n"
+        "#define BLACK   " STR(BLACK) "\n"
+        "#define WHITE   " STR(WHITE) "\n"
+        "void main(void) {\n"
+        "    vec2 la = texture2D(u_baseTex, v_uv).ra;\n"
+        "    vec2 p = floor(256.0*v_uv);\n"
+        "    vec2 uv = vec2(\n"
+        "        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
+        "        mod(p.x - p.y, 3.0) / 3.0\n" // phase
+        "    );\n"
+        "    vec4 result = texture2D(u_ntscTex, uv) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK));\n"
+        "    gl_FragColor = result;\n"
+        "}\n";
+    p->lvl_prog = buildShader(lvl_vert_src, lvl_frag_src);
+    setUniforms(p->lvl_prog);
+
+    // Configure RGB framebuffer.
+    glActiveTexture(GL_TEXTURE3);
+    makeFBTex(&p->rgb_tex, &p->rgb_fb, 1024, 256, GL_RGB, GL_LINEAR);
+    const char* rgb_vert_src =
+        "precision highp float;\n"
+        "attribute vec4 vert;\n"
+        "varying vec2 v_uv[6];\n"
+        "#define S vec2(1.0/256.0, 0.0)\n"
+        "#define O(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
+        "void main() {\n"
+        "O(0,-4.0);\n"
+        "O(1,-3.0);\n"
+        "O(2,-2.0);\n"
+        "O(3,-1.0);\n"
+        "O(4, 0.0);\n"
+        "O(5, 1.0);\n"
+        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
+        "}\n";
+    const char* rgb_frag_src =
+        "precision highp float;\n"
+        "uniform sampler2D u_lvlTex;\n"
         "uniform vec2 u_mousePos;\n"
-        "varying vec2 v_uv[7];\n"
-          "#define PI 3.1415926535\n"
-          "#define PIC (PI / 6.0)\n"
-        "#define IN_SIZE 256.0\n"
-        "#define WINDOW_SCALER 4.0\n"
-        "#define GAMMA (2.2 / 2.0)\n"
+        "varying vec2 v_uv[6];\n"
+#if 1 // 0: texture test pass-through
+        "#define PI 3.1415926535\n"
+        "#define PIC (PI / 6.0)\n"
+        "#define GAMMA (2.2 / 1.9)\n"
         "const mat3 c_convMat = mat3(\n"
         "    1.0,        1.0,        1.0,       // Y\n"
+#if 0
+        // from nesdev wiki
         "    0.946882,   -0.274788,  -1.108545, // I\n"
         "    0.623557,   -0.635691,  1.709007   // Q\n"
+#else
+        // from nes_ntsc by blargg, default
+        "    0.956,   -0.272,  -1.105, // I\n"
+        "    0.621,   -0.647,  1.702   // Q\n"
+#endif
         ");\n"
         "\n"
         "#define LOWEST  " STR(LOWEST) "\n"
@@ -272,180 +278,113 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "const vec4 one = vec4(1.0);\n"
         "const vec4 nil = vec4(0.0);\n"
         "\n"
-        "vec4 sampleRaw(in vec2 p, in vec2 la)\n"
-        "{\n"
-        "    vec2 uv = vec2(\n"
-        "        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
-        "        mod(p.x - p.y, 3.0) / 3.0\n" // phase
-        "    );\n"
-        "     return texture2D(u_ntscTex, uv) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK));\n"
-        "}\n"
-        "#define YW 3.0\n"
-        "#define IW 6.0\n"
-        "#define QW 6.0\n"
-/*
-        "vec4 k(in vec4 d, in float w)\n"
-        "{\n"
-        "    return step(d, vec4(w));\n"
-        "}\n"
-*/
-        "vec4 scanphase;\n"
-#if 1
-        "vec3 sample(in vec2 p, in vec2 la, in vec4 k)\n"
-        "{\n"
-        "    vec4 v = sampleRaw(p, la);\n"
-        "    vec4 a = 8.0*PIC*p.x + scanphase;\n"
+        "vec3 sample(in vec4 a, in vec4 v, in vec4 k) {\n"
         "    return vec3(\n"
         "        dot(k, v),\n"
         "        dot(k, v*cos(a)),\n"
         "        dot(k, v*sin(a))\n"
         "    );\n"
         "}\n"
-#elif 0
-        "vec3 sample(in vec2 p, in vec4 yk, in vec4 ik, in vec4 qk)\n"
-        "{\n"
-        "    vec4 v = sampleRaw(p);\n"
-        "    vec4 a = 8.0*PIC*p.x + scanphase;\n"
-        "    return vec3(\n"
-        "        dot(yk, v),\n"
-        "        dot(ik, v*cos(a)),\n"
-        "        dot(qk, v*sin(a))\n"
-        "    );\n"
-        "}\n"
+        "void main(void) {\n"
+        "vec2 coord = floor(4.0*256.0*v_uv[4]);\n"
+        "vec2 p = floor(coord / 4.0);\n"
+        "vec4 offs = vec4(mod(coord.x, 4.0));\n"
+
+        // q=36, fringe center, smoothing method
+        "vec4 v[6];\n"
+        "v[0] = texture2D(u_lvlTex, v_uv[0]);\n"
+        "v[1] = texture2D(u_lvlTex, v_uv[1]);\n"
+        "v[2] = texture2D(u_lvlTex, v_uv[2]);\n"
+        "v[3] = texture2D(u_lvlTex, v_uv[3]);\n"
+        "v[4] = texture2D(u_lvlTex, v_uv[4]);\n"
+        "v[5] = texture2D(u_lvlTex, v_uv[5]);\n"
+
+        "v[0] *= step(0.0, v_uv[0].x);\n"
+        "v[1] *= step(0.0, v_uv[1].x);\n"
+        "v[2] *= step(0.0, v_uv[2].x);\n"
+        "v[3] *= step(0.0, v_uv[3].x);\n"
+        "v[5] *= step(v_uv[5].x, 1.0);\n"
+
+        "const vec4 c_base = PIC*(3.9 + vec4(0.5, 2.5, 4.5, 6.5));\n"
+        "vec4 scanphase = c_base - PIC*mod(p.y*8.0, 12.0);\n"
+        "vec4 ph[6];\n"
+        "ph[0] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[0].x));\n"
+        "ph[1] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[1].x));\n"
+        "ph[2] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[2].x));\n"
+        "ph[3] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[3].x));\n"
+        "ph[4] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[4].x));\n"
+        "ph[5] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[5].x));\n"
+
+        "vec4 c0 = clamp01(vec4(1.0, 0.0,-1.0,-2.0) + offs);\n"
+        "vec4 c1 = clamp01(vec4(2.0, 3.0, 4.0, 4.0) - offs);\n"
+        "vec4 c2 = max(    vec4(0.0, 0.0, 0.0, 1.0) - offs, 0.0);\n"
+
+        "vec3 s[3];\n"
+        "s[2]  = sample(ph[0], v[0], c2);\n"
+        "s[2] += sample(ph[1], v[1], c1);\n"
+        "s[2] += sample(ph[2], v[2], c0);\n"
+
+        "s[1]  = sample(ph[2], v[2], one-c0);\n"
+        "s[1] += sample(ph[3], v[3], one-c2);\n"
+        "s[1] += sample(ph[4], v[4], one-c1);\n"
+
+        "s[0]  = sample(ph[3], v[3], c2);\n"
+        "s[0] += sample(ph[4], v[4], c1);\n"
+        "s[0] += sample(ph[5], v[5], c0);\n"
+
+        "vec3 yiq;\n"
+        "yiq.r = s[0].r;\n"
+        "yiq.g = s[0].g + s[1].g;\n"
+        "yiq.b = s[0].b + s[1].b + s[2].b;\n"
+        "yiq *= (1.0 / vec3(6.0, 12.0, 18.0));\n"
+
+        "vec3 result = c_convMat * yiq;\n"
+        "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
+        "}\n";
 #else
-        "vec3 sampleK(in vec2 p, in float t)\n"
-        "{\n"
-        "    vec4 v = sampleRaw(p);\n"
-        "    vec4 a = 8.0*PIC*p.x + scanphase;\n"
-        "    vec4 d = abs(vec4(0.5, 1.5, 2.5, 3.5) + t);\n"
-        "    return vec3(\n"
-//        "        dot(mix(k(d, YW), 0.5*k(d, IW), u_mousePos.x), v),\n"
-        "        dot(mix(k(d, YW), 0.5*k(d, IW), 1.0/16.0), v),\n"
-        "        dot(k(d, IW), v*cos(a)),\n"
-        "        dot(k(d, QW), v*sin(a))\n"
-        "    );\n"
-        "}\n"
+        "void main(void) {\n"
+        "gl_FragColor = texture2D(u_lvlTex, v_uv[4]);\n"
+        "}\n";
 #endif
-        "void main(void)\n"
-        "{\n"
-        "    vec2 coord = floor(WINDOW_SCALER*IN_SIZE*v_uv[4]);\n"
-        "    vec2 p = floor(coord / WINDOW_SCALER);\n"
-        "    vec4 phase = vec4(mod(coord.x, 4.0));\n"
-        "    scanphase = PIC * (3.9+vec4(0.5, 2.5, 4.5, 6.5) - mod(p.y*8.0, 12.0));\n"
-        "    vec3 yiq = vec3(0.0);\n"
-#if 1
-        // fringe all to the right, q=48
-#if 1
-        "    vec4 c0 = clamp01(vec4(1.0, 0.0,-1.0,-2.0) + phase);\n"
-        "    vec4 c1 = clamp01(vec4(2.0, 3.0, 4.0, 4.0) - phase);\n"
-        "    vec4 c2 = clamp01(vec4(0.0, 0.0, 0.0, 1.0) - phase);\n"
-
-//        "    const float m = 2.0 / 3.0;\n"
-#if 1
-        "    vec3 s[4];\n"
-        "    float m = 1.0/16.0;\n"
-        "    float n = 0.0;//u_mousePos.x;\n"
-
-        "    vec2 la[7];\n"
-        "    la[0] = texture2D(u_baseTex, v_uv[0]).ra;\n"
-        "    la[1] = texture2D(u_baseTex, v_uv[1]).ra;\n"
-        "    la[2] = texture2D(u_baseTex, v_uv[2]).ra;\n"
-        "    la[3] = texture2D(u_baseTex, v_uv[3]).ra;\n"
-        "    la[4] = texture2D(u_baseTex, v_uv[4]).ra;\n"
-        "    la[5] = texture2D(u_baseTex, v_uv[5]).ra;\n"
-        "    la[6] = texture2D(u_baseTex, v_uv[6]).ra;\n"
-
-        "    s[3]  = sample(p + vec2(-4.0, 0.0), la[0], one-c0);\n"
-        "    s[3] += sample(p + vec2(-3.0, 0.0), la[1], one-c2);\n"
-        "    s[3] += sample(p + vec2(-2.0, 0.0), la[2], one-c1);\n"
-
-        "    s[2]  = sample(p + vec2(-3.0, 0.0), la[1], c2);\n"
-        "    s[2] += sample(p + vec2(-2.0, 0.0), la[2], c1);\n"
-        "    s[2] += sample(p + vec2(-1.0, 0.0), la[3], c0);\n"
-
-        "    s[1]  = sample(p + vec2(-1.0, 0.0), la[3], one-c0);\n"
-        "    s[1] += sample(p + vec2( 0.0, 0.0), la[4], one-c2);\n"
-        "    s[1] += sample(p + vec2( 1.0, 0.0), la[5], one-c1);\n"
-
-        "    s[0]  = sample(p + vec2( 0.0, 0.0), la[4], c2);\n"
-        "    s[0] += sample(p + vec2( 1.0, 0.0), la[5], c1);\n"
-        "    s[0] += sample(p + vec2( 2.0, 0.0), la[6], c0);\n"
-
-        "    yiq.r = (m*s[0].r + s[1].r + m*s[2].r) / (6.0 * (1.0+m+m));\n"
-        "    yiq.g = (n*s[0].g + s[1].g + s[2].g + n*s[3].g) / (6.0 * (2.0+n+n));\n"
-        "    yiq.b = (s[0].b + s[1].b + s[2].b + s[3].b) / (6.0 * (4.0));\n"
-#else
-        "    vec3 s[3];\n"
-        "    float m = 1.0;//u_mousePos.y;\n"
-        "    float yt = m*0.1;//u_mousePos.x;\n"
-        "    float it = m*m*0.1;//u_mousePos.x;\n"
-
-        "    s[2]  = sample(p + vec2(-4.0, 0.0), c2);\n"
-        "    s[2] += sample(p + vec2(-3.0, 0.0), c1);\n"
-        "    s[2] += sample(p + vec2(-2.0, 0.0), c0);\n"
-
-        "    s[1]  = sample(p + vec2(-2.0, 0.0), one-c0);\n"
-        "    s[1] += sample(p + vec2(-1.0, 0.0), one-c2);\n"
-        "    s[1] += sample(p,                   one-c1);\n"
-
-        "    s[0]  = sample(p + vec2(-1.0, 0.0), c2);\n"
-        "    s[0] += sample(p,                   c1);\n"
-        "    s[0] += sample(p + vec2( 1.0, 0.0), c0);\n"
-
-        "    yiq.r = (s[0].r + yt*s[1].r + yt*yt*s[2].r) / (6.0 * (1.0+yt+yt*yt));\n"
-        "    yiq.g = (s[0].g + m*s[1].g + it*s[2].g) / (6.0 * (1.0+m+it));\n"
-        "    yiq.b = (s[0].b + m*s[1].b + m*m*s[2].b) / (6.0 * (1.0+m+m*m));\n"
-#endif
-
-#else
-        "    vec4 ye0 = clamp01(vec4(1.0, 0.0,-1.0,-2.0) + phase);\n"
-        "    vec4 ye1 = clamp01(vec4(2.0, 3.0, 4.0, 4.0) - phase);\n"
-        "    vec4 ye2 = clamp01(vec4(0.0, 0.0, 0.0, 1.0) - phase);\n"
-        "    yiq += sample(p + vec2(-1.0, 0.0), ye2, ye2, ye2);\n"
-        "    yiq += sample(p,                   ye1, ye1, ye1);\n"
-        "    yiq += sample(p + vec2( 1.0, 0.0), ye0, ye0, ye0);\n"
-        "    yiq /= 2.0 * vec3(3.0);\n"
-#endif
-/*
-        // even fringing to both sides, q=48
-        "    vec4 yedge0 = clamp01(vec4( 0.0, 0.0, 1.0, 2.0) - phase);\n"
-        "    vec4 yedge1 = clamp01(vec4( 3.0, 4.0, 4.0, 4.0) - phase);\n"
-        "    vec4 yedge2 = clamp01(vec4( 0.0,-1.0,-2.0,-3.0) + phase);\n"
-        "    vec4 iedge0 = clamp01(vec4( 0.0, 0.0, 0.0, 1.0) - phase);\n"
-        "    vec4 iedge1 = clamp01(vec4( 2.0, 3.0, 4.0, 4.0) - phase);\n"
-        "    vec4 iedge2 = clamp01(vec4( 1.0, 1.0, 1.0, 0.0) + phase);\n"
-        "    vec4 iedge3 = clamp01(vec4(-1.0,-2.0,-3.0,-3.0) + phase);\n"
-        "    vec4 qedge0 = clamp01(vec4( 0.0, 1.0, 2.0, 3.0) - phase);\n"
-        "    vec4 qedge1 = clamp01(vec4( 1.0, 0.0,-1.0,-2.0) + phase);\n"
-        "    yiq += sample(p + vec2(-3.0, 0.0), zeros,   zeros, qedge0);\n"
-        "    yiq += sample(p + vec2(-2.0, 0.0), zeros,  iedge0,   ones);\n"
-        "    yiq += sample(p + vec2(-1.0, 0.0), yedge0, iedge1,   ones);\n"
-        "    yiq += sample(p,                   yedge1,   ones,   ones);\n"
-        "    yiq += sample(p + vec2( 1.0, 0.0), yedge2, iedge2,   ones);\n"
-        "    yiq += sample(p + vec2( 2.0, 0.0), zeros,  iedge3,   ones);\n"
-        "    yiq += sample(p + vec2( 3.0, 0.0), zeros,   zeros, qedge1);\n"
-        "    yiq /= vec3(6.0, 12.0, 24.0);\n"
-*/
-#else
-        "    float ph = -phase[0];\n"
-        "    yiq += sampleK(p-vec2(2.0, 0.0), ph-8.0);\n"
-        "    yiq += sampleK(p-vec2(1.0, 0.0), ph-4.0);\n"
-        "    yiq += sampleK(p,                ph);\n"
-        "    yiq += sampleK(p+vec2(1.0, 0.0), ph+4.0);\n"
-        "    yiq += sampleK(p+vec2(2.0, 0.0), ph+8.0);\n"
-        "    yiq /= 2.0 * vec3(YW, IW, QW);\n"
-#endif
-//        "    yiq.r *= 2.0 * u_mousePos.y;\n"
-//        "    yiq.gb *= 2.0 * u_mousePos.x;\n"
-        "    vec3 result = c_convMat * yiq;\n"
-//        "    float scan = 1.0 - (5.0/256.0 * (WINDOW_SCALER-1.0)/2.0) * distance(mod(coord.y, WINDOW_SCALER), (WINDOW_SCALER-1.0)/2.0);\n"
-//        "    gl_FragColor = vec4(clamp01(pow(result, c_gamma)) * scan, 1.0);\n"
-        "    gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
-        "}\n"
-        ;
-
-    p->rgb_prog = buildShader(vert_src, frag_src);
+    p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
     setUniforms(p->rgb_prog);
+
+    // Setup display (output) shader.
+    const char* disp_vert_src =
+        "precision highp float;\n"
+        "attribute vec4 vert;\n"
+        "varying vec2 v_uv;\n"
+        "void main() {\n"
+        "v_uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
+        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
+        "}\n";
+    const char* disp_frag_src =
+        "precision highp float;\n"
+        "uniform sampler2D u_rgbTex;\n"
+        "varying vec2 v_uv;\n"
+        "void main(void) {\n"
+        "vec3 color = texture2D(u_rgbTex, v_uv).rgb;\n"
+#if 1
+        "gl_FragColor = vec4(color, 1.0);\n"
+#else
+        "float luma = min(1.35 * dot(vec3(0.299, 0.587, 0.114), color), 1.0);\n"
+        "vec2 p = floor((4.0*256.0) * v_uv);\n"
+        "vec2 m = mod(p, 4.0);\n"
+        "vec3 grille;\n"
+        "if (m.x >= 3.0) grille =       vec3(0.333, 0.667, 1.000);\n"
+        "else if (m.x >= 2.0) grille =  vec3(1.000, 0.667, 0.333);\n"
+        "else if (m.x >= 1.0) grille =  vec3(0.333, 0.667, 1.000);\n"
+        "else grille =                  vec3(1.000, 0.667, 0.333);\n"
+        "grille = 0.84 + 0.16*grille;\n"
+        "float d = distance(m.y, (4.0-2.0) / 2.0);\n"
+        "float scan = (30.0/256.0 * (4.0-2.0) / 1.0) * d;\n"
+        "vec3 result = mix(color, grille * (1.0-scan) * color, 1.0-luma);\n"
+        "gl_FragColor = vec4(result, 1.0);\n"
+//        "gl_FragColor = vec4(result - scan, 1.0);\n"
+#endif
+        "}\n";
+    p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
+    setUniforms(p->disp_prog);
 
 // TODO: remove from final
 /*
@@ -476,9 +415,27 @@ void es2nDeinit(es2n *p)
 
 void es2nRender(es2n *p, GLushort *pixels)
 {
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, p->base_tex);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 256, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, pixels);
 
-	glClear(GL_COLOR_BUFFER_BIT);
+    glBindFramebuffer(GL_FRAMEBUFFER, p->lvl_fb);
+    glViewport(0, 8, 256, 224);
+    glUseProgram(p->lvl_prog);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, p->rgb_fb);
+    glViewport(0, 8, 1024, 224);
+    glUseProgram(p->rgb_prog);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
+    glBlendColor(PERSISTENCE_R, PERSISTENCE_G, PERSISTENCE_B, 0.0);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisable(GL_BLEND);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
+    glUseProgram(p->disp_prog);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
