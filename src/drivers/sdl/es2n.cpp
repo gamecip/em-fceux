@@ -133,8 +133,8 @@ void makeFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filt
     glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     glGenFramebuffers(1, fb);
     glBindFramebuffer(GL_FRAMEBUFFER, *fb);
@@ -254,7 +254,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 #if 1 // 0: texture test pass-through
         "#define PI 3.1415926535\n"
         "#define PIC (PI / 6.0)\n"
-        "#define GAMMA (2.2 / 1.9)\n"
+        "#define GAMMA (2.2 / 1.89)\n"
         "const mat3 c_convMat = mat3(\n"
         "    1.0,        1.0,        1.0,       // Y\n"
 #if 0
@@ -332,11 +332,11 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "s[0] += sample(ph[4], v[4], c1);\n"
         "s[0] += sample(ph[5], v[5], c0);\n"
 
-        "vec3 yiq;\n"
-        "yiq.r = s[0].r;\n"
-        "yiq.g = s[0].g + s[1].g;\n"
-        "yiq.b = s[0].b + s[1].b + s[2].b;\n"
-        "yiq *= (1.0 / vec3(6.0, 12.0, 18.0));\n"
+        "vec3 yiq = vec3(\n"
+        "    s[0].r,\n"
+        "    s[0].g + s[1].g,\n"
+        "    s[0].b + s[1].b + 0.5*s[2].b\n"
+        ") / (6.0 * vec3(1.0, 2.0, 2.5));\n"
 
         "vec3 result = c_convMat * yiq;\n"
         "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
@@ -365,22 +365,18 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "void main(void) {\n"
         "vec3 color = texture2D(u_rgbTex, v_uv).rgb;\n"
 #if 1
-        "gl_FragColor = vec4(color, 1.0);\n"
+        "float luma = dot(vec3(0.299, 0.587, 0.114), color);\n"
+        "float m = mod(floor((3.0*256.0) * v_uv.y), 3.0);\n"
+        "float d = distance(m, 1.0);\n"
+        "float scan = 1.0 - d;\n"
+        "vec3 result = color + ((1.0-luma) * (3.0/256.0) * (3.0*scan - 1.0));\n"
+        "gl_FragColor = vec4(result, 1.0);\n"
 #else
-        "float luma = min(1.35 * dot(vec3(0.299, 0.587, 0.114), color), 1.0);\n"
-        "vec2 p = floor((4.0*256.0) * v_uv);\n"
-        "vec2 m = mod(p, 4.0);\n"
         "vec3 grille;\n"
         "if (m.x >= 3.0) grille =       vec3(0.333, 0.667, 1.000);\n"
         "else if (m.x >= 2.0) grille =  vec3(1.000, 0.667, 0.333);\n"
         "else if (m.x >= 1.0) grille =  vec3(0.333, 0.667, 1.000);\n"
         "else grille =                  vec3(1.000, 0.667, 0.333);\n"
-        "grille = 0.84 + 0.16*grille;\n"
-        "float d = distance(m.y, (4.0-2.0) / 2.0);\n"
-        "float scan = (30.0/256.0 * (4.0-2.0) / 1.0) * d;\n"
-        "vec3 result = mix(color, grille * (1.0-scan) * color, 1.0-luma);\n"
-        "gl_FragColor = vec4(result, 1.0);\n"
-//        "gl_FragColor = vec4(result - scan, 1.0);\n"
 #endif
         "}\n";
     p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
