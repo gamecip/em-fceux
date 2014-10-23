@@ -211,10 +211,6 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "uniform sampler2D u_baseTex;\n"
         "uniform sampler2D u_ntscTex;\n"
         "varying vec2 v_uv;\n"
-        "#define LOWEST  " STR(LOWEST) "\n"
-        "#define HIGHEST " STR(HIGHEST) "\n"
-        "#define BLACK   " STR(BLACK) "\n"
-        "#define WHITE   " STR(WHITE) "\n"
         "void main(void) {\n"
         "    vec2 la = texture2D(u_baseTex, v_uv).ra;\n"
         "    vec2 p = floor(256.0*v_uv);\n"
@@ -222,7 +218,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
         "        mod(p.x - p.y, 3.0) / 3.0\n" // phase
         "    );\n"
-        "    vec4 result = texture2D(u_ntscTex, uv) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK));\n"
+        "    vec4 result = texture2D(u_ntscTex, uv);\n"
         "    gl_FragColor = result;\n"
         "}\n";
     p->lvl_prog = buildShader(lvl_vert_src, lvl_frag_src);
@@ -236,14 +232,14 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "attribute vec4 vert;\n"
         "varying vec2 v_uv[6];\n"
         "#define S vec2(1.0/256.0, 0.0)\n"
-        "#define O(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
+        "#define UV_OUT(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
         "void main() {\n"
-        "O(0,-4.0);\n"
-        "O(1,-3.0);\n"
-        "O(2,-2.0);\n"
-        "O(3,-1.0);\n"
-        "O(4, 0.0);\n"
-        "O(5, 1.0);\n"
+        "UV_OUT(0,-4.0);\n"
+        "UV_OUT(1,-3.0);\n"
+        "UV_OUT(2,-2.0);\n"
+        "UV_OUT(3,-1.0);\n"
+        "UV_OUT(4, 0.0);\n"
+        "UV_OUT(5, 1.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* rgb_frag_src =
@@ -252,9 +248,15 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "uniform vec2 u_mousePos;\n"
         "varying vec2 v_uv[6];\n"
 #if 1 // 0: texture test pass-through
-        "#define PI 3.1415926535\n"
+        "#define PI " STR(M_PI) "\n"
         "#define PIC (PI / 6.0)\n"
         "#define GAMMA (2.2 / 1.89)\n"
+        "#define LOWEST  " STR(LOWEST) "\n"
+        "#define HIGHEST " STR(HIGHEST) "\n"
+        "#define BLACK   " STR(BLACK) "\n"
+        "#define WHITE   " STR(WHITE) "\n"
+        "#define RESCALE(v_) ((v_) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK)))\n"
+        "#define SMP_IN(i_) v[i_] = RESCALE(texture2D(u_lvlTex, v_uv[i_]))\n"
         "const mat3 c_convMat = mat3(\n"
         "    1.0,        1.0,        1.0,       // Y\n"
 #if 0
@@ -292,12 +294,12 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
         // q=36, fringe center, smoothing method
         "vec4 v[6];\n"
-        "v[0] = texture2D(u_lvlTex, v_uv[0]);\n"
-        "v[1] = texture2D(u_lvlTex, v_uv[1]);\n"
-        "v[2] = texture2D(u_lvlTex, v_uv[2]);\n"
-        "v[3] = texture2D(u_lvlTex, v_uv[3]);\n"
-        "v[4] = texture2D(u_lvlTex, v_uv[4]);\n"
-        "v[5] = texture2D(u_lvlTex, v_uv[5]);\n"
+        "SMP_IN(0);\n"
+        "SMP_IN(1);\n"
+        "SMP_IN(2);\n"
+        "SMP_IN(3);\n"
+        "SMP_IN(4);\n"
+        "SMP_IN(5);\n"
 
         "v[0] *= step(0.0, v_uv[0].x);\n"
         "v[1] *= step(0.0, v_uv[1].x);\n"
