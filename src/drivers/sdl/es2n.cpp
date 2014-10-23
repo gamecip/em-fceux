@@ -9,9 +9,9 @@
 #define NUM_CYCLES 3
 #define NUM_CYCLES_TEXTURE 4
 #define NUM_COLORS (64 * 8) // 64 palette colors, 8 color de-emphasis settings.
-#define PERSISTENCE_R 0.16  // Red phosphor persistence.
-#define PERSISTENCE_G 0.20  // Green "
-#define PERSISTENCE_B 0.22  // Blue "
+#define PERSISTENCE_R 0.165 // Red phosphor persistence.
+#define PERSISTENCE_G 0.205 // Green "
+#define PERSISTENCE_B 0.225  // Blue "
 
 // Source code modified from:
 // http://wiki.nesdev.com/w/index.php/NTSC_video
@@ -245,12 +245,11 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     const char* rgb_frag_src =
         "precision highp float;\n"
         "uniform sampler2D u_lvlTex;\n"
-        "uniform vec2 u_mousePos;\n"
         "varying vec2 v_uv[6];\n"
 #if 1 // 0: texture test pass-through
         "#define PI " STR(M_PI) "\n"
         "#define PIC (PI / 6.0)\n"
-        "#define GAMMA (2.2 / 1.89)\n"
+        "#define GAMMA (2.2 / 1.9)\n"
         "#define LOWEST  " STR(LOWEST) "\n"
         "#define HIGHEST " STR(HIGHEST) "\n"
         "#define BLACK   " STR(BLACK) "\n"
@@ -334,11 +333,19 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "s[0] += sample(ph[4], v[4], c1);\n"
         "s[0] += sample(ph[5], v[5], c0);\n"
 
+#if 1
+        "vec3 yiq = vec3(\n"
+        "    s[1].r,\n"
+        "    0.7*s[0].g + s[1].g + 0.7*s[2].g,\n"
+        "    0.7*s[0].b + s[1].b + 0.7*s[2].b\n"
+        ") / (6.0 * vec3(1.0, 2.4, 2.4));\n"
+#else
         "vec3 yiq = vec3(\n"
         "    s[0].r,\n"
         "    s[0].g + s[1].g,\n"
         "    s[0].b + s[1].b + 0.5*s[2].b\n"
         ") / (6.0 * vec3(1.0, 2.0, 2.5));\n"
+#endif
 
         "vec3 result = c_convMat * yiq;\n"
         "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
@@ -371,7 +378,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "float m = mod(floor((3.0*256.0) * v_uv.y), 3.0);\n"
         "float d = distance(m, 1.0);\n"
         "float scan = 1.0 - d;\n"
-        "vec3 result = color + ((1.0-luma) * (3.0/256.0) * (3.0*scan - 1.0));\n"
+        "vec3 result = color + ((1.0-luma) * (3.7/256.0) * (3.0*scan - 1.0));\n"
         "gl_FragColor = vec4(result, 1.0);\n"
 #else
         "vec3 grille;\n"
