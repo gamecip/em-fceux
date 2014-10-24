@@ -22,7 +22,10 @@ typedef struct t_es2n
 
     GLuint disp_prog;   // Shader for final display.
 
-    GLint viewport[4]; // Original viewport.
+    GLint viewport[4];  // Original viewport.
+
+    GLuint crt_verts_buf;   // Vertex buffer for CRT.
+    GLuint crt_elems_buf;   // Element buffer for CRT.
 } es2n;
 
 void es2nInit(es2n *p, int left, int right, int top, int bottom);

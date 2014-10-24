@@ -134,6 +134,7 @@ void makeFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filt
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     glGenFramebuffers(1, fb);
@@ -165,6 +166,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glEnableVertexAttribArray(0);
 
     // Quad vertices, packed as: x, y, u, v
     const GLfloat quadverts[4 * 4] = {
@@ -179,9 +181,51 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glBindBuffer(GL_ARRAY_BUFFER, p->quadbuf);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quadverts), quadverts, GL_STATIC_DRAW);
 
-    // Create vertex attribute array.
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    // Create CRT vertex buffer.
+#define N 4
+#define M 3
+    const size_t size_verts = sizeof(GLfloat) * 4 * (2*N+1) * (2*M+1);
+    GLfloat *crt_verts = (GLfloat*) malloc(size_verts);
+    const double dx = 8.8;
+    const double dy = 4.4;
+    const double dx2 = dx*dx;
+    const double dy2 = dy*dy;
+    const double mx = sqrt(1.0 + dx2);
+    const double my = sqrt(1.0 + dy2);
+    for (int j = -M; j <= M; j++) {
+        for (int i = -N; i <= N; i++) {
+            int k = 4 * ((j+M) * (2*N+1) + i+N);
+            const double x = (double) i/N;
+            const double y = (double) j/M;
+            const double r2 = x*x + y*y;
+            crt_verts[k+0] = mx * x / sqrt(dx2 + r2);
+            crt_verts[k+1] = my * y / sqrt(dy2 + r2);
+            crt_verts[k+2] = 0.5 + 0.5*x;
+            crt_verts[k+3] = ((top-bottom) * (0.5 + 0.5*y) + bottom) / 256.0f;
+        }
+    }
+    glGenBuffers(1, &p->crt_verts_buf);
+    glBindBuffer(GL_ARRAY_BUFFER, p->crt_verts_buf);
+    glBufferData(GL_ARRAY_BUFFER, size_verts, crt_verts, GL_STATIC_DRAW);
+    free(crt_verts);
+
+    const size_t size_elems = sizeof(GLushort) * (2 * (2*N+1+1) * (2*M));
+    GLushort *crt_elems = (GLushort*) malloc(size_elems);
+    int k = 0;
+    for (int j = 0; j < 2*M; j++) {
+        for (int i = 0; i < 2*N+1; i++) {
+            crt_elems[k+0] = i + (j+0) * (2*N+1);
+            crt_elems[k+1] = i + (j+1) * (2*N+1);
+            k += 2;
+        }
+        crt_elems[k+0] = crt_elems[k-1];
+        crt_elems[k+1] = crt_elems[k-1 - 2*2*N];
+        k += 2;
+    }
+    glGenBuffers(1, &p->crt_elems_buf);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, p->crt_elems_buf);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, size_elems, crt_elems, GL_STATIC_DRAW);
+    free(crt_elems);
 
     // Setup input texture.
     glActiveTexture(GL_TEXTURE0);
@@ -424,6 +468,9 @@ void es2nRender(es2n *p, GLushort *pixels)
     glBindTexture(GL_TEXTURE_2D, p->base_tex);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 256, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, pixels);
 
+    glBindBuffer(GL_ARRAY_BUFFER, p->quadbuf);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
     glBindFramebuffer(GL_FRAMEBUFFER, p->lvl_fb);
     glViewport(0, 8, 256, 224);
     glUseProgram(p->lvl_prog);
@@ -438,9 +485,12 @@ void es2nRender(es2n *p, GLushort *pixels)
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glDisable(GL_BLEND);
 
+    glBindBuffer(GL_ARRAY_BUFFER, p->crt_verts_buf);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
     glUseProgram(p->disp_prog);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDrawElements(GL_TRIANGLE_STRIP, 2 * (2*N+1+1) * (2*M), GL_UNSIGNED_SHORT, 0);
 }
 
