@@ -9,12 +9,13 @@ typedef struct t_es2n
 {
     GLuint quadbuf;     // Fullscreen quad vertex buffer.
 
-    GLuint base_tex;    // Base input texture (indexed NES palette).
-    GLuint ntsc_tex;    // Palette to voltage levels lookup texture.
+    GLuint idx_tex;     // Input indexed color texture (NES palette, 256x240).
+    GLuint deemp_tex;   // Input de-emphasis bits per row (240x1).
+    GLuint lookup_tex;  // Palette to voltage levels lookup texture.
 
-    GLuint lvl_fb;      // Framebuffer for voltage level texture generation.
-    GLuint lvl_tex;     // Texture of voltage levels (256x256x4).
-    GLuint lvl_prog;    // Shader for levels.
+    GLuint signal_fb;   // Framebuffer for signal texture generation.
+    GLuint signal_tex;  // Texture of signal (256x256x4).
+    GLuint signal_prog; // Shader for signal.
 
     GLuint rgb_fb;      // Framebuffer for output RGB texture generation.
     GLuint rgb_tex;     // Output RGB texture (1024x256x3).
@@ -30,6 +31,6 @@ typedef struct t_es2n
 
 void es2nInit(es2n *p, int left, int right, int top, int bottom);
 void es2nDeinit(es2n *p);
-void es2nRender(es2n *p, GLushort *pixels);
+void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp);
 
 #endif

@@ -6,12 +6,25 @@
 #define STR(s_) _STR(s_)
 #define _STR(s_) #s_
 
+#define IDX_I       0
+#define DEEMP_I     1
+#define LOOKUP_I    2
+#define SIGNAL_I    3
+#define RGB_I       4
+#define TEX(i_)     (GL_TEXTURE0+(i_))
+
 #define NUM_CYCLES 3
 #define NUM_CYCLES_TEXTURE 4
 #define NUM_COLORS (64 * 8) // 64 palette colors, 8 color de-emphasis settings.
-#define PERSISTENCE_R 0.165 // Red phosphor persistence.
-#define PERSISTENCE_G 0.205 // Green "
-#define PERSISTENCE_B 0.225  // Blue "
+#if 0
+#define PERSISTENCE_R 0.500 // Red phosphor persistence.
+#define PERSISTENCE_G 0.500 // Green "
+#define PERSISTENCE_B 0.500  // Blue "
+#else
+#define PERSISTENCE_R 1.7*0.165 // Red phosphor persistence.
+#define PERSISTENCE_G 1.7*0.205 // Green "
+#define PERSISTENCE_B 1.7*0.225  // Blue "
+#endif
 
 // Source code modified from:
 // http://wiki.nesdev.com/w/index.php/NTSC_video
@@ -83,16 +96,15 @@ static void genKernelTex(es2n *p)
         }
     }
 
-    glActiveTexture(GL_TEXTURE1);
-    glGenTextures(1, &p->ntsc_tex);
-    glBindTexture(GL_TEXTURE_2D, p->ntsc_tex);
+    glActiveTexture(TEX(LOOKUP_I));
+    glGenTextures(1, &p->lookup_tex);
+    glBindTexture(GL_TEXTURE_2D, p->lookup_tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, NUM_COLORS, NUM_CYCLES_TEXTURE, 0, GL_RGBA, GL_UNSIGNED_BYTE, result);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-    glActiveTexture(GL_TEXTURE0);
     free(result);
 }
 
@@ -146,19 +158,23 @@ void makeFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filt
 static void setUniforms(GLuint prog)
 {
     GLint k;
-    k = glGetUniformLocation(prog, "u_baseTex");
-    glUniform1i(k, 0);
-    k = glGetUniformLocation(prog, "u_ntscTex");
-    glUniform1i(k, 1);
-    k = glGetUniformLocation(prog, "u_lvlTex");
-    glUniform1i(k, 2);
+    k = glGetUniformLocation(prog, "u_idxTex");
+    glUniform1i(k, IDX_I);
+    k = glGetUniformLocation(prog, "u_deempTex");
+    glUniform1i(k, DEEMP_I);
+    k = glGetUniformLocation(prog, "u_lookupTex");
+    glUniform1i(k, LOOKUP_I);
+    k = glGetUniformLocation(prog, "u_signalTex");
+    glUniform1i(k, SIGNAL_I);
     k = glGetUniformLocation(prog, "u_rgbTex");
-    glUniform1i(k, 3);
+    glUniform1i(k, RGB_I);
 }
 
+#include <stdio.h>
 // TODO: reformat inputs to something more meaningful
 void es2nInit(es2n *p, int left, int right, int top, int bottom)
 {
+    printf("left:%d right:%d top:%d bottom:%d\n", left, right, top, bottom);
     memset(p, 0, sizeof(es2n));
 
     glGetIntegerv(GL_VIEWPORT, p->viewport);
@@ -182,12 +198,12 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glBufferData(GL_ARRAY_BUFFER, sizeof(quadverts), quadverts, GL_STATIC_DRAW);
 
     // Create CRT vertex buffer.
-#define N 4
-#define M 3
+#define N 8
+#define M 6
     const size_t size_verts = sizeof(GLfloat) * 4 * (2*N+1) * (2*M+1);
     GLfloat *crt_verts = (GLfloat*) malloc(size_verts);
-    const double dx = 8.8;
-    const double dy = 4.4;
+    const double dx = 8.9;
+    const double dy = 3.6;
     const double dx2 = dx*dx;
     const double dy2 = dy*dy;
     const double mx = sqrt(1.0 + dx2);
@@ -227,11 +243,21 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, size_elems, crt_elems, GL_STATIC_DRAW);
     free(crt_elems);
 
-    // Setup input texture.
-    glActiveTexture(GL_TEXTURE0);
-    glGenTextures(1, &p->base_tex);
-    glBindTexture(GL_TEXTURE_2D, p->base_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA, 256, 256, 0, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, 0);
+    // Setup input pixels texture.
+    glActiveTexture(TEX(IDX_I));
+    glGenTextures(1, &p->idx_tex);
+    glBindTexture(GL_TEXTURE_2D, p->idx_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 256, 256, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    // Setup input de-emphasis rows texture.
+    glActiveTexture(TEX(DEEMP_I));
+    glGenTextures(1, &p->deemp_tex);
+    glBindTexture(GL_TEXTURE_2D, p->deemp_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 256, 1, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -240,56 +266,61 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     genKernelTex(p);
 
     // Configure levels framebuffer.
-    glActiveTexture(GL_TEXTURE2);
-    makeFBTex(&p->lvl_tex, &p->lvl_fb, 256, 256, GL_RGBA, GL_NEAREST);
-    const char* lvl_vert_src =
+    glActiveTexture(TEX(SIGNAL_I));
+    makeFBTex(&p->signal_tex, &p->signal_fb, 256, 256, GL_RGBA, GL_NEAREST);
+    const char* signal_vert_src =
         "precision highp float;\n"
         "attribute vec4 vert;\n"
-        "varying vec2 v_uv;\n"
+        "varying vec2 v_uv[2];\n"
         "void main() {\n"
-        "v_uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
+        "v_uv[0] = vec2(vert.z, (240.0/256.0) - vert.w);\n"
+        "v_uv[1] = vec2(v_uv[0].y, 0.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
-    const char* lvl_frag_src =
+    const char* signal_frag_src =
         "precision highp float;\n"
-        "uniform sampler2D u_baseTex;\n"
-        "uniform sampler2D u_ntscTex;\n"
-        "varying vec2 v_uv;\n"
+        "uniform sampler2D u_idxTex;\n"
+        "uniform sampler2D u_deempTex;\n"
+        "uniform sampler2D u_lookupTex;\n"
+        "uniform float u_field;\n"
+        "varying vec2 v_uv[2];\n"
         "void main(void) {\n"
-        "    vec2 la = texture2D(u_baseTex, v_uv).ra;\n"
-        "    vec2 p = floor(256.0*v_uv);\n"
+        "    vec2 la = vec2(texture2D(u_idxTex, v_uv[0]).r, texture2D(u_deempTex, v_uv[1]).r);\n"
+        "    vec2 p = floor(256.0*v_uv[0]);\n"
         "    vec2 uv = vec2(\n"
         "        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
-        "        mod(p.x - p.y, 3.0) / 3.0\n" // phase
+        "        mod(p.x - p.y + u_field, 3.0) / 3.0\n" // phase
         "    );\n"
-        "    vec4 result = texture2D(u_ntscTex, uv);\n"
+        "    vec4 result = texture2D(u_lookupTex, uv);\n"
         "    gl_FragColor = result;\n"
         "}\n";
-    p->lvl_prog = buildShader(lvl_vert_src, lvl_frag_src);
-    setUniforms(p->lvl_prog);
+    p->signal_prog = buildShader(signal_vert_src, signal_frag_src);
+    setUniforms(p->signal_prog);
 
     // Configure RGB framebuffer.
-    glActiveTexture(GL_TEXTURE3);
+    glActiveTexture(TEX(RGB_I));
     makeFBTex(&p->rgb_tex, &p->rgb_fb, 1024, 256, GL_RGB, GL_LINEAR);
     const char* rgb_vert_src =
         "precision highp float;\n"
         "attribute vec4 vert;\n"
-        "varying vec2 v_uv[6];\n"
+        "varying vec2 v_uv[7];\n"
         "#define S vec2(1.0/256.0, 0.0)\n"
         "#define UV_OUT(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
         "void main() {\n"
-        "UV_OUT(0,-4.0);\n"
-        "UV_OUT(1,-3.0);\n"
-        "UV_OUT(2,-2.0);\n"
-        "UV_OUT(3,-1.0);\n"
-        "UV_OUT(4, 0.0);\n"
-        "UV_OUT(5, 1.0);\n"
+        "UV_OUT(0,-5.0);\n"
+        "UV_OUT(1,-4.0);\n"
+        "UV_OUT(2,-3.0);\n"
+        "UV_OUT(3,-2.0);\n"
+        "UV_OUT(4,-1.0);\n"
+        "UV_OUT(5, 0.0);\n"
+        "UV_OUT(6, 1.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* rgb_frag_src =
         "precision highp float;\n"
-        "uniform sampler2D u_lvlTex;\n"
-        "varying vec2 v_uv[6];\n"
+        "uniform sampler2D u_signalTex;\n"
+        "uniform float u_field;\n"
+        "varying vec2 v_uv[7];\n"
 #if 1 // 0: texture test pass-through
         "#define PI " STR(M_PI) "\n"
         "#define PIC (PI / 6.0)\n"
@@ -299,7 +330,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "#define BLACK   " STR(BLACK) "\n"
         "#define WHITE   " STR(WHITE) "\n"
         "#define RESCALE(v_) ((v_) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK)))\n"
-        "#define SMP_IN(i_) v[i_] = RESCALE(texture2D(u_lvlTex, v_uv[i_]))\n"
+        "#define SMP_IN(i_) v[i_] = RESCALE(texture2D(u_signalTex, v_uv[i_]))\n"
         "const mat3 c_convMat = mat3(\n"
         "    1.0,        1.0,        1.0,       // Y\n"
 #if 0
@@ -331,64 +362,77 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "    );\n"
         "}\n"
         "void main(void) {\n"
-        "vec2 coord = floor(4.0*256.0*v_uv[4]);\n"
+        "vec2 coord = floor(4.0*256.0*v_uv[5]);\n"
         "vec2 p = floor(coord / 4.0);\n"
         "vec4 offs = vec4(mod(coord.x, 4.0));\n"
 
         // q=36, fringe center, smoothing method
-        "vec4 v[6];\n"
+        "vec4 v[7];\n"
         "SMP_IN(0);\n"
         "SMP_IN(1);\n"
         "SMP_IN(2);\n"
         "SMP_IN(3);\n"
         "SMP_IN(4);\n"
         "SMP_IN(5);\n"
+        "SMP_IN(6);\n"
 
         "v[0] *= step(0.0, v_uv[0].x);\n"
         "v[1] *= step(0.0, v_uv[1].x);\n"
         "v[2] *= step(0.0, v_uv[2].x);\n"
         "v[3] *= step(0.0, v_uv[3].x);\n"
-        "v[5] *= step(v_uv[5].x, 1.0);\n"
+        "v[4] *= step(0.0, v_uv[4].x);\n"
+        "v[6] *= step(v_uv[5].x, 1.0);\n"
 
         "const vec4 c_base = PIC*(3.9 + vec4(0.5, 2.5, 4.5, 6.5));\n"
-        "vec4 scanphase = c_base - PIC*mod(p.y*8.0, 12.0);\n"
-        "vec4 ph[6];\n"
+        "vec4 scanphase = c_base + PIC*mod(8.0 * (u_field-p.y), 12.0);\n"
+        "vec4 ph[7];\n"
         "ph[0] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[0].x));\n"
         "ph[1] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[1].x));\n"
         "ph[2] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[2].x));\n"
         "ph[3] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[3].x));\n"
         "ph[4] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[4].x));\n"
         "ph[5] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[5].x));\n"
+        "ph[6] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[6].x));\n"
 
         "vec4 c0 = clamp01(vec4(1.0, 0.0,-1.0,-2.0) + offs);\n"
         "vec4 c1 = clamp01(vec4(2.0, 3.0, 4.0, 4.0) - offs);\n"
         "vec4 c2 = max(    vec4(0.0, 0.0, 0.0, 1.0) - offs, 0.0);\n"
 
-        "vec3 s[3];\n"
-        "s[2]  = sample(ph[0], v[0], c2);\n"
-        "s[2] += sample(ph[1], v[1], c1);\n"
-        "s[2] += sample(ph[2], v[2], c0);\n"
+        "vec3 s[4];\n"
+        "s[3]  = sample(ph[0], v[0], one-c0);\n"
+        "s[3] += sample(ph[1], v[1], one-c2);\n"
+        "s[3] += sample(ph[2], v[2], one-c1);\n"
 
-        "s[1]  = sample(ph[2], v[2], one-c0);\n"
-        "s[1] += sample(ph[3], v[3], one-c2);\n"
-        "s[1] += sample(ph[4], v[4], one-c1);\n"
+        "s[2]  = sample(ph[1], v[1], c2);\n"
+        "s[2] += sample(ph[2], v[2], c1);\n"
+        "s[2] += sample(ph[3], v[3], c0);\n"
 
-        "s[0]  = sample(ph[3], v[3], c2);\n"
-        "s[0] += sample(ph[4], v[4], c1);\n"
-        "s[0] += sample(ph[5], v[5], c0);\n"
+        "s[1]  = sample(ph[3], v[3], one-c0);\n"
+        "s[1] += sample(ph[4], v[4], one-c2);\n"
+        "s[1] += sample(ph[5], v[5], one-c1);\n"
 
-#if 1
+        "s[0]  = sample(ph[4], v[4], c2);\n"
+        "s[0] += sample(ph[5], v[5], c1);\n"
+        "s[0] += sample(ph[6], v[6], c0);\n"
+
+#if 0
         "vec3 yiq = vec3(\n"
         "    s[1].r,\n"
         "    0.7*s[0].g + s[1].g + 0.7*s[2].g,\n"
-        "    0.7*s[0].b + s[1].b + 0.7*s[2].b\n"
-        ") / (6.0 * vec3(1.0, 2.4, 2.4));\n"
+        "    1.0*s[0].b + s[1].b + 1.0*s[2].b\n"
+        ") / (6.0 * vec3(1.0, 2.4, 3.0));\n"
+#elif 1
+        "vec3 yiq = vec3(\n"
+        "    s[1].r,\n"
+        "    s[0].g + s[1].g,\n"
+        "    s[0].b + s[1].b\n"
+        ") / (6.0 * vec3(1.0, 2.0, 2.0));\n"
 #else
         "vec3 yiq = vec3(\n"
-        "    s[0].r,\n"
-        "    s[0].g + s[1].g,\n"
-        "    s[0].b + s[1].b + 0.5*s[2].b\n"
-        ") / (6.0 * vec3(1.0, 2.0, 2.5));\n"
+        "    s[3].r,\n"
+        "    s[2].g + s[3].g,\n"
+        "    s[0].b + s[1].b + s[2].b + s[3].b\n"
+        ") / (6.0 * vec3(1.0, 2.0, 4.0));\n"
 #endif
 
         "vec3 result = c_convMat * yiq;\n"
@@ -396,7 +440,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "}\n";
 #else
         "void main(void) {\n"
-        "gl_FragColor = texture2D(u_lvlTex, v_uv[4]);\n"
+        "gl_FragColor = texture2D(u_signalTex, v_uv[4]);\n"
         "}\n";
 #endif
     p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
@@ -406,18 +450,28 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     const char* disp_vert_src =
         "precision highp float;\n"
         "attribute vec4 vert;\n"
-        "varying vec2 v_uv;\n"
+        "varying vec2 v_uv[3];\n"
         "void main() {\n"
-        "v_uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
+        "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
+        "v_uv[0] = uv + vec2(1.0/1024.0, 0.0);\n"
+        "v_uv[1] = uv;\n"
+        "v_uv[2] = uv - vec2(1.0/1024.0, 0.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* disp_frag_src =
         "precision highp float;\n"
         "uniform sampler2D u_rgbTex;\n"
-        "varying vec2 v_uv;\n"
+        "varying vec2 v_uv[3];\n"
         "void main(void) {\n"
-        "vec3 color = texture2D(u_rgbTex, v_uv).rgb;\n"
+        "vec3 color = vec3(texture2D(u_rgbTex, v_uv[0]).r, texture2D(u_rgbTex, v_uv[1]).g, texture2D(u_rgbTex, v_uv[2]).b);\n"
 #if 1
+// For 2x size 
+        "float luma = dot(vec3(0.299, 0.587, 0.114), color);\n"
+        "float scan = mod(floor((2.0*256.0) * v_uv[1].y), 2.0);\n"
+        "vec3 result = color + ((1.0-luma) * (5.5/256.0) * (2.0*scan - 1.0));\n"
+        "gl_FragColor = vec4(result, 1.0);\n"
+#elif 0
+// For 3x size 
         "float luma = dot(vec3(0.299, 0.587, 0.114), color);\n"
         "float m = mod(floor((3.0*256.0) * v_uv.y), 3.0);\n"
         "float d = distance(m, 1.0);\n"
@@ -447,13 +501,13 @@ void es2nDeinit(es2n *p)
 {
 // TODO: is cleanup needed?
 /*
-    if (p->base_tex) {
-        glDeleteTextures(1, &p->base_tex);
-        p->base_tex = 0;
+    if (p->idx_tex) {
+        glDeleteTextures(1, &p->idx_tex);
+        p->idx_tex = 0;
     }
-    if (p->ntsc_tex) {
-        glDeleteTextures(1, &p->ntsc_tex);
-        p->ntsc_tex = 0;
+    if (p->lookup_tex) {
+        glDeleteTextures(1, &p->lookup_tex);
+        p->lookup_tex = 0;
     }
     if (p->rgb_prog) {
         glDeleteProgram(p->rgb_prog);
@@ -462,23 +516,42 @@ void es2nDeinit(es2n *p)
 */
 }
 
-void es2nRender(es2n *p, GLushort *pixels)
+// TODO: just for testing
+static float s_field;
+
+static void updateUniforms(GLuint prog)
 {
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, p->base_tex);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 256, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE, pixels);
+    int k = glGetUniformLocation(prog, "u_field");
+    glUniform1f(k, s_field);
+}
+
+void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp)
+{
+    s_field = !s_field;
+
+    // Update input pixels.
+    glActiveTexture(TEX(IDX_I));
+    glBindTexture(GL_TEXTURE_2D, p->idx_tex);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels);
+
+    // Update input de-emphasis rows.
+    glActiveTexture(TEX(DEEMP_I));
+    glBindTexture(GL_TEXTURE_2D, p->deemp_tex);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 240, 1, GL_LUMINANCE, GL_UNSIGNED_BYTE, row_deemp);
 
     glBindBuffer(GL_ARRAY_BUFFER, p->quadbuf);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, p->lvl_fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, p->signal_fb);
     glViewport(0, 8, 256, 224);
-    glUseProgram(p->lvl_prog);
+    glUseProgram(p->signal_prog);
+    updateUniforms(p->signal_prog);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
     glBindFramebuffer(GL_FRAMEBUFFER, p->rgb_fb);
     glViewport(0, 8, 1024, 224);
     glUseProgram(p->rgb_prog);
+    updateUniforms(p->rgb_prog);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
     glBlendColor(PERSISTENCE_R, PERSISTENCE_G, PERSISTENCE_B, 0.0);
@@ -491,6 +564,8 @@ void es2nRender(es2n *p, GLushort *pixels)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
     glUseProgram(p->disp_prog);
+//    glDrawElements(GL_TRIANGLE_STRIP, 2 * (2*N+1+1) * 2, GL_UNSIGNED_SHORT, 0);
+//    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);
     glDrawElements(GL_TRIANGLE_STRIP, 2 * (2*N+1+1) * (2*M), GL_UNSIGNED_SHORT, 0);
 }
 

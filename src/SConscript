@@ -41,5 +41,5 @@ print env['LINKFLAGS']
 if env['PLATFORM'] == 'win32':
   fceux = env.Program('fceux.exe', file_list)
 else:
-  fceux = env.Program('fceux', file_list)
+  fceux = env.Program('../deployment/fceux', file_list)
 Return('fceux')

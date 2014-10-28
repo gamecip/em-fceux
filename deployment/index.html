@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>FCEUX</title>
+    <style>
+      body {
+        font-family: Verdana, Geneva, sans-serif;
+        margin: 0;
+        border: 0px none;
+        padding: none;
+        background-color: #111;
+        float: none;
+      }
+
+      .emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
+      div.emscripten { text-align: center; }      
+      #container {
+        text-align: center;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        border: 0px none;
+        width: 585px;
+        height: 448px;
+        margin-left: -292px;
+        margin-top: -224px;
+        background-color: #111;
+      }
+      canvas.emscripten {
+        position: absolute;
+        border: 0px none;
+      }
+
+      #visor {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        border: 0px none;
+        width: 998px;
+        height: 649px;
+        margin-left: -382px;
+        margin-top: -316px;
+        background-image: url('img/mock3.png');
+      }
+
+      #loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 585px;
+        height: 88px;
+        margin-left: -292px;
+        margin-top: -44px;
+        background-color: #111;
+      }
+
+      #controls {
+        position: absolute;
+        width: 585px;
+        height: 448px;
+        background-color: #111;
+      }
+
+      #spinner {
+        height: 36px;
+        width: 36px;
+        margin: 0;
+        display: inline-block;
+
+        -webkit-animation: rotation .7s linear infinite;
+        -moz-animation: rotation .7s linear infinite;
+        -o-animation: rotation .7s linear infinite;
+        animation: rotation 0.7s linear infinite;
+
+        border-left: 24px solid #FCFCFC;
+        border-right: 24px solid #FCFCFC;
+        border-bottom: 24px solid #FCFCFC;
+        border-top: 24px solid #111;
+        
+        border-radius: 100%;
+        background-color: #111;
+      }
+
+      @-webkit-keyframes rotation {
+        from {-webkit-transform: rotate(0deg);}
+        to {-webkit-transform: rotate(360deg);}
+      }
+      @-moz-keyframes rotation {
+        from {-moz-transform: rotate(0deg);}
+        to {-moz-transform: rotate(360deg);}
+      }
+      @-o-keyframes rotation {
+        from {-o-transform: rotate(0deg);}
+        to {-o-transform: rotate(360deg);}
+      }
+      @keyframes rotation {
+        from {transform: rotate(0deg);}
+        to {transform: rotate(360deg);}
+      }
+    </style>
+    <script type="text/javascript">
+      function loadROMFile(files) {
+        var f = files[0]; 
+        if (f) {
+          var r = new FileReader();
+          r.onload = function(e) { 
+            var opts = {encoding:'binary'};
+            FS.writeFile(f.name, new Uint8Array(e.target.result), opts);
+            Module.romName = f.name;
+            Module.romReload = 1;
+          }
+          r.readAsArrayBuffer(f);
+        } else { 
+          alert("Failed to load file: " + f.name);
+        }
+      }
+      function handleInputChange(ev) {
+        loadROMFile(ev.target.files);
+      }
+      window.onbeforeunload = function (ev) {
+        var msg = 'Do you want to close the FCEUX emulator and the current game? Unsaved game data will be lost.';
+        (ev || window.event).returnValue = msg; 
+        return msg;
+      };
+    </script>
+  </head>
+  <body>
+
+    <div id="container">
+      <canvas class="emscripten" id="canvas" hidden="true" oncontextmenu="event.preventDefault()"></canvas>
+      <div id="loader">
+        <div id="spinner"></div>
+      </div>
+      <div id="controls" hidden="true">
+      </div>
+    </div>
+
+    <div id="visor"></div>
+
+    <script type='text/javascript'>
+      var loaderElement = document.getElementById('loader');
+      var controlsElement = document.getElementById('controls');
+
+      var Module = {
+        preRun: [function() {
+          SDL.defaults.copyOnLock = false;
+        }],
+        postRun: [],
+        print: function() {
+          text = Array.prototype.slice.call(arguments).join(' ');
+          console.log(text);
+        },
+        printErr: function(text) {
+          text = Array.prototype.slice.call(arguments).join(' ');
+          console.error(text);
+        },
+        canvas: (function() {
+          var canvasElement = document.getElementById('canvas');
+
+          // As a default initial behavior, pop up an alert when webgl context is lost. To make your
+          // application robust, you may want to override this behavior before shipping!
+          // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
+          canvasElement.addEventListener("webglcontextlost", function(e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+
+          return canvasElement;
+        })(),
+        setStatus: function(text) {
+          if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+          if (text === Module.setStatus.text) return;
+          var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+          var now = Date.now();
+          if (m && now - Date.now() < 30) return;
+          if (m) {
+            text = m[1];
+            //loaderElement.hidden = false;
+          } else {
+            if (!text) {
+              //controlsElement.hidden = false;
+              Module.canvas.hidden = false;
+              loaderElement.hidden = true;
+            }
+          }
+        },
+        totalDependencies: 0,
+        monitorRunDependencies: function(left) {
+          this.totalDependencies = Math.max(this.totalDependencies, left);
+          Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+        }
+      };
+      Module.setStatus('Loading...');
+      window.onerror = function(event) {
+        Module.setStatus = function(text) {
+          if (text) Module.printErr('[post-exception status] ' + text);
+        };
+      };
+    </script>
+    <script async type="text/javascript" src="fceux.js"></script>
+    <script type="text/javascript">
+      function dragHandler(text) {
+        return function(ev) {
+          ev.stopPropagation();
+          ev.preventDefault();
+          console.log('drag:' + text);
+        };
+      }
+      function dropHandler(ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        console.log('drop');
+        loadROMFile(ev.dataTransfer.files);
+      }
+//      document.getElementById('fileinput').addEventListener('change', handleInputChange, false);
+//      var elem = Module.canvas;
+      var elem = document.getElementById('visor');
+      elem.addEventListener('dragenter', dragHandler('enter'), false);
+      elem.addEventListener('dragleave', dragHandler('leave'), false);
+      elem.addEventListener('dragover', dragHandler('over'), false);
+      elem.addEventListener('drop', dropHandler, false);
+    </script>
+    <script src="//cdn.webglstats.com/stat.js" defer="defer" async="async"></script>
+
+  <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(true, false)">
+  </body>
+</html>
