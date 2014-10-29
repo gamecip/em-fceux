@@ -3,6 +3,8 @@
 #include <cstring>
 #include <cmath>
 
+#define TEST 0
+
 #define STR(s_) _STR(s_)
 #define _STR(s_) #s_
 
@@ -77,8 +79,84 @@ static double NTSCsignal(int pixel, int phase)
     return signal;
 }
 
+#if TEST == 1
+static float s_mins[3];
+static float s_maxs[3];
+#endif
+
 static void genKernelTex(es2n *p)
 {
+#if TEST == 1
+#define NUM_SUBS 8
+#define NUM_TAPS 5
+#define LOOKUP_TEX_W 512
+	double *yiqs = (double*) calloc(3 * NUM_CYCLES*NUM_SUBS*NUM_TAPS * NUM_COLORS, sizeof(double));
+
+ 	s_mins[0] = s_mins[1] = s_mins[2] = 0.0f;
+ 	s_maxs[0] = s_maxs[1] = s_maxs[2] = 0.0f;
+
+    for (int color = 0; color < NUM_COLORS; color++) {
+        for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
+            for (int sub = 0; sub < NUM_SUBS; sub++) {
+                for (int tap = 0; tap < NUM_TAPS; tap++) {
+                    const int phase = cycle * 8;
+                    const double shift = phase + 3.9;
+
+                    float yiq[3] = {0.0f, 0.0f, 0.0f};
+                    for (int p = 0; p < 8; p++)
+                    {
+                        double signal = NTSCsignal(color, phase + p);
+                        signal = (signal-BLACK) / (WHITE-BLACK);
+
+                        const double level = signal / 8.0;
+                        // box kernel
+                        auto kernel = [&](double w) { return abs(0.5 + sub + NUM_SUBS * (tap-floor(NUM_TAPS/2))) < 0.5 * w; }
+                        yiq[0] += kernel(YW) * level;
+                        yiq[1] += kernel(IW) * level * cos(M_PI * (shift+p) / 6.0);
+                        yiq[2] += kernel(QW) * level * sin(M_PI * (shift+p) / 6.0);
+                    }
+
+                    for (int i = 0; i < 3; i++) {
+                        s_mins[i] = fmin(s_mins[i], yiq[i]);
+                        s_maxs[i] = fmax(s_maxs[i], yiq[i]);
+                    }
+
+                    const int k = 3 * (color*NUM_CYCLES*NUM_SUBS*NUM_TAPS + cycle*NUM_SUBS*NUM_TAPS + sub*NUM_TAPS + tap);
+                    yiqs[k+0] = yiq[0];
+                    yiqs[k+1] = yiq[1];
+                    yiqs[k+2] = yiq[2];
+                }
+            }
+        }
+    }
+
+	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_TEX_W * NUM_COLORS, sizeof(unsigned char));
+    for (int color = 0; color < NUM_COLORS; color++) {
+        for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
+            for (int sub = 0; sub < NUM_SUBS; sub++) {
+                for (int tap = 0; tap < NUM_TAPS; tap++) {
+                    const int k = 3 * (color*LOOKUP_TEX_W + cycle*NUM_SUBS*NUM_TAPS + sub*NUM_TAPS + tap);
+                    for (int i = 0; i < 3; i++) {
+                        const double clamped = (yiqs[k+i]-s_mins[i]) / (s_maxs[i]-s_mins[i]);
+                        result[k+i] = (unsigned char) (255.0 * clamped + 0.5);
+                    }
+                }
+            }
+        }
+    }
+
+	glActiveTexture(TEX(LOOKUP_I));
+    glGenTextures(1, &p->lookup_tex);
+    glBindTexture(GL_TEXTURE_2D, p->lookup_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, LOOKUP_TEX_W, NUM_COLORS, 0, GL_RGB, GL_UNSIGNED_BYTE, result);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	free(yiqs);
+	free(result);
+#else
     unsigned char *result = (unsigned char*) calloc(4 * NUM_CYCLES_TEXTURE * NUM_COLORS, sizeof(GLubyte));
 
     for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
@@ -106,6 +184,7 @@ static void genKernelTex(es2n *p)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     free(result);
+#endif
 }
 
 static GLuint compileShader(GLenum type, const char *src)
@@ -146,8 +225,7 @@ void makeFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filt
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
 
     glGenFramebuffers(1, fb);
     glBindFramebuffer(GL_FRAMEBUFFER, *fb);

@@ -1,3 +1,4 @@
 #!/bin/bash
-pushd ~/emsdk && source emsdk_env.sh && popd
+# Huh?? Why we suddenly start needing pwd here?
+pushd ~/emsdk && pwd && source emsdk_env.sh && popd
 emscons scons $@
