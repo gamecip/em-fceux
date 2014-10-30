@@ -80,7 +80,7 @@ static double NTSCsignal(int pixel, int phase)
 }
 
 #if TEST == 1
-#define NUM_SUBPS 8
+#define NUM_SUBPS 4
 #define NUM_TAPS 7
 #define LOOKUP_W 256
 #define YW2 6.0
@@ -90,8 +90,7 @@ static double NTSCsignal(int pixel, int phase)
 static float s_mins[3];
 static float s_maxs[3];
 
-// box kernel
-static double kernel(double w2, double center, double x)
+static double box(double w2, double center, double x)
 {
     return abs(x - center) < w2 ? 1.0 : 0.0;
 }
@@ -111,7 +110,7 @@ static void genKernelTex(es2n *p)
     for (int color = 0; color < NUM_COLORS; color++) {
         for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
             for (int subp = 0; subp < NUM_SUBPS; subp++) {
-                const double kernel_center = 0.5 + subp + 8*(NUM_TAPS/2);
+                const double kernel_center = 1.5 + 2*subp + 8*(NUM_TAPS/2);
 
                 for (int tap = 0; tap < NUM_TAPS; tap++) {
                     float yiq[3] = {0.0f, 0.0f, 0.0f};
@@ -124,9 +123,9 @@ static void genKernelTex(es2n *p)
                             const double x = p + 8.0*tap;
                             const double level = ((NTSCsignal(color, phase+p) - BLACK) / (WHITE-BLACK)) / (2.0*8.0);
 
-                            yiq[0] += kernel(YW2, kernel_center, x) * level;
-                            yiq[1] += kernel(IW2, kernel_center, x) * level * cos(M_PI * (shift+p) / 6.0);
-                            yiq[2] += kernel(QW2, kernel_center, x) * level * sin(M_PI * (shift+p) / 6.0);
+                            yiq[0] += box(YW2, kernel_center, x) * level;
+                            yiq[1] += box(IW2, kernel_center, x) * level * cos(M_PI * (shift+p) / 6.0);
+                            yiq[2] += box(QW2, kernel_center, x) * level * sin(M_PI * (shift+p) / 6.0);
                         }
                     }
 
@@ -366,6 +365,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     genKernelTex(p);
 
+#if TEST == 0
     // Configure levels framebuffer.
     glActiveTexture(TEX(SIGNAL_I));
     makeFBTex(&p->signal_tex, &p->signal_fb, 256, 256, GL_RGBA, GL_NEAREST);
@@ -397,6 +397,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "}\n";
     p->signal_prog = buildShader(signal_vert_src, signal_frag_src);
     setUniforms(p->signal_prog);
+#endif
 
     // Configure RGB framebuffer.
     glActiveTexture(TEX(RGB_I));
@@ -473,7 +474,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "SMP(4);\n"
         "SMP(5);\n"
         "SMP(6);\n"
-        "yiq /= (vec3(YW2, IW2, QW2) / (NUM_SUBPS/2.0));\n"
+        "yiq /= (vec3(YW2, IW2, QW2) / (8.0/2.0));\n"
         "vec3 result = c_convMat * yiq;\n"
         "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
         "}\n";
@@ -639,25 +640,34 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "precision highp float;\n"
         "#define NUM_SUBPS " STR(NUM_SUBPS) ".0\n"
         "attribute vec4 vert;\n"
-        "varying vec2 v_uv[3];\n"
+        "varying vec2 v_uv[5];\n"
         "void main() {\n"
         "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
-        "v_uv[0] = uv+vec2(1.0 / (NUM_SUBPS*256.0), 0.0);\n"
-        "v_uv[1] = uv;\n"
-        "v_uv[2] = uv-vec2(1.0 / (NUM_SUBPS*256.0), 0.0);\n"
+        "v_uv[0] = uv+vec2(2.0 / (NUM_SUBPS*256.0), 0.0);\n"
+        "v_uv[1] = uv+vec2(1.0 / (NUM_SUBPS*256.0), 0.0);\n"
+        "v_uv[2] = uv;\n"
+        "v_uv[3] = uv-vec2(1.0 / (NUM_SUBPS*256.0), 0.0);\n"
+        "v_uv[4] = uv-vec2(2.0 / (NUM_SUBPS*256.0), 0.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* disp_frag_src =
         "precision highp float;\n"
         "uniform sampler2D u_rgbTex;\n"
-        "varying vec2 v_uv[3];\n"
+        "varying vec2 v_uv[5];\n"
         "#define SMP(i_, m_) color += (m_) * texture2D(u_rgbTex, v_uv[i_]).rgb\n"
         "void main(void) {\n"
+#if 0
         "vec3 color = vec3(0.0);\n"
-        "SMP(0, 0.25);\n"
-        "SMP(1, 0.50);\n"
-        "SMP(2, 0.25);\n"
+        "SMP(0, vec3(0.25, 0.00, 0.00));\n"
+        "SMP(1, vec3(0.50, 0.25, 0.00));\n"
+        "SMP(2, vec3(0.25, 0.50, 0.25));\n"
+        "SMP(3, vec3(0.00, 0.25, 0.50));\n"
+        "SMP(4, vec3(0.00, 0.00, 0.25));\n"
         "gl_FragColor = vec4(color, 1.0);\n"
+#else
+        // Direct color
+        "gl_FragColor = texture2D(u_rgbTex, v_uv[2]);\n"
+#endif
 
 #else // TEST == 0
 
@@ -765,7 +775,7 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp)
 
 #if TEST == 1
     glBindFramebuffer(GL_FRAMEBUFFER, p->rgb_fb);
-    glViewport(0, 8, 2048, 224);
+    glViewport(0, 8, NUM_SUBPS*256, 224);
     glUseProgram(p->rgb_prog);
     updateUniforms(p->rgb_prog);
     glEnable(GL_BLEND);
@@ -793,6 +803,7 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
     glUseProgram(p->disp_prog);
+//    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glDrawElements(GL_TRIANGLE_STRIP, 2 * (2*N+1+1) * (2*M), GL_UNSIGNED_SHORT, 0);
 }
 
