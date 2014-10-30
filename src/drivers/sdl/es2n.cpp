@@ -3,7 +3,7 @@
 #include <cstring>
 #include <cmath>
 
-#define TEST 0
+#define TEST 1
 
 #define STR(s_) _STR(s_)
 #define _STR(s_) #s_
@@ -23,9 +23,9 @@
 #define PERSISTENCE_G 0.500 // Green "
 #define PERSISTENCE_B 0.500  // Blue "
 #else
-#define PERSISTENCE_R 1.7*0.165 // Red phosphor persistence.
-#define PERSISTENCE_G 1.7*0.205 // Green "
-#define PERSISTENCE_B 1.7*0.225  // Blue "
+#define PERSISTENCE_R 1.25*0.165 // Red phosphor persistence.
+#define PERSISTENCE_G 1.25*0.205 // Green "
+#define PERSISTENCE_B 1.25*0.225  // Blue "
 #endif
 
 // Source code modified from:
@@ -80,40 +80,54 @@ static double NTSCsignal(int pixel, int phase)
 }
 
 #if TEST == 1
+#define NUM_SUBPS 8
+#define NUM_TAPS 7
+#define LOOKUP_W 256
+#define YW2 6.0
+#define IW2 12.0
+#define QW2 24.0
+
 static float s_mins[3];
 static float s_maxs[3];
+
+// box kernel
+static double kernel(double w2, double center, double x)
+{
+    return abs(x - center) < w2 ? 1.0 : 0.0;
+}
 #endif
 
 static void genKernelTex(es2n *p)
 {
 #if TEST == 1
-#define NUM_SUBS 8
-#define NUM_TAPS 5
-#define LOOKUP_TEX_W 512
-	double *yiqs = (double*) calloc(3 * NUM_CYCLES*NUM_SUBS*NUM_TAPS * NUM_COLORS, sizeof(double));
+	double *yiqs = (double*) calloc(3 * NUM_CYCLES*NUM_SUBPS*NUM_TAPS * NUM_COLORS, sizeof(double));
 
  	s_mins[0] = s_mins[1] = s_mins[2] = 0.0f;
  	s_maxs[0] = s_maxs[1] = s_maxs[2] = 0.0f;
 
+    // Generate lookup for every possible color, cycle, tap and subpixel combination.
+    // Average the two NTSC fields to generate ideal output.
+    // Complexity looks horrid but it's not really.
     for (int color = 0; color < NUM_COLORS; color++) {
         for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
-            for (int sub = 0; sub < NUM_SUBS; sub++) {
+            for (int subp = 0; subp < NUM_SUBPS; subp++) {
+                const double kernel_center = 0.5 + subp + 8*(NUM_TAPS/2);
+
                 for (int tap = 0; tap < NUM_TAPS; tap++) {
-                    const int phase = cycle * 8;
-                    const double shift = phase + 3.9;
-
                     float yiq[3] = {0.0f, 0.0f, 0.0f};
-                    for (int p = 0; p < 8; p++)
-                    {
-                        double signal = NTSCsignal(color, phase + p);
-                        signal = (signal-BLACK) / (WHITE-BLACK);
 
-                        const double level = signal / 8.0;
-                        // box kernel
-                        auto kernel = [&](double w) { return abs(0.5 + sub + NUM_SUBS * (tap-floor(NUM_TAPS/2))) < 0.5 * w; }
-                        yiq[0] += kernel(YW) * level;
-                        yiq[1] += kernel(IW) * level * cos(M_PI * (shift+p) / 6.0);
-                        yiq[2] += kernel(QW) * level * sin(M_PI * (shift+p) / 6.0);
+                    for (int field = 0; field < 2; field++) {
+                        const int phase = 8 * (cycle+field);
+                        const double shift = phase + 3.9;
+
+                        for (int p = 0; p < 8; p++) {
+                            const double x = p + 8.0*tap;
+                            const double level = ((NTSCsignal(color, phase+p) - BLACK) / (WHITE-BLACK)) / (2.0*8.0);
+
+                            yiq[0] += kernel(YW2, kernel_center, x) * level;
+                            yiq[1] += kernel(IW2, kernel_center, x) * level * cos(M_PI * (shift+p) / 6.0);
+                            yiq[2] += kernel(QW2, kernel_center, x) * level * sin(M_PI * (shift+p) / 6.0);
+                        }
                     }
 
                     for (int i = 0; i < 3; i++) {
@@ -121,7 +135,7 @@ static void genKernelTex(es2n *p)
                         s_maxs[i] = fmax(s_maxs[i], yiq[i]);
                     }
 
-                    const int k = 3 * (color*NUM_CYCLES*NUM_SUBS*NUM_TAPS + cycle*NUM_SUBS*NUM_TAPS + sub*NUM_TAPS + tap);
+                    const int k = 3 * (color*NUM_CYCLES*NUM_SUBPS*NUM_TAPS + cycle*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
                     yiqs[k+0] = yiq[0];
                     yiqs[k+1] = yiq[1];
                     yiqs[k+2] = yiq[2];
@@ -130,15 +144,16 @@ static void genKernelTex(es2n *p)
         }
     }
 
-	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_TEX_W * NUM_COLORS, sizeof(unsigned char));
+	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
     for (int color = 0; color < NUM_COLORS; color++) {
         for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
-            for (int sub = 0; sub < NUM_SUBS; sub++) {
+            for (int subp = 0; subp < NUM_SUBPS; subp++) {
                 for (int tap = 0; tap < NUM_TAPS; tap++) {
-                    const int k = 3 * (color*LOOKUP_TEX_W + cycle*NUM_SUBS*NUM_TAPS + sub*NUM_TAPS + tap);
+                    const int ik = 3 * (color*NUM_CYCLES*NUM_SUBPS*NUM_TAPS + cycle*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
+                    const int ok = 3 * (color*LOOKUP_W + cycle*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
                     for (int i = 0; i < 3; i++) {
-                        const double clamped = (yiqs[k+i]-s_mins[i]) / (s_maxs[i]-s_mins[i]);
-                        result[k+i] = (unsigned char) (255.0 * clamped + 0.5);
+                        const double clamped = (yiqs[ik+i]-s_mins[i]) / (s_maxs[i]-s_mins[i]);
+                        result[ok+i] = (unsigned char) (255.0 * clamped + 0.5);
                     }
                 }
             }
@@ -148,7 +163,7 @@ static void genKernelTex(es2n *p)
 	glActiveTexture(TEX(LOOKUP_I));
     glGenTextures(1, &p->lookup_tex);
     glBindTexture(GL_TEXTURE_2D, p->lookup_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, LOOKUP_TEX_W, NUM_COLORS, 0, GL_RGB, GL_UNSIGNED_BYTE, result);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, LOOKUP_W, NUM_COLORS, 0, GL_RGB, GL_UNSIGNED_BYTE, result);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -246,6 +261,12 @@ static void setUniforms(GLuint prog)
     glUniform1i(k, SIGNAL_I);
     k = glGetUniformLocation(prog, "u_rgbTex");
     glUniform1i(k, RGB_I);
+#if TEST == 1
+    k = glGetUniformLocation(prog, "u_mins");
+    glUniform3fv(k, 1, s_mins);
+    k = glGetUniformLocation(prog, "u_maxs");
+    glUniform3fv(k, 1, s_maxs);
+#endif
 }
 
 #include <stdio.h>
@@ -259,6 +280,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+    glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
+    glBlendColor(PERSISTENCE_R, PERSISTENCE_G, PERSISTENCE_B, 0.0);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glEnableVertexAttribArray(0);
 
@@ -377,6 +400,91 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Configure RGB framebuffer.
     glActiveTexture(TEX(RGB_I));
+#if TEST == 1
+    makeFBTex(&p->rgb_tex, &p->rgb_fb, NUM_SUBPS*256, 256, GL_RGB, GL_LINEAR);
+    const char* rgb_vert_src =
+        "precision highp float;\n"
+        "#define NUM_TAPS  " STR(NUM_TAPS)  ".0\n"
+        "attribute vec4 vert;\n"
+        "varying vec2 v_uv[int(NUM_TAPS)];\n"
+        "#define S vec2(1.0/256.0, 0.0)\n"
+        "#define UV_OUT(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
+        "void main() {\n"
+        "UV_OUT(0,-3.0);\n"
+        "UV_OUT(1,-2.0);\n"
+        "UV_OUT(2,-1.0);\n"
+        "UV_OUT(3, 0.0);\n"
+        "UV_OUT(4, 1.0);\n"
+        "UV_OUT(5, 2.0);\n"
+        "UV_OUT(6, 3.0);\n"
+        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
+        "}\n";
+    const char* rgb_frag_src =
+        "precision highp float;\n"
+        "#define NUM_SUBPS " STR(NUM_SUBPS) ".0\n"
+        "#define NUM_TAPS  " STR(NUM_TAPS)  ".0\n"
+        "#define LOOKUP_W  " STR(LOOKUP_W)  ".0\n"
+        "#define YW2  " STR(YW2)  "\n"
+        "#define IW2  " STR(IW2)  "\n"
+        "#define QW2  " STR(QW2)  "\n"
+        "#define GAMMA (2.2 / 1.9)\n"
+        "uniform sampler2D u_idxTex;\n"
+        "uniform sampler2D u_deempTex;\n"
+        "uniform sampler2D u_lookupTex;\n"
+        "uniform vec3 u_mins;\n"
+        "uniform vec3 u_maxs;\n"
+        "varying vec2 v_uv[int(NUM_TAPS)];\n"
+#if 1 // 0: texture test pass-through
+        "const mat3 c_convMat = mat3(\n"
+        "    1.0,        1.0,        1.0,       // Y\n"
+#if 0
+        // from nesdev wiki
+        "    0.946882,   -0.274788,  -1.108545, // I\n"
+        "    0.623557,   -0.635691,  1.709007   // Q\n"
+#else
+        // from nes_ntsc by blargg, default
+        "    0.956,   -0.272,  -1.105, // I\n"
+        "    0.621,   -0.647,  1.702   // Q\n"
+#endif
+        ");\n"
+        "\n"
+        "const vec3 c_gamma = vec3(GAMMA);\n"
+        "const vec4 one = vec4(1.0);\n"
+        "const vec4 nil = vec4(0.0);\n"
+        "\n"
+        "#define P(i_)  p = floor(256.0*v_uv[i_])\n"
+        "#define U(i_)  (mod(p.x - p.y, 3.0)*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + float(i_)) / (LOOKUP_W-1.0)\n"
+        "#define LA(i_) la = vec2(texture2D(u_idxTex, v_uv[i_]).r, texture2D(u_deempTex, vec2(v_uv[i_].y, 0.0)).r)\n"
+        "#define V()    dot((255.0/511.0) * vec2(1.0, 64.0), la)\n"
+        "#define UV(i_) uv = vec2(U(i_), V())\n"
+        "#define RESCALE(v_) ((v_) * (u_maxs-u_mins) + u_mins)\n"
+        "#define SMP(i_) LA(i_); P(i_); UV(i_); yiq += RESCALE(texture2D(u_lookupTex, UV(i_)).rgb)\n"
+        "\n"
+        "void main(void) {\n"
+        "float subp = mod(floor(NUM_SUBPS*256.0*v_uv[2].x), NUM_SUBPS);\n"
+        "vec2 p;\n"
+        "vec2 la;\n"
+        "vec2 uv;\n"
+        "vec3 yiq = vec3(0.0);\n"
+        "SMP(0);\n"
+        "SMP(1);\n"
+        "SMP(2);\n"
+        "SMP(3);\n"
+        "SMP(4);\n"
+        "SMP(5);\n"
+        "SMP(6);\n"
+        "yiq /= (vec3(YW2, IW2, QW2) / (NUM_SUBPS/2.0));\n"
+        "vec3 result = c_convMat * yiq;\n"
+        "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
+        "}\n";
+#else
+        "void main(void) {\n"
+        "gl_FragColor = texture2D(u_lookupTex, v_uv[2]);\n"
+        "}\n";
+#endif
+
+#else // TEST == 0
+
     makeFBTex(&p->rgb_tex, &p->rgb_fb, 1024, 256, GL_RGB, GL_LINEAR);
     const char* rgb_vert_src =
         "precision highp float;\n"
@@ -521,10 +629,38 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "gl_FragColor = texture2D(u_signalTex, v_uv[4]);\n"
         "}\n";
 #endif
+#endif // TEST
     p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
     setUniforms(p->rgb_prog);
 
     // Setup display (output) shader.
+#if TEST == 1
+    const char* disp_vert_src =
+        "precision highp float;\n"
+        "#define NUM_SUBPS " STR(NUM_SUBPS) ".0\n"
+        "attribute vec4 vert;\n"
+        "varying vec2 v_uv[3];\n"
+        "void main() {\n"
+        "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
+        "v_uv[0] = uv+vec2(1.0 / (NUM_SUBPS*256.0), 0.0);\n"
+        "v_uv[1] = uv;\n"
+        "v_uv[2] = uv-vec2(1.0 / (NUM_SUBPS*256.0), 0.0);\n"
+        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
+        "}\n";
+    const char* disp_frag_src =
+        "precision highp float;\n"
+        "uniform sampler2D u_rgbTex;\n"
+        "varying vec2 v_uv[3];\n"
+        "#define SMP(i_, m_) color += (m_) * texture2D(u_rgbTex, v_uv[i_]).rgb\n"
+        "void main(void) {\n"
+        "vec3 color = vec3(0.0);\n"
+        "SMP(0, 0.25);\n"
+        "SMP(1, 0.50);\n"
+        "SMP(2, 0.25);\n"
+        "gl_FragColor = vec4(color, 1.0);\n"
+
+#else // TEST == 0
+
     const char* disp_vert_src =
         "precision highp float;\n"
         "attribute vec4 vert;\n"
@@ -542,7 +678,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "varying vec2 v_uv[3];\n"
         "void main(void) {\n"
         "vec3 color = vec3(texture2D(u_rgbTex, v_uv[0]).r, texture2D(u_rgbTex, v_uv[1]).g, texture2D(u_rgbTex, v_uv[2]).b);\n"
-#if 1
+#if 0
 // For 2x size 
         "float luma = dot(vec3(0.299, 0.587, 0.114), color);\n"
         "float scan = mod(floor((2.0*256.0) * v_uv[1].y), 2.0);\n"
@@ -556,13 +692,20 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "float scan = 1.0 - d;\n"
         "vec3 result = color + ((1.0-luma) * (3.7/256.0) * (3.0*scan - 1.0));\n"
         "gl_FragColor = vec4(result, 1.0);\n"
-#else
+#elif 0
+// Unfinished! Testing grille
         "vec3 grille;\n"
         "if (m.x >= 3.0) grille =       vec3(0.333, 0.667, 1.000);\n"
         "else if (m.x >= 2.0) grille =  vec3(1.000, 0.667, 0.333);\n"
         "else if (m.x >= 1.0) grille =  vec3(0.333, 0.667, 1.000);\n"
         "else grille =                  vec3(1.000, 0.667, 0.333);\n"
+#else
+// Direct 
+        "gl_FragColor = vec4(color, 1.0);\n"
 #endif
+
+#endif // TEST
+
         "}\n";
     p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
     setUniforms(p->disp_prog);
@@ -620,6 +763,15 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp)
     glBindBuffer(GL_ARRAY_BUFFER, p->quadbuf);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
+#if TEST == 1
+    glBindFramebuffer(GL_FRAMEBUFFER, p->rgb_fb);
+    glViewport(0, 8, 2048, 224);
+    glUseProgram(p->rgb_prog);
+    updateUniforms(p->rgb_prog);
+    glEnable(GL_BLEND);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisable(GL_BLEND);
+#else
     glBindFramebuffer(GL_FRAMEBUFFER, p->signal_fb);
     glViewport(0, 8, 256, 224);
     glUseProgram(p->signal_prog);
@@ -631,10 +783,9 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp)
     glUseProgram(p->rgb_prog);
     updateUniforms(p->rgb_prog);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
-    glBlendColor(PERSISTENCE_R, PERSISTENCE_G, PERSISTENCE_B, 0.0);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glDisable(GL_BLEND);
+#endif
 
     glBindBuffer(GL_ARRAY_BUFFER, p->crt_verts_buf);
     glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
@@ -642,8 +793,6 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
     glUseProgram(p->disp_prog);
-//    glDrawElements(GL_TRIANGLE_STRIP, 2 * (2*N+1+1) * 2, GL_UNSIGNED_SHORT, 0);
-//    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);
     glDrawElements(GL_TRIANGLE_STRIP, 2 * (2*N+1+1) * (2*M), GL_UNSIGNED_SHORT, 0);
 }
 

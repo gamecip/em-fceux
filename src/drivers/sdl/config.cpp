@@ -174,8 +174,8 @@ InitConfig()
 	config->addOption("autoscale", "SDL.AutoScale", 1);
 	config->addOption("keepratio", "SDL.KeepRatio", 1);
     // Scaling for proper NTSC output (3x scaling).
-//	config->addOption("xscale", "SDL.XScale", 3.0*(8.0/7.0) + 0.5/256.0); 
-//	config->addOption("yscale", "SDL.YScale", 3.0);
+//    config->addOption("xscale", "SDL.XScale", 8.0); 
+//    config->addOption("yscale", "SDL.YScale", 2.0);
 	config->addOption("xscale", "SDL.XScale", 2.0*(8.0/7.0) + 0.5/256.0);
 	config->addOption("yscale", "SDL.YScale", 2.0);
 	config->addOption("xstretch", "SDL.XStretch", 0);
