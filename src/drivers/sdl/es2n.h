@@ -13,10 +13,6 @@ typedef struct t_es2n
     GLuint deemp_tex;   // Input de-emphasis bits per row (240x1).
     GLuint lookup_tex;  // Palette to voltage levels lookup texture.
 
-    GLuint signal_fb;   // Framebuffer for signal texture generation.
-    GLuint signal_tex;  // Texture of signal (256x256x4).
-    GLuint signal_prog; // Shader for signal.
-
     GLuint rgb_fb;      // Framebuffer for output RGB texture generation.
     GLuint rgb_tex;     // Output RGB texture (1024x256x3).
     GLuint rgb_prog;    // Shader for RGB.

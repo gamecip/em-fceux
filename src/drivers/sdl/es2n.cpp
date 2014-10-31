@@ -13,8 +13,7 @@
 #define IDX_I       0
 #define DEEMP_I     1
 #define LOOKUP_I    2
-#define SIGNAL_I    3
-#define RGB_I       4
+#define RGB_I       3
 #define TEX(i_)     (GL_TEXTURE0+(i_))
 
 #define NUM_CYCLES 3
@@ -33,12 +32,18 @@
 #define BLACK       0.518
 #define WHITE       HIGHEST
 
+#define DEFINE(name_) "#define " #name_ " float(" STR(name_) ")\n"
+
 #if TEST == 1
 
 #define NUM_SUBPS 4
 #define NUM_TAPS 7
 // Following must be POT >= NUM_CYCLES*NUM_TAPS*NUM_SUBPS, ex. 3*4*7=84 -> 128
 #define LOOKUP_W 128
+// Set overscan on left and right sides as 12px (total 24px).
+#define OVERSCAN_W 12
+#define IDX_W (256 + 2*OVERSCAN_W)
+#define RGB_W (NUM_SUBPS * IDX_W)
 // Half-widths of kernels, should be multiples of 6.0 (=chroma subcarrier wavelenth in samples / 2)
 #define YW2 6.0
 #define IW2 12.0
@@ -53,10 +58,6 @@ static double box(double w2, double center, double x)
 {
     return abs(x - center) < w2 ? 1.0 : 0.0;
 }
-
-#else // TEST == 0
-
-#define NUM_CYCLES_TEXTURE 4
 
 #endif // TEST
 
@@ -111,7 +112,7 @@ static void genKernelTex(es2n *p)
 
     // Generate lookup for every color, cycle, tap and subpixel combination.
     // Average the two NTSC fields to generate ideal output.
-    // Complexity looks horrid but it's not really.
+    // ...Looks horrid, and yes it's complex, but computation is quite fast.
     for (int color = 0; color < NUM_COLORS; color++) {
         for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
             for (int subp = 0; subp < NUM_SUBPS; subp++) {
@@ -261,8 +262,6 @@ static void setUniforms(GLuint prog)
     glUniform1i(k, DEEMP_I);
     k = glGetUniformLocation(prog, "u_lookupTex");
     glUniform1i(k, LOOKUP_I);
-    k = glGetUniformLocation(prog, "u_signalTex");
-    glUniform1i(k, SIGNAL_I);
     k = glGetUniformLocation(prog, "u_rgbTex");
     glUniform1i(k, RGB_I);
 #if TEST == 1
@@ -279,7 +278,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     printf("left:%d right:%d top:%d bottom:%d\n", left, right, top, bottom);
     memset(p, 0, sizeof(es2n));
 
-    p->overscan_pixels = (GLubyte*) malloc(256*240);
+    p->overscan_pixels = (GLubyte*) malloc(OVERSCAN_W*240);
     p->overscan_color = 0xFE; // Set bogus value to ensure overscan update.
 
     glGetIntegerv(GL_VIEWPORT, p->viewport);
@@ -293,10 +292,10 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Quad vertices, packed as: x, y, u, v
     const GLfloat quadverts[4 * 4] = {
-        -1.0f, -1.0f, left / 512.0f, bottom / 256.0f,
-         1.0f, -1.0f, right / 512.0f, bottom / 256.0f,
-        -1.0f,  1.0f, left / 512.0f, top / 256.0f, 
-         1.0f,  1.0f, right / 512.0f, top / 256.0f
+        -1.0f, -1.0f, left  / 256.0f, bottom / 256.0f,
+         1.0f, -1.0f, right / 256.0f, bottom / 256.0f,
+        -1.0f,  1.0f, left  / 256.0f, top / 256.0f, 
+         1.0f,  1.0f, right / 256.0f, top / 256.0f
     };
 
     // Create quad vertex buffer.
@@ -354,8 +353,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glActiveTexture(TEX(IDX_I));
     glGenTextures(1, &p->idx_tex);
     glBindTexture(GL_TEXTURE_2D, p->idx_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 512, 256, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, IDX_W, 256, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -372,51 +371,18 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     genKernelTex(p);
 
-#if TEST == 0
-    // Configure levels framebuffer.
-    glActiveTexture(TEX(SIGNAL_I));
-    makeFBTex(&p->signal_tex, &p->signal_fb, 256, 256, GL_RGBA, GL_NEAREST);
-    const char* signal_vert_src =
-        "precision highp float;\n"
-        "attribute vec4 vert;\n"
-        "varying vec2 v_uv[2];\n"
-        "void main() {\n"
-        "v_uv[0] = vec2(vert.z, (240.0/256.0) - vert.w);\n"
-        "v_uv[1] = vec2(v_uv[0].y, 0.0);\n"
-        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
-        "}\n";
-    const char* signal_frag_src =
-        "precision highp float;\n"
-        "uniform sampler2D u_idxTex;\n"
-        "uniform sampler2D u_deempTex;\n"
-        "uniform sampler2D u_lookupTex;\n"
-        "uniform float u_field;\n"
-        "varying vec2 v_uv[2];\n"
-        "void main(void) {\n"
-        "    vec2 la = vec2(texture2D(u_idxTex, v_uv[0]).r, texture2D(u_deempTex, v_uv[1]).r);\n"
-        "    vec2 p = floor(256.0*v_uv[0]);\n"
-        "    vec2 uv = vec2(\n"
-        "        dot((255.0/511.0) * vec2(1.0, 64.0), la),\n" // color
-        "        mod(p.x - p.y + u_field, 3.0) / 3.0\n" // phase
-        "    );\n"
-        "    vec4 result = texture2D(u_lookupTex, uv);\n"
-        "    gl_FragColor = result;\n"
-        "}\n";
-    p->signal_prog = buildShader(signal_vert_src, signal_frag_src);
-    setUniforms(p->signal_prog);
-#endif
-
     // Configure RGB framebuffer.
     glActiveTexture(TEX(RGB_I));
 #if TEST == 1
-    makeFBTex(&p->rgb_tex, &p->rgb_fb, NUM_SUBPS*256, 256, GL_RGB, GL_LINEAR);
+    makeFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, 256, GL_RGB, GL_LINEAR);
     const char* rgb_vert_src =
         "precision highp float;\n"
-        "#define NUM_TAPS  " STR(NUM_TAPS)  ".0\n"
+        DEFINE(NUM_TAPS)
+        DEFINE(IDX_W)
         "attribute vec4 vert;\n"
         "varying vec2 v_uv[int(NUM_TAPS)];\n"
-        "#define S vec2(1.0/512.0, 0.0)\n"
-        "#define UV_OUT(i_, o_) v_uv[i_] = vec2(-12.0/512.0, 0.0) + vec2(280.0/256.0, 1.0) * (vert.zw + (o_)*S)\n"
+        "#define S vec2(1.0/IDX_W, 0.0)\n"
+        "#define UV_OUT(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
         "void main() {\n"
         "UV_OUT(0,-3.0);\n"
         "UV_OUT(1,-2.0);\n"
@@ -429,12 +395,13 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "}\n";
     const char* rgb_frag_src =
         "precision highp float;\n"
-        "#define NUM_SUBPS " STR(NUM_SUBPS) ".0\n"
-        "#define NUM_TAPS  " STR(NUM_TAPS)  ".0\n"
-        "#define LOOKUP_W  " STR(LOOKUP_W)  ".0\n"
-        "#define YW2  " STR(YW2)  "\n"
-        "#define IW2  " STR(IW2)  "\n"
-        "#define QW2  " STR(QW2)  "\n"
+        DEFINE(NUM_SUBPS)
+        DEFINE(NUM_TAPS)
+        DEFINE(LOOKUP_W)
+        DEFINE(IDX_W)
+        DEFINE(YW2)
+        DEFINE(IW2)
+        DEFINE(QW2)
         "#define GAMMA (2.2 / 1.9)\n"
         "uniform sampler2D u_idxTex;\n"
         "uniform sampler2D u_deempTex;\n"
@@ -460,7 +427,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "const vec4 one = vec4(1.0);\n"
         "const vec4 nil = vec4(0.0);\n"
         "\n"
-        "#define P(i_)  p = floor(512.0*v_uv[i_])\n"
+        "#define P(i_)  p = floor(IDX_W*v_uv[i_])\n"
         "#define U(i_)  (mod(p.x - p.y, 3.0)*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + float(i_)) / (LOOKUP_W-1.0)\n"
         "#define LA(i_) la = vec2(texture2D(u_idxTex, v_uv[i_]).r, texture2D(u_deempTex, vec2(v_uv[i_].y, 0.0)).r)\n"
         "#define V()    dot((255.0/511.0) * vec2(1.0, 64.0), la)\n"
@@ -469,7 +436,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "#define SMP(i_) LA(i_); P(i_); UV(i_); yiq += RESCALE(texture2D(u_lookupTex, UV(i_)).rgb)\n"
         "\n"
         "void main(void) {\n"
-        "float subp = mod(floor(NUM_SUBPS*512.0*v_uv[2].x), NUM_SUBPS);\n"
+        "float subp = mod(floor(NUM_SUBPS*IDX_W*v_uv[int(NUM_TAPS)/2].x), NUM_SUBPS);\n"
         "vec2 p;\n"
         "vec2 la;\n"
         "vec2 uv;\n"
@@ -490,153 +457,6 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "gl_FragColor = texture2D(u_lookupTex, v_uv[2]);\n"
         "}\n";
 #endif
-
-#else // TEST == 0
-
-    makeFBTex(&p->rgb_tex, &p->rgb_fb, 1024, 256, GL_RGB, GL_LINEAR);
-    const char* rgb_vert_src =
-        "precision highp float;\n"
-        "attribute vec4 vert;\n"
-        "varying vec2 v_uv[7];\n"
-        "#define S vec2(1.0/256.0, 0.0)\n"
-        "#define UV_OUT(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
-        "void main() {\n"
-        "UV_OUT(0,-5.0);\n"
-        "UV_OUT(1,-4.0);\n"
-        "UV_OUT(2,-3.0);\n"
-        "UV_OUT(3,-2.0);\n"
-        "UV_OUT(4,-1.0);\n"
-        "UV_OUT(5, 0.0);\n"
-        "UV_OUT(6, 1.0);\n"
-        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
-        "}\n";
-    const char* rgb_frag_src =
-        "precision highp float;\n"
-        "uniform sampler2D u_signalTex;\n"
-        "uniform float u_field;\n"
-        "varying vec2 v_uv[7];\n"
-#if 1 // 0: texture test pass-through
-        "#define PI " STR(M_PI) "\n"
-        "#define PIC (PI / 6.0)\n"
-        "#define GAMMA (2.2 / 1.9)\n"
-        "#define LOWEST  " STR(LOWEST) "\n"
-        "#define HIGHEST " STR(HIGHEST) "\n"
-        "#define BLACK   " STR(BLACK) "\n"
-        "#define WHITE   " STR(WHITE) "\n"
-        "#define RESCALE(v_) ((v_) * ((HIGHEST-LOWEST)/(WHITE-BLACK)) + ((LOWEST-BLACK)/(WHITE-BLACK)))\n"
-        "#define SMP_IN(i_) v[i_] = RESCALE(texture2D(u_signalTex, v_uv[i_]))\n"
-        "const mat3 c_convMat = mat3(\n"
-        "    1.0,        1.0,        1.0,       // Y\n"
-#if 0
-        // from nesdev wiki
-        "    0.946882,   -0.274788,  -1.108545, // I\n"
-        "    0.623557,   -0.635691,  1.709007   // Q\n"
-#else
-        // from nes_ntsc by blargg, default
-        "    0.956,   -0.272,  -1.105, // I\n"
-        "    0.621,   -0.647,  1.702   // Q\n"
-#endif
-        ");\n"
-        "\n"
-        "#define LOWEST  " STR(LOWEST) "\n"
-        "#define HIGHEST " STR(HIGHEST) "\n"
-        "#define BLACK   " STR(BLACK) "\n"
-        "#define WHITE   " STR(WHITE) "\n"
-        "#define clamp01(v) clamp(v, 0.0, 1.0)\n"
-        "\n"
-        "const vec3 c_gamma = vec3(GAMMA);\n"
-        "const vec4 one = vec4(1.0);\n"
-        "const vec4 nil = vec4(0.0);\n"
-        "\n"
-        "vec3 sample(in vec4 a, in vec4 v, in vec4 k) {\n"
-        "    return vec3(\n"
-        "        dot(k, v),\n"
-        "        dot(k, v*cos(a)),\n"
-        "        dot(k, v*sin(a))\n"
-        "    );\n"
-        "}\n"
-        "void main(void) {\n"
-        "vec2 coord = floor(4.0*256.0*v_uv[5]);\n"
-        "vec2 p = floor(coord / 4.0);\n"
-        "vec4 offs = vec4(mod(coord.x, 4.0));\n"
-
-        // q=36, fringe center, smoothing method
-        "vec4 v[7];\n"
-        "SMP_IN(0);\n"
-        "SMP_IN(1);\n"
-        "SMP_IN(2);\n"
-        "SMP_IN(3);\n"
-        "SMP_IN(4);\n"
-        "SMP_IN(5);\n"
-        "SMP_IN(6);\n"
-
-        "v[0] *= step(0.0, v_uv[0].x);\n"
-        "v[1] *= step(0.0, v_uv[1].x);\n"
-        "v[2] *= step(0.0, v_uv[2].x);\n"
-        "v[3] *= step(0.0, v_uv[3].x);\n"
-        "v[4] *= step(0.0, v_uv[4].x);\n"
-        "v[6] *= step(v_uv[5].x, 1.0);\n"
-
-        "const vec4 c_base = PIC*(3.9 + vec4(0.5, 2.5, 4.5, 6.5));\n"
-        "vec4 scanphase = c_base + PIC*mod(8.0 * (u_field-p.y), 12.0);\n"
-        "vec4 ph[7];\n"
-        "ph[0] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[0].x));\n"
-        "ph[1] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[1].x));\n"
-        "ph[2] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[2].x));\n"
-        "ph[3] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[3].x));\n"
-        "ph[4] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[4].x));\n"
-        "ph[5] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[5].x));\n"
-        "ph[6] = scanphase + ((8.0*PIC)*floor(256.0*v_uv[6].x));\n"
-
-        "vec4 c0 = clamp01(vec4(1.0, 0.0,-1.0,-2.0) + offs);\n"
-        "vec4 c1 = clamp01(vec4(2.0, 3.0, 4.0, 4.0) - offs);\n"
-        "vec4 c2 = max(    vec4(0.0, 0.0, 0.0, 1.0) - offs, 0.0);\n"
-
-        "vec3 s[4];\n"
-        "s[3]  = sample(ph[0], v[0], one-c0);\n"
-        "s[3] += sample(ph[1], v[1], one-c2);\n"
-        "s[3] += sample(ph[2], v[2], one-c1);\n"
-
-        "s[2]  = sample(ph[1], v[1], c2);\n"
-        "s[2] += sample(ph[2], v[2], c1);\n"
-        "s[2] += sample(ph[3], v[3], c0);\n"
-
-        "s[1]  = sample(ph[3], v[3], one-c0);\n"
-        "s[1] += sample(ph[4], v[4], one-c2);\n"
-        "s[1] += sample(ph[5], v[5], one-c1);\n"
-
-        "s[0]  = sample(ph[4], v[4], c2);\n"
-        "s[0] += sample(ph[5], v[5], c1);\n"
-        "s[0] += sample(ph[6], v[6], c0);\n"
-
-#if 0
-        "vec3 yiq = vec3(\n"
-        "    s[1].r,\n"
-        "    0.7*s[0].g + s[1].g + 0.7*s[2].g,\n"
-        "    1.0*s[0].b + s[1].b + 1.0*s[2].b\n"
-        ") / (6.0 * vec3(1.0, 2.4, 3.0));\n"
-#elif 1
-        "vec3 yiq = vec3(\n"
-        "    s[1].r,\n"
-        "    s[0].g + s[1].g,\n"
-        "    s[0].b + s[1].b\n"
-        ") / (6.0 * vec3(1.0, 2.0, 2.0));\n"
-#else
-        "vec3 yiq = vec3(\n"
-        "    s[3].r,\n"
-        "    s[2].g + s[3].g,\n"
-        "    s[0].b + s[1].b + s[2].b + s[3].b\n"
-        ") / (6.0 * vec3(1.0, 2.0, 4.0));\n"
-#endif
-
-        "vec3 result = c_convMat * yiq;\n"
-        "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
-        "}\n";
-#else
-        "void main(void) {\n"
-        "gl_FragColor = texture2D(u_signalTex, v_uv[4]);\n"
-        "}\n";
-#endif
 #endif // TEST
     p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
     setUniforms(p->rgb_prog);
@@ -645,16 +465,17 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 #if TEST == 1
     const char* disp_vert_src =
         "precision highp float;\n"
-        "#define NUM_SUBPS " STR(NUM_SUBPS) ".0\n"
+        DEFINE(RGB_W)
         "attribute vec4 vert;\n"
         "varying vec2 v_uv[5];\n"
+        "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
         "void main() {\n"
         "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
-        "v_uv[0] = uv+vec2(2.0 / (NUM_SUBPS*256.0), 0.0);\n"
-        "v_uv[1] = uv+vec2(1.0 / (NUM_SUBPS*256.0), 0.0);\n"
-        "v_uv[2] = uv;\n"
-        "v_uv[3] = uv-vec2(1.0 / (NUM_SUBPS*256.0), 0.0);\n"
-        "v_uv[4] = uv-vec2(2.0 / (NUM_SUBPS*256.0), 0.0);\n"
+        "TAP(0,-2.0);\n"
+        "TAP(1,-1.0);\n"
+        "TAP(2, 0.0);\n"
+        "TAP(3, 1.0);\n"
+        "TAP(4, 2.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* disp_frag_src =
@@ -764,14 +585,15 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_c
     // Update input pixels.
     glActiveTexture(TEX(IDX_I));
     glBindTexture(GL_TEXTURE_2D, p->idx_tex);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, OVERSCAN_W, 0, 256, 240, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels);
     if (p->overscan_color != overscan_color) {
         p->overscan_color = overscan_color;
         printf("overscan: %02X\n", overscan_color);
 
-        memset(p->overscan_pixels, overscan_color, 256*240);
+        memset(p->overscan_pixels, overscan_color, OVERSCAN_W*240);
         
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 256, 0, 256, 240, GL_LUMINANCE, GL_UNSIGNED_BYTE, p->overscan_pixels);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, OVERSCAN_W, 240, GL_LUMINANCE, GL_UNSIGNED_BYTE, p->overscan_pixels);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, IDX_W-OVERSCAN_W, 0, OVERSCAN_W, 240, GL_LUMINANCE, GL_UNSIGNED_BYTE, p->overscan_pixels);
     }
 
     // Update input de-emphasis rows.
@@ -784,21 +606,7 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_c
 
 #if TEST == 1
     glBindFramebuffer(GL_FRAMEBUFFER, p->rgb_fb);
-    glViewport(0, 8, NUM_SUBPS*256, 224);
-    glUseProgram(p->rgb_prog);
-    updateUniforms(p->rgb_prog);
-    glEnable(GL_BLEND);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glDisable(GL_BLEND);
-#else
-    glBindFramebuffer(GL_FRAMEBUFFER, p->signal_fb);
-    glViewport(0, 8, 256, 224);
-    glUseProgram(p->signal_prog);
-    updateUniforms(p->signal_prog);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, p->rgb_fb);
-    glViewport(0, 8, 1024, 224);
+    glViewport(0, 8, RGB_W, 224);
     glUseProgram(p->rgb_prog);
     updateUniforms(p->rgb_prog);
     glEnable(GL_BLEND);
