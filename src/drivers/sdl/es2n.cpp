@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+// TODO: remove, not needed
+#include <stdio.h>
 
 #define TEST 1
 
@@ -16,19 +18,12 @@
 #define TEX(i_)     (GL_TEXTURE0+(i_))
 
 #define NUM_CYCLES 3
-#define NUM_CYCLES_TEXTURE 4
 #define NUM_COLORS (64 * 8) // 64 palette colors, 8 color de-emphasis settings.
-#if 0
-#define PERSISTENCE_R 0.500 // Red phosphor persistence.
-#define PERSISTENCE_G 0.500 // Green "
-#define PERSISTENCE_B 0.500  // Blue "
-#else
 #define PERSISTENCE_R 1.25*0.165 // Red phosphor persistence.
 #define PERSISTENCE_G 1.25*0.205 // Green "
-#define PERSISTENCE_B 1.25*0.225  // Blue "
-#endif
+#define PERSISTENCE_B 1.25*0.225 // Blue "
 
-// Source code modified from:
+// This source code is modified (and fixed!) from original at:
 // http://wiki.nesdev.com/w/index.php/NTSC_video
 
 // Bounds for signal level normalization
@@ -37,6 +32,33 @@
 #define HIGHEST     1.962
 #define BLACK       0.518
 #define WHITE       HIGHEST
+
+#if TEST == 1
+
+#define NUM_SUBPS 4
+#define NUM_TAPS 7
+// Following must be POT >= NUM_CYCLES*NUM_TAPS*NUM_SUBPS, ex. 3*4*7=84 -> 128
+#define LOOKUP_W 128
+// Half-widths of kernels, should be multiples of 6.0 (=chroma subcarrier wavelenth in samples / 2)
+#define YW2 6.0
+#define IW2 12.0
+#define QW2 24.0
+
+// TODO: move to es2n struct
+static float s_mins[3];
+static float s_maxs[3];
+
+// TODO: could be a macro?
+static double box(double w2, double center, double x)
+{
+    return abs(x - center) < w2 ? 1.0 : 0.0;
+}
+
+#else // TEST == 0
+
+#define NUM_CYCLES_TEXTURE 4
+
+#endif // TEST
 
 // Generate the square wave
 static bool inColorPhase(int color, int phase)
@@ -79,23 +101,6 @@ static double NTSCsignal(int pixel, int phase)
     return signal;
 }
 
-#if TEST == 1
-#define NUM_SUBPS 4
-#define NUM_TAPS 7
-#define LOOKUP_W 256
-#define YW2 6.0
-#define IW2 12.0
-#define QW2 24.0
-
-static float s_mins[3];
-static float s_maxs[3];
-
-static double box(double w2, double center, double x)
-{
-    return abs(x - center) < w2 ? 1.0 : 0.0;
-}
-#endif
-
 static void genKernelTex(es2n *p)
 {
 #if TEST == 1
@@ -104,7 +109,7 @@ static void genKernelTex(es2n *p)
  	s_mins[0] = s_mins[1] = s_mins[2] = 0.0f;
  	s_maxs[0] = s_maxs[1] = s_maxs[2] = 0.0f;
 
-    // Generate lookup for every possible color, cycle, tap and subpixel combination.
+    // Generate lookup for every color, cycle, tap and subpixel combination.
     // Average the two NTSC fields to generate ideal output.
     // Complexity looks horrid but it's not really.
     for (int color = 0; color < NUM_COLORS; color++) {
@@ -268,12 +273,14 @@ static void setUniforms(GLuint prog)
 #endif
 }
 
-#include <stdio.h>
 // TODO: reformat inputs to something more meaningful
 void es2nInit(es2n *p, int left, int right, int top, int bottom)
 {
     printf("left:%d right:%d top:%d bottom:%d\n", left, right, top, bottom);
     memset(p, 0, sizeof(es2n));
+
+    p->overscan_pixels = (GLubyte*) malloc(256*240);
+    p->overscan_color = 0xFE; // Set bogus value to ensure overscan update.
 
     glGetIntegerv(GL_VIEWPORT, p->viewport);
 
@@ -286,10 +293,10 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Quad vertices, packed as: x, y, u, v
     const GLfloat quadverts[4 * 4] = {
-        -1.0f, -1.0f, left / 256.0f, bottom / 256.0f,
-         1.0f, -1.0f, right / 256.0f, bottom / 256.0f,
-        -1.0f,  1.0f, left / 256.0f, top / 256.0f, 
-         1.0f,  1.0f, right / 256.0f, top / 256.0f
+        -1.0f, -1.0f, left / 512.0f, bottom / 256.0f,
+         1.0f, -1.0f, right / 512.0f, bottom / 256.0f,
+        -1.0f,  1.0f, left / 512.0f, top / 256.0f, 
+         1.0f,  1.0f, right / 512.0f, top / 256.0f
     };
 
     // Create quad vertex buffer.
@@ -347,8 +354,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glActiveTexture(TEX(IDX_I));
     glGenTextures(1, &p->idx_tex);
     glBindTexture(GL_TEXTURE_2D, p->idx_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 256, 256, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 512, 256, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -408,8 +415,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "#define NUM_TAPS  " STR(NUM_TAPS)  ".0\n"
         "attribute vec4 vert;\n"
         "varying vec2 v_uv[int(NUM_TAPS)];\n"
-        "#define S vec2(1.0/256.0, 0.0)\n"
-        "#define UV_OUT(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
+        "#define S vec2(1.0/512.0, 0.0)\n"
+        "#define UV_OUT(i_, o_) v_uv[i_] = vec2(-12.0/512.0, 0.0) + vec2(280.0/256.0, 1.0) * (vert.zw + (o_)*S)\n"
         "void main() {\n"
         "UV_OUT(0,-3.0);\n"
         "UV_OUT(1,-2.0);\n"
@@ -453,7 +460,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "const vec4 one = vec4(1.0);\n"
         "const vec4 nil = vec4(0.0);\n"
         "\n"
-        "#define P(i_)  p = floor(256.0*v_uv[i_])\n"
+        "#define P(i_)  p = floor(512.0*v_uv[i_])\n"
         "#define U(i_)  (mod(p.x - p.y, 3.0)*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + float(i_)) / (LOOKUP_W-1.0)\n"
         "#define LA(i_) la = vec2(texture2D(u_idxTex, v_uv[i_]).r, texture2D(u_deempTex, vec2(v_uv[i_].y, 0.0)).r)\n"
         "#define V()    dot((255.0/511.0) * vec2(1.0, 64.0), la)\n"
@@ -462,7 +469,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "#define SMP(i_) LA(i_); P(i_); UV(i_); yiq += RESCALE(texture2D(u_lookupTex, UV(i_)).rgb)\n"
         "\n"
         "void main(void) {\n"
-        "float subp = mod(floor(NUM_SUBPS*256.0*v_uv[2].x), NUM_SUBPS);\n"
+        "float subp = mod(floor(NUM_SUBPS*512.0*v_uv[2].x), NUM_SUBPS);\n"
         "vec2 p;\n"
         "vec2 la;\n"
         "vec2 uv;\n"
@@ -747,23 +754,25 @@ void es2nDeinit(es2n *p)
 */
 }
 
-// TODO: just for testing
-static float s_field;
-
+// TODO: remove
 static void updateUniforms(GLuint prog)
 {
-    int k = glGetUniformLocation(prog, "u_field");
-    glUniform1f(k, s_field);
 }
 
-void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp)
+void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 {
-    s_field = !s_field;
-
     // Update input pixels.
     glActiveTexture(TEX(IDX_I));
     glBindTexture(GL_TEXTURE_2D, p->idx_tex);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 240, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels);
+    if (p->overscan_color != overscan_color) {
+        p->overscan_color = overscan_color;
+        printf("overscan: %02X\n", overscan_color);
+
+        memset(p->overscan_pixels, overscan_color, 256*240);
+        
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 256, 0, 256, 240, GL_LUMINANCE, GL_UNSIGNED_BYTE, p->overscan_pixels);
+    }
 
     // Update input de-emphasis rows.
     glActiveTexture(TEX(DEEMP_I));

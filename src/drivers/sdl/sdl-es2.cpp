@@ -10,14 +10,16 @@
 
 static es2n s_es2n;
 
+extern uint8 deempScan[240];
+extern uint8 PALRAM[0x20];
+
 void SetOpenGLPalette(uint8*)
 {
 }
 
-extern uint8 deempScan[240];
 void BlitOpenGL(uint8 *buf)
 {
-    es2nRender(&s_es2n, buf, deempScan);
+    es2nRender(&s_es2n, buf, deempScan, PALRAM[0]);
 	SDL_GL_SwapBuffers();
 }
 

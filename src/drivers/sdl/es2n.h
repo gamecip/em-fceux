@@ -27,10 +27,13 @@ typedef struct t_es2n
 
     GLuint crt_verts_buf;   // Vertex buffer for CRT.
     GLuint crt_elems_buf;   // Element buffer for CRT.
+
+    GLubyte overscan_color;   // Current overscan color (background/zero color).
+    GLubyte *overscan_pixels; // Temporary overscan pixels (1x240).
 } es2n;
 
 void es2nInit(es2n *p, int left, int right, int top, int bottom);
 void es2nDeinit(es2n *p);
-void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp);
+void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color);
 
 #endif
