@@ -18,6 +18,7 @@
 #include "../../types.h"
 
 #include <emscripten.h>
+#include <html5.h>
 
 #include <unistd.h>
 #include <csignal>
@@ -328,6 +329,30 @@ static void EmscriptenInitStuff()
     });
 }
 
+static EM_BOOL gamepad_callback(int eventType, const EmscriptenGamepadEvent *e, void *userData)
+{
+    // TODO: remove prints
+//    printf("%s: timeStamp: %g, connected: %d, index: %ld, numAxes: %d, numButtons: %d, id: \"%s\", mapping: \"%s\"\n",
+//            "Gamepad state", e->timestamp, e->connected, e->index,
+//            e->numAxes, e->numButtons, e->id, e->mapping);
+
+    if (e->connected) {
+        // TODO: remove prints
+//        for(int i = 0; i < e->numAxes; ++i) {
+//            printf("Axis %d: %g\n", i, e->axis[i]);
+//        }
+//        for(int i = 0; i < e->numButtons; ++i) {
+//            printf("Button %d: Digital: %d, Analog: %g\n", i, e->digitalButton[i], e->analogButton[i]);
+//        }
+
+		InitJoysticks();
+	} else {
+		KillJoysticks();
+	}
+
+	return 0;
+}
+
 /**
  * The main loop for the SDL.
  */
@@ -339,11 +364,13 @@ int main(int argc, char *argv[])
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
-	/* SDL_INIT_VIDEO Needed for (joystick config) event processing? */
-	if(SDL_Init(SDL_INIT_VIDEO)) {
+	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK)) {
 		printf("Could not initialize SDL: %s.\n", SDL_GetError());
 		return(-1);
 	}
+
+	emscripten_set_gamepadconnected_callback(0, 1, gamepad_callback);
+	emscripten_set_gamepaddisconnected_callback(0, 1, gamepad_callback);
 
 	// Initialize the configuration system
 	g_config = InitConfig();

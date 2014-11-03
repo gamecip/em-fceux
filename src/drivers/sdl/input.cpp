@@ -975,8 +975,9 @@ UpdatePhysicalInput ()
 	//SDL_PumpEvents();
 }
 
-
+#ifndef EMSCRIPTEN
 static int bcpv, bcpj;
+#endif
 
 /**
  *  Begin configuring the buttons by placing the video and joystick
@@ -985,6 +986,7 @@ static int bcpv, bcpj;
  */
 int ButtonConfigBegin ()
 {
+#ifndef EMSCRIPTEN
 //dont shut down video subsystem if we are using gtk to prevent the sdl window from becoming detached to GTK window
 // prg318 - 10-2-2011
 #ifdef _GTK
@@ -1051,7 +1053,7 @@ int ButtonConfigBegin ()
 	// XXX soules - why did we shut this down?
 	// initialize the joystick subsystem
 	InitJoysticks ();
-
+#endif
 	return 1;
 }
 
@@ -1063,6 +1065,7 @@ int ButtonConfigBegin ()
 void
 ButtonConfigEnd ()
 {
+#ifndef EMSCRIPTEN
 	// shutdown the joystick and video subsystems
 	KillJoysticks ();
 	//SDL_QuitSubSystem(SDL_INIT_VIDEO); 
@@ -1075,6 +1078,7 @@ ButtonConfigEnd ()
 	{
 		InitJoysticks ();
 	}
+#endif
 }
 
 /**
@@ -2104,35 +2108,43 @@ UpdateInput (Config * config)
 	int type, devnum, button;
 
 	// gamepad 0 - 3
-	for (unsigned int i = 0; i < GAMEPAD_NUM_DEVICES; i++)
-	{
-		char buf[64];
-		snprintf (buf, 20, "SDL.Input.GamePad.%d.", i);
-		prefix = buf;
+	// TODO: remove
+//	printf("!!!! UpdateInpout gamepad\n");
+	for (unsigned int i = 0; i < GAMEPAD_NUM_DEVICES; i++) {
+	    for (unsigned int j = 0; j < GAMEPAD_NUM_BUTTONS; j++) {
 
-		config->getOption (prefix + "DeviceType", &device);
-		if (device.find ("Keyboard") != std::string::npos)
-		{
-			type = BUTTC_KEYBOARD;
-		}
-		else if (device.find ("Joystick") != std::string::npos)
-		{
-			type = BUTTC_JOYSTICK;
-		}
-		else
-		{
-			type = 0;
-		}
+	        unsigned int k = 0;
 
-		config->getOption (prefix + "DeviceNum", &devnum);
-		for (unsigned int j = 0; j < GAMEPAD_NUM_BUTTONS; j++)
-		{
-			config->getOption (prefix + GamePadNames[j], &button);
+            for (; k < MAXBUTTCONFIG; k++) {
+                char buf[64];
+                snprintf (buf, 23, "SDL.Input.GamePad.%d%d.", i, k);
+                prefix = buf;
 
-			GamePadConfig[i][j].ButtType[0] = type;
-			GamePadConfig[i][j].DeviceNum[0] = devnum;
-			GamePadConfig[i][j].ButtonNum[0] = button;
-			GamePadConfig[i][j].NumC = 1;
+                config->getOption (prefix + "DeviceType", &device);
+                if (device.find ("Keyboard") != std::string::npos) {
+                    type = BUTTC_KEYBOARD;
+                } else if (device.find ("Joystick") != std::string::npos) {
+                    type = BUTTC_JOYSTICK;
+                } else {
+                    break;
+                }
+
+                config->getOption (prefix + GamePadNames[j], &button);
+                if ((j == 0) && (button == -1)) {
+                    break;
+                }
+
+                config->getOption (prefix + "DeviceNum", &devnum);
+
+                // TODO: remove
+//                printf("!!!! read: %s: %d %d %d\n", (prefix + GamePadNames[j]).c_str(), type, devnum, button);
+                GamePadConfig[i][j].ButtType[k] = type;
+                GamePadConfig[i][j].DeviceNum[k] = devnum;
+                GamePadConfig[i][j].ButtonNum[k] = button;
+            }
+
+            printf("!!!! numC:%d\n", k);
+            GamePadConfig[i][j].NumC = k;
 		}
 	}
 
@@ -2331,6 +2343,45 @@ UpdateInput (Config * config)
 const char *GamePadNames[GAMEPAD_NUM_BUTTONS] = { "A", "B", "Select", "Start",
 	"Up", "Down", "Left", "Right", "TurboA", "TurboB"
 };
+#if 1
+const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES][MAXBUTTCONFIG] =
+{ { "Keyboard", "Joystick", "None", "None" },
+{ "None", "None", "None", "None" },
+{ "None", "None", "None", "None" },
+{ "None", "None", "None", "None" }
+};
+const int DefaultGamePad[GAMEPAD_NUM_DEVICES][MAXBUTTCONFIG][GAMEPAD_NUM_BUTTONS] =
+{ { {SDLK_F, SDLK_D, SDLK_S, SDLK_RETURN, SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT, -1, -1},
+{0, 1, 2, 3, 49153, 32769, 49152, 32768, 4, 5},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1} },
+{ {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1} },
+{ {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1} },
+{ {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
+{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1} }
+};
+/*
+SDL.Input.GamePad.0A = 0
+SDL.Input.GamePad.0B = 1
+SDL.Input.GamePad.0DeviceNum = 0
+SDL.Input.GamePad.0Down = 32769
+SDL.Input.GamePad.0Left = 49152
+SDL.Input.GamePad.0Right = 32768
+SDL.Input.GamePad.0Select = 2
+SDL.Input.GamePad.0Start = 3
+SDL.Input.GamePad.0TurboA = 0
+SDL.Input.GamePad.0TurboB = 0
+SDL.Input.GamePad.0Up = 49153
+*/
+#else
 const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES] =
 { "Keyboard", "None", "None", "None" };
 const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS] =
@@ -2340,6 +2391,7 @@ const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS] =
 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
+#endif
 
 // PowerPad defaults
 const char *PowerPadNames[POWERPAD_NUM_BUTTONS] =

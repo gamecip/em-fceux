@@ -90,7 +90,9 @@ KillJoysticks()
 		}
 		s_Joysticks[n]=0;
 	}
+#ifndef EMSCRIPTEN
 	SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+#endif
 	return 0;
 }
 
@@ -103,7 +105,10 @@ InitJoysticks()
 	int n; /* joystick index */
 	int total;
 
+#ifndef EMSCRIPTEN
+	// For Emscripten, keep joystick subsystem initialized all the time.
 	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+#endif
 
 	total = SDL_NumJoysticks();
 	if(total>MAX_JOYSTICKS) {

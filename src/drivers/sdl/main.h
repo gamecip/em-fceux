@@ -23,6 +23,7 @@
 #include "../../driver.h"
 #include "../common/config.h"
 #include "../common/args.h"
+#include "input.h"
 
 extern int eoptions;
 #define EO_NO8LIM      1
@@ -49,8 +50,8 @@ int CLImain(int argc, char *argv[]);
 #define GAMEPAD_NUM_DEVICES 4
 #define GAMEPAD_NUM_BUTTONS 10
 extern const char *GamePadNames[GAMEPAD_NUM_BUTTONS];
-extern const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES];
-extern const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS];
+extern const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES][MAXBUTTCONFIG];
+extern const int DefaultGamePad[GAMEPAD_NUM_DEVICES][MAXBUTTCONFIG][GAMEPAD_NUM_BUTTONS];
 
 // PowerPad defaults
 #define POWERPAD_NUM_DEVICES 2
