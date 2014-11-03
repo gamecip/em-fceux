@@ -453,7 +453,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         DEFINE(RGB_W)
         "attribute vec4 vert;\n"
         "varying vec2 v_uv[5];\n"
-        "#define TAP(i_, o_) v_uv[i_] = uv + vec2(((o_)+0.5) / RGB_W, 0.5/256.0) \n"
+        "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0) \n"
         "void main() {\n"
         "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
         "TAP(0,-2.0);\n"
@@ -504,7 +504,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
 void es2nDeinit(es2n *p)
 {
-// TODO: is cleanup needed?
+// TODO: cleanup is needed!!!
 /*
     if (p->idx_tex) {
         glDeleteTextures(1, &p->idx_tex);
