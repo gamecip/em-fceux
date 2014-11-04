@@ -40,10 +40,8 @@
 #define OVERSCAN_W 12
 #define IDX_W (256 + 2*OVERSCAN_W)
 #define RGB_W (NUM_SUBPS * IDX_W)
-// Half-widths of kernels, should be multiples of 6.0 (=chroma subcarrier wavelenth in samples / 2)
-#define YW2 24.0
-#define IW2 18.0
-#define QW2 18.0
+// Half-width of ideal Y kernel (=chroma subcarrier wavelenth / 2, in samples)
+#define YW2 6.0
 
 // TODO: move to es2n struct
 static float s_mins[3];
@@ -53,27 +51,6 @@ static float s_maxs[3];
 static double box(double w2, double center, double x)
 {
     return abs(x - center) < w2 ? 1.0 : 0.0;
-}
-
-// Sinc-Blackman
-#define SAMPLE_RATE (2.0*21.47727273)
-static double sinc(double w2, double center, double x)
-{
-#define K 16.0 // TODO: magic, calculate kernel up front?
-    const double fc = 2.05 / SAMPLE_RATE;
-    double d = x - center;
-    if (d == 0.0) {
-        return K * 2.02*M_PI*fc;
-    } else {
-        double h = K * sin(2.0*M_PI*fc * d) / d;
-        double t = 0.5 + 0.5 * abs(d)/w2; // TODO: make symmetric, should check it is..
-        t = (t < 0.0) ? 0.0 : (t > 1.0) ? 1.0 : t;
-        // Standard Blackman coeffs
-        const double a0 = 7938.0 / 18608.0;
-        const double a1 = 9240.0 / 18608.0;
-        const double a2 = 1430.0 / 18608.0;
-        return h * (a0 - a1*cos(2.0*M_PI*t) + a2*cos(4.0*M_PI*t));
-    }
 }
 
 // Generate the square wave
@@ -144,14 +121,14 @@ static void genKernelTex(es2n *p)
                         double level0 = NTSCsignal(color, phase0+p);
                         double level1 = NTSCsignal(color, phase1+p);
 
+                        double ym = box(YW2, kernel_center, x) / 8.0;
+                        level0 = ym * ((level0-BLACK) / (WHITE-BLACK));
+                        level1 = ym * ((level1-BLACK) / (WHITE-BLACK));
                         double y = (level0+level1) / 2.0;
                         double c = (level0-level1) / 2.0;
-                        y = ((y-BLACK) / (WHITE-BLACK)) / 8.0;
-                        c = ((c-BLACK) / (WHITE-BLACK)) / 8.0;
-
-                        yiq[0] += sinc(YW2, kernel_center, x) * y;
-                        yiq[1] += 1.40*box(IW2, kernel_center, x) * c * cos(M_PI * (shift+p) / 6.0);
-                        yiq[2] += 1.48*box(QW2, kernel_center, x) * c * sin(M_PI * (shift+p) / 6.0);
+                        yiq[0] += y;
+                        yiq[1] += 1.40*c * cos(M_PI * (shift+p) / 6.0);
+                        yiq[2] += 1.48*c * sin(M_PI * (shift+p) / 6.0);
                     }
 
                     for (int i = 0; i < 3; i++) {
@@ -387,8 +364,6 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         DEFINE(LOOKUP_W)
         DEFINE(IDX_W)
         DEFINE(YW2)
-        DEFINE(IW2)
-        DEFINE(QW2)
         "#define GAMMA (2.2 / 1.92)\n"
         "uniform sampler2D u_idxTex;\n"
         "uniform sampler2D u_deempTex;\n"
@@ -435,7 +410,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "SMP(4);\n"
         "SMP(5);\n"
         "SMP(6);\n"
-        "yiq /= (vec3(YW2, IW2, QW2) / (8.0/2.0));\n"
+        "yiq /= (vec3(YW2) / (8.0/2.0));\n"
         "vec3 result = c_convMat * yiq;\n"
         "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
         "}\n";
