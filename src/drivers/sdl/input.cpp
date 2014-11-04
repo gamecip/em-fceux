@@ -1792,6 +1792,7 @@ int DWaitButton (const uint8 * text, ButtConfig * bc, int wb)
 					bc->DeviceNum[wb] = 0;
 					bc->ButtonNum[wb] = event.key.keysym.sym;
 					return (1);
+#ifndef EMSCRIPTEN
 				case SDL_JOYBUTTONDOWN:
 					bc->ButtType[wb] = BUTTC_JOYSTICK;
 					bc->DeviceNum[wb] = event.jbutton.which;
@@ -1837,6 +1838,7 @@ int DWaitButton (const uint8 * text, ButtConfig * bc, int wb)
 							done--;
 					}
 					break;
+#endif
 				default:
 					done--;
 			}
@@ -1886,6 +1888,7 @@ extern Config *g_config;
 
 void ConfigDevice (int which, int arg)
 {
+#ifndef EMSCRIPTEN
 	char buf[256];
 	int x;
 	std::string prefix;
@@ -2012,6 +2015,7 @@ void ConfigDevice (int which, int arg)
 	}
 
 	ButtonConfigEnd ();
+#endif
 }
 
 
@@ -2020,6 +2024,7 @@ void ConfigDevice (int which, int arg)
  */
 void InputCfg (const std::string & text)
 {
+#ifndef EMSCRIPTEN
 #ifdef _GTK
 	// enable noGui to prevent the gtk x11 hack from executing
 	noGui = 1;
@@ -2063,6 +2068,7 @@ void InputCfg (const std::string & text)
 	else
 		printf ("Please run \"fceux --nogui\" before using --inputcfg\n");
 
+#endif
 }
 
 
