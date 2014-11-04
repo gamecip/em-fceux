@@ -18,6 +18,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
+#ifndef EMSCRIPTEN
 
 /// \file
 /// \brief Handles joystick input using the SDL.
@@ -61,7 +62,7 @@ DTestButtonJoy(ButtConfig *bc)
 									bc->ButtonNum[x] & 16383);
 			if ((bc->ButtonNum[x] & 0x4000) && pos <= -16383) {
 				return 1;
-			} else if (!(bc->ButtonNum[x] & 0x4000) && pos >= 16363) {
+			} else if (!(bc->ButtonNum[x] & 0x4000) && pos >= 16383) {
 				return 1;
 			}
 		} 
@@ -90,9 +91,7 @@ KillJoysticks()
 		}
 		s_Joysticks[n]=0;
 	}
-#ifndef EMSCRIPTEN
 	SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-#endif
 	return 0;
 }
 
@@ -105,10 +104,7 @@ InitJoysticks()
 	int n; /* joystick index */
 	int total;
 
-#ifndef EMSCRIPTEN
-	// For Emscripten, keep joystick subsystem initialized all the time.
 	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
-#endif
 
 	total = SDL_NumJoysticks();
 	if(total>MAX_JOYSTICKS) {
@@ -126,3 +122,6 @@ InitJoysticks()
 	s_jinited = 1;
 	return 1;
 }
+
+#endif // ifndef EMSCRIPTEN
+

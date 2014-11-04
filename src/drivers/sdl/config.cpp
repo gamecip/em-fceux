@@ -280,21 +280,15 @@ InitConfig()
 
 	// GamePad 0 - 3
 	for(unsigned int i = 0; i < GAMEPAD_NUM_DEVICES; i++) {
-	    for(unsigned int j = 0; j < MAXBUTTCONFIG; j++) {
-            char buf[64];
-            snprintf(buf, 23, "SDL.Input.GamePad.%d%d.", i, j);
-            prefix = buf;
+		char buf[64];
+		snprintf(buf, 20, "SDL.Input.GamePad.%d.", i);
+		prefix = buf;
 
-            config->addOption(prefix + "DeviceType", DefaultGamePadDevice[i][j]);
-            config->addOption(prefix + "DeviceNum",  0);
-            for(unsigned int k = 0; k < GAMEPAD_NUM_BUTTONS; k++) {
-                config->addOption(prefix + GamePadNames[k], DefaultGamePad[i][j][k]);
-                // TODO: remove
-//                if (DefaultGamePad[i][j][k] != -1) {
-//                    printf("!!!! write: %s: %d\n", (prefix + GamePadNames[k]).c_str(), DefaultGamePad[i][j][k]);
-//                }
-            }
-	    }
+		config->addOption(prefix + "DeviceType", DefaultGamePadDevice[i]);
+		config->addOption(prefix + "DeviceNum",  0);
+		for(unsigned int j = 0; j < GAMEPAD_NUM_BUTTONS; j++) {
+			config->addOption(prefix + GamePadNames[j], DefaultGamePad[i][j]);
+		}
 	}
     
 	// PowerPad 0 - 1

@@ -16,8 +16,13 @@ uint32 GetWriteSound(void);
 
 void SilenceSound(int s); /* DOS and SDL */
 
+#ifndef EMSCRIPTEN
 int InitJoysticks(void);
 int KillJoysticks(void);
+#else
+#define InitJoysticks() 1
+#define KillJoysticks() 0
+#endif
 uint32 *GetJSOr(void);
 
 int InitVideo(FCEUGI *gi);

@@ -47,7 +47,11 @@ extern ButtConfig GamePadConfig[4][10];
 void IncreaseEmulationSpeed(void);
 void DecreaseEmulationSpeed(void);
 
+#ifndef EMSCRIPTEN
 int DTestButtonJoy(ButtConfig *bc);
+#else
+#define DTestButtonJoy(a_) 0
+#endif
 
 void FCEUD_UpdateInput(void);
 

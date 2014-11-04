@@ -43,6 +43,9 @@
 #endif
 #endif
 
+#ifdef EMSCRIPTEN
+#include <html5.h>
+#endif
 
 #include <cstring>
 #include <cstdio>
@@ -1141,6 +1144,37 @@ ButtConfig GamePadConfig[4][10] = {
 	GPZ ()
 };
 
+#ifdef EMSCRIPTEN
+// idx 0..9 matches: a, b, select, start, up, down, left, right, turbo a, turbo b
+static int EmscriptenTestButton(const EmscriptenGamepadEvent *p, int idx)
+{
+    if (!p->connected) {
+        return 0;
+    }
+    if (idx >= 8) {
+        // Turbo A, Turbo B.
+        idx = idx - 4;
+        return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] > 0.5)));
+    } else if (idx >= 4) {
+        // Up, down, left, right.
+        const int positive_axis = idx & 1;
+        idx = !((idx & 0x02) >> 1);
+        if (idx < p->numAxes) {
+            if (positive_axis) { 
+                return p->axis[idx] > 0.5;
+            } else { 
+                return p->axis[idx] < -0.5;
+            }
+        } else {
+            return 0;
+        }
+    } else { 
+        // A, B, Select, Start.
+        return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] > 0.5)));
+    }
+}
+#endif
+
 /**
  * Update the status of the gamepad input devices.
  */
@@ -1165,6 +1199,18 @@ UpdateGamepad(void)
 	int opposite_dirs;
 	g_config->getOption("SDL.Input.EnableOppositeDirectionals", &opposite_dirs);
 
+#ifdef EMSCRIPTEN
+    // Four possibly connected joysticks/gamepads are read here, each matching a NES gamepad.
+    EmscriptenGamepadEvent gamepads[4];
+    for (int i = 0; i < 4; i++) {
+        if (EMSCRIPTEN_RESULT_SUCCESS != emscripten_get_gamepad_status(i, &gamepads[i])) {
+            // Set disconnected if query failed.
+            gamepads[i].connected = 0;
+        }
+    }
+    
+#endif
+
 	// go through each of the four game pads
 	for (wg = 0; wg < 4; wg++)
 	{
@@ -1173,8 +1219,12 @@ UpdateGamepad(void)
 		// a, b, select, start, up, down, left, right
 		for (x = 0; x < 8; x++)
 		{
+#ifndef EMSCRIPTEN
 			if (DTestButton (&GamePadConfig[wg][x]))
 			{
+#else
+			if (DTestButton(&GamePadConfig[wg][x]) || EmscriptenTestButton(&gamepads[wg], x)) {
+#endif
 				if(opposite_dirs == 0)
 				{
 					// test for left+right and up+down
@@ -1210,8 +1260,12 @@ UpdateGamepad(void)
 		{
 			for (x = 0; x < 2; x++)
 			{
+#ifndef EMSCRIPTEN
 				if (DTestButton (&GamePadConfig[wg][8 + x]))
-				{
+                {
+#else
+    			if (DTestButton(&GamePadConfig[wg][8+x]) || EmscriptenTestButton(&gamepads[wg], 8+x)) {
+#endif
 					JS |= (1 << x) << (wg << 3);
 				}
 			}
@@ -2108,43 +2162,35 @@ UpdateInput (Config * config)
 	int type, devnum, button;
 
 	// gamepad 0 - 3
-	// TODO: remove
-//	printf("!!!! UpdateInpout gamepad\n");
-	for (unsigned int i = 0; i < GAMEPAD_NUM_DEVICES; i++) {
-	    for (unsigned int j = 0; j < GAMEPAD_NUM_BUTTONS; j++) {
+	for (unsigned int i = 0; i < GAMEPAD_NUM_DEVICES; i++)
+	{
+		char buf[64];
+		snprintf (buf, 20, "SDL.Input.GamePad.%d.", i);
+		prefix = buf;
 
-	        unsigned int k = 0;
+		config->getOption (prefix + "DeviceType", &device);
+		if (device.find ("Keyboard") != std::string::npos)
+		{
+			type = BUTTC_KEYBOARD;
+		}
+		else if (device.find ("Joystick") != std::string::npos)
+		{
+			type = BUTTC_JOYSTICK;
+		}
+		else
+		{
+			type = 0;
+		}
 
-            for (; k < MAXBUTTCONFIG; k++) {
-                char buf[64];
-                snprintf (buf, 23, "SDL.Input.GamePad.%d%d.", i, k);
-                prefix = buf;
+		config->getOption (prefix + "DeviceNum", &devnum);
+		for (unsigned int j = 0; j < GAMEPAD_NUM_BUTTONS; j++)
+		{
+			config->getOption (prefix + GamePadNames[j], &button);
 
-                config->getOption (prefix + "DeviceType", &device);
-                if (device.find ("Keyboard") != std::string::npos) {
-                    type = BUTTC_KEYBOARD;
-                } else if (device.find ("Joystick") != std::string::npos) {
-                    type = BUTTC_JOYSTICK;
-                } else {
-                    break;
-                }
-
-                config->getOption (prefix + GamePadNames[j], &button);
-                if ((j == 0) && (button == -1)) {
-                    break;
-                }
-
-                config->getOption (prefix + "DeviceNum", &devnum);
-
-                // TODO: remove
-//                printf("!!!! read: %s: %d %d %d\n", (prefix + GamePadNames[j]).c_str(), type, devnum, button);
-                GamePadConfig[i][j].ButtType[k] = type;
-                GamePadConfig[i][j].DeviceNum[k] = devnum;
-                GamePadConfig[i][j].ButtonNum[k] = button;
-            }
-
-            printf("!!!! numC:%d\n", k);
-            GamePadConfig[i][j].NumC = k;
+			GamePadConfig[i][j].ButtType[0] = type;
+			GamePadConfig[i][j].DeviceNum[0] = devnum;
+			GamePadConfig[i][j].ButtonNum[0] = button;
+			GamePadConfig[i][j].NumC = 1;
 		}
 	}
 
@@ -2343,45 +2389,6 @@ UpdateInput (Config * config)
 const char *GamePadNames[GAMEPAD_NUM_BUTTONS] = { "A", "B", "Select", "Start",
 	"Up", "Down", "Left", "Right", "TurboA", "TurboB"
 };
-#if 1
-const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES][MAXBUTTCONFIG] =
-{ { "Keyboard", "Joystick", "None", "None" },
-{ "None", "None", "None", "None" },
-{ "None", "None", "None", "None" },
-{ "None", "None", "None", "None" }
-};
-const int DefaultGamePad[GAMEPAD_NUM_DEVICES][MAXBUTTCONFIG][GAMEPAD_NUM_BUTTONS] =
-{ { {SDLK_F, SDLK_D, SDLK_S, SDLK_RETURN, SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT, -1, -1},
-{0, 1, 2, 3, 49153, 32769, 49152, 32768, 4, 5},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1} },
-{ {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1} },
-{ {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1} },
-{ {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1},
-{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1} }
-};
-/*
-SDL.Input.GamePad.0A = 0
-SDL.Input.GamePad.0B = 1
-SDL.Input.GamePad.0DeviceNum = 0
-SDL.Input.GamePad.0Down = 32769
-SDL.Input.GamePad.0Left = 49152
-SDL.Input.GamePad.0Right = 32768
-SDL.Input.GamePad.0Select = 2
-SDL.Input.GamePad.0Start = 3
-SDL.Input.GamePad.0TurboA = 0
-SDL.Input.GamePad.0TurboB = 0
-SDL.Input.GamePad.0Up = 49153
-*/
-#else
 const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES] =
 { "Keyboard", "None", "None", "None" };
 const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS] =
@@ -2391,7 +2398,6 @@ const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS] =
 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
-#endif
 
 // PowerPad defaults
 const char *PowerPadNames[POWERPAD_NUM_BUTTONS] =
