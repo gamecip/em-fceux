@@ -40,8 +40,9 @@
 #define OVERSCAN_W 12
 #define IDX_W (256 + 2*OVERSCAN_W)
 #define RGB_W (NUM_SUBPS * IDX_W)
-// Half-width of ideal Y kernel (=chroma subcarrier wavelenth / 2, in samples)
+// Half-width of Y and C box filter kernels.
 #define YW2 6.0
+#define CW2 12.0
 
 // TODO: move to es2n struct
 static float s_mins[3];
@@ -114,18 +115,19 @@ static void genKernelTex(es2n *p)
 
                     const int phase0 = 8 * cycle; // Color generator outputs 8 samples per PPU pixel.
                     const int phase1 = phase0 + 8; // PPU skips 1st pixel for less jaggies when interleaved fields are combined.
-                    const double shift = phase0 + 4.8; // TODO: why? is it -33 degrees phase shift for UV -> IQ?
+                    const double shift = phase0 + 6.0 - 6.0*33.0/180.0; // -33 degrees phase shift, UV->IQ
 
                     for (int p = 0; p < 8; p++) {
                         const double x = p + 8.0*tap;
                         double level0 = NTSCsignal(color, phase0+p);
                         double level1 = NTSCsignal(color, phase1+p);
 
-                        double ym = box(YW2, kernel_center, x) / 8.0;
-                        level0 = ym * ((level0-BLACK) / (WHITE-BLACK));
-                        level1 = ym * ((level1-BLACK) / (WHITE-BLACK));
-                        double y = (level0+level1) / 2.0;
-                        double c = (level0-level1) / 2.0;
+                        double my = box(YW2, kernel_center, x) / 8.0;
+                        double mc = box(CW2, kernel_center, x) / 8.0;
+                        level0 = ((level0-BLACK) / (WHITE-BLACK));
+                        level1 = ((level1-BLACK) / (WHITE-BLACK));
+                        double y = my * (level0+level1) / 2.0;
+                        double c = mc * (level0-level1) / 2.0;
                         yiq[0] += y;
                         yiq[1] += 1.40*c * cos(M_PI * (shift+p) / 6.0);
                         yiq[2] += 1.48*c * sin(M_PI * (shift+p) / 6.0);
@@ -364,6 +366,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         DEFINE(LOOKUP_W)
         DEFINE(IDX_W)
         DEFINE(YW2)
+        DEFINE(CW2)
         "#define GAMMA (2.2 / 1.92)\n"
         "uniform sampler2D u_idxTex;\n"
         "uniform sampler2D u_deempTex;\n"
@@ -410,7 +413,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "SMP(4);\n"
         "SMP(5);\n"
         "SMP(6);\n"
-        "yiq /= (vec3(YW2) / (8.0/2.0));\n"
+        "yiq /= (vec3(YW2, CW2, CW2) / (8.0/2.0));\n"
         "vec3 result = c_convMat * yiq;\n"
         "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
         "}\n";
