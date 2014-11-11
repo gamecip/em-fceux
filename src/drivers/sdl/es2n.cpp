@@ -14,8 +14,6 @@
 #define RGB_I       3
 #define TEX(i_)     (GL_TEXTURE0+(i_))
 
-#define NUM_PHASES 3
-#define NUM_COLORS (64 * 8) // 64 palette colors, 8 color de-emphasis settings.
 #define PERSISTENCE_R 0.165 // Red phosphor persistence.
 #define PERSISTENCE_G 0.205 // Green "
 #define PERSISTENCE_B 0.225 // Blue "
@@ -32,10 +30,13 @@
 
 #define DEFINE(name_) "#define " #name_ " float(" STR(name_) ")\n"
 
+// 64 palette colors, 8 color de-emphasis settings.
+#define NUM_COLORS (64 * 8)
+#define NUM_PHASES 3
 #define NUM_SUBPS 4
-#define NUM_TAPS 7
-// Following must be POT >= NUM_PHASES*NUM_TAPS*NUM_SUBPS, ex. 3*4*7=84 -> 128
-#define LOOKUP_W 128
+#define NUM_TAPS 5
+// Following must be POT >= NUM_PHASES*NUM_TAPS*NUM_SUBPS, ex. 3*5*4=60 -> 64
+#define LOOKUP_W 64
 // Set overscan on left and right sides as 12px (total 24px).
 #define OVERSCAN_W 12
 #define IDX_W (256 + 2*OVERSCAN_W)
@@ -200,6 +201,9 @@ static void genKernelTex(es2n *p)
         }
     }
 
+//    printf("mins: %.3f %.3f %.3f\n", s_mins[0], s_mins[1], s_mins[2]);
+//    printf("maxs: %.3f %.3f %.3f\n", s_maxs[0], s_maxs[1], s_maxs[2]);
+
 	glActiveTexture(TEX(LOOKUP_I));
     glGenTextures(1, &p->lookup_tex);
     glBindTexture(GL_TEXTURE_2D, p->lookup_tex);
@@ -282,7 +286,7 @@ static void setUniforms(GLuint prog)
 // TODO: reformat inputs to something more meaningful
 void es2nInit(es2n *p, int left, int right, int top, int bottom)
 {
-    printf("left:%d right:%d top:%d bottom:%d\n", left, right, top, bottom);
+//    printf("left:%d right:%d top:%d bottom:%d\n", left, right, top, bottom);
     memset(p, 0, sizeof(es2n));
 
     p->overscan_pixels = (GLubyte*) malloc(OVERSCAN_W*240);
@@ -390,13 +394,11 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "#define S vec2(1.0/IDX_W, 0.0)\n"
         "#define UV_OUT(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
         "void main() {\n"
-        "UV_OUT(0,-3.0);\n"
-        "UV_OUT(1,-2.0);\n"
-        "UV_OUT(2,-1.0);\n"
-        "UV_OUT(3, 0.0);\n"
-        "UV_OUT(4, 1.0);\n"
-        "UV_OUT(5, 2.0);\n"
-        "UV_OUT(6, 3.0);\n"
+        "UV_OUT(0,-2.0);\n"
+        "UV_OUT(1,-1.0);\n"
+        "UV_OUT(2, 0.0);\n"
+        "UV_OUT(3, 1.0);\n"
+        "UV_OUT(4, 2.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* rgb_frag_src =
@@ -451,8 +453,6 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "SMP(2);\n"
         "SMP(3);\n"
         "SMP(4);\n"
-        "SMP(5);\n"
-        "SMP(6);\n"
         "yiq /= (vec3(YW2, CW2, CW2) / (8.0/2.0));\n"
         "vec3 result = c_convMat * yiq;\n"
         "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
@@ -554,7 +554,7 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_c
     glTexSubImage2D(GL_TEXTURE_2D, 0, OVERSCAN_W, 0, 256, 240, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels);
     if (p->overscan_color != overscan_color) {
         p->overscan_color = overscan_color;
-        printf("overscan: %02X\n", overscan_color);
+//        printf("overscan: %02X\n", overscan_color);
 
         memset(p->overscan_pixels, overscan_color, OVERSCAN_W*240);
         
