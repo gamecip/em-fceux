@@ -340,7 +340,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Configure RGB framebuffer.
     glActiveTexture(TEX(RGB_I));
-    makeFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, 256, GL_RGB, GL_NEAREST);
+    makeFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, 256, GL_RGB, GL_LINEAR);
     const char* rgb_vert_src =
         "precision highp float;\n"
         DEFINE(NUM_TAPS)
@@ -465,8 +465,10 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "SMP(4, vec3(-0.500));\n"
         "gl_FragColor = vec4(color, 1.0);\n"
 #else
-        // Direct color
-        "gl_FragColor = texture2D(u_rgbTex, v_uv[2]);\n"
+        // Filter nearest on y, linear on x.
+        "vec2 uv = v_uv[2];\n"
+        "uv.y = floor(256.0 * uv.y)/256.0 + 0.5/256.0;\n"
+        "gl_FragColor = texture2D(u_rgbTex, uv);\n"
 #endif
         "}\n";
     p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
