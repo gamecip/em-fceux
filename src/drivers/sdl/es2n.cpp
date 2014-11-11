@@ -14,7 +14,7 @@
 #define RGB_I       3
 #define TEX(i_)     (GL_TEXTURE0+(i_))
 
-#define NUM_CYCLES 3
+#define NUM_PHASES 3
 #define NUM_COLORS (64 * 8) // 64 palette colors, 8 color de-emphasis settings.
 #define PERSISTENCE_R 0.165 // Red phosphor persistence.
 #define PERSISTENCE_G 0.205 // Green "
@@ -34,7 +34,7 @@
 
 #define NUM_SUBPS 4
 #define NUM_TAPS 7
-// Following must be POT >= NUM_CYCLES*NUM_TAPS*NUM_SUBPS, ex. 3*4*7=84 -> 128
+// Following must be POT >= NUM_PHASES*NUM_TAPS*NUM_SUBPS, ex. 3*4*7=84 -> 128
 #define LOOKUP_W 128
 // Set overscan on left and right sides as 12px (total 24px).
 #define OVERSCAN_W 12
@@ -48,7 +48,7 @@
 static float s_mins[3];
 static float s_maxs[3];
 
-// Boxcar
+// Box filter kernel.
 static double box(double w2, double center, double x)
 {
     return abs(x - center) < w2 ? 1.0 : 0.0;
@@ -97,40 +97,78 @@ static double NTSCsignal(int pixel, int phase)
 
 static void genKernelTex(es2n *p)
 {
-	double *yiqs = (double*) calloc(3 * NUM_CYCLES*NUM_SUBPS*NUM_TAPS * NUM_COLORS, sizeof(double));
+    double *ys = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
+    double *is = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
+    double *qs = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
+	double *yiqs = (double*) calloc(3 * NUM_PHASES*NUM_SUBPS*NUM_TAPS * NUM_COLORS, sizeof(double));
+	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
 
  	s_mins[0] = s_mins[1] = s_mins[2] = 0.0f;
  	s_maxs[0] = s_maxs[1] = s_maxs[2] = 0.0f;
 
-    // Generate lookup for every color, cycle, tap and subpixel combination.
-    // Average the two NTSC fields to generate ideal output.
+    // Generate temporary lookup containing samplings of separated and normalized YIQ components
+    // for each phase and color combination. Separation is performed using a simulated 1D comb filter.
+    int i = 0;
+    for (int phase = 0; phase < NUM_PHASES; phase++) {
+        // PPU color generator outputs 8 samples per pixel, and we have 3 different phases.
+        const int phase0 = 8 * phase; 
+        // While field 0 is normal, PPU skips 1st screen pixel for field 1 causing offset of 8 samples.
+        const int phase1 = phase0 + 8;
+        // Phase (hue) shift for demodulation. Additionally YUV to YIQ conversion needs ~33 degrees shift.
+        const double shift = phase0 + 6.0 - 12.0*33.0/360.0; 
+
+        for (int color = 0; color < NUM_COLORS; color++) {
+            // Here we store the eight (8) generated YIQ samples for the pixel.
+            for (int s = 0; s < 8; s++) {
+                // Obtain NTSC signal level from PPU color generator for both fields.
+                double level0 = NTSCsignal(color, phase0+s);
+                double level1 = NTSCsignal(color, phase1+s);
+                // Normalize to our desired black-white range. It's linear operation, no problem.
+                level0 = ((level0-BLACK) / (WHITE-BLACK));
+                level1 = ((level1-BLACK) / (WHITE-BLACK));
+                // 1D comb filter which relies on the inverse phase of the two fields. Ideally this allows
+                // extracting accurate luma and chroma. Here however, the phase is slightly off. We'd need 6
+                // samples phase difference (=half chroma wavelength), but we get 8 which comes from the
+                // discarded 1st pixel of field 1. The error is 2 samples, 60 degrees.
+                // This is fixed in the demodulation.
+                double y = (level0+level1) / 2.0;
+                double c = (level0-level1) / 2.0;
+                double a = M_PI * (shift+s) / 6.0;
+                // Demodulate and store YIQ.
+                ys[i] = y;
+                is[i] = 1.414*c * cos(a);
+                qs[i] = 1.480*c * sin(a);
+                i++;
+            }
+        }
+    }
+
+    // Generate an exhausting lookup texture for every color, phase, tap and subpixel combination.
     // ...Looks horrid, and yes it's complex, but computation is quite fast.
     for (int color = 0; color < NUM_COLORS; color++) {
-        for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
+        for (int phase = 0; phase < NUM_PHASES; phase++) {
             for (int subp = 0; subp < NUM_SUBPS; subp++) {
-                const double kernel_center = 1.5 + 2*subp + 8*(NUM_TAPS/2);
-
                 for (int tap = 0; tap < NUM_TAPS; tap++) {
                     float yiq[3] = {0.0f, 0.0f, 0.0f};
 
-                    const int phase0 = 8 * cycle; // Color generator outputs 8 samples per PPU pixel.
-                    const int phase1 = phase0 + 8; // PPU skips 1st pixel for less jaggies when interleaved fields are combined.
-                    const double shift = phase0 + 6.0 - 6.0*33.0/180.0; // -33 degrees phase shift, UV->IQ
+                    // Because of half subpixel accuracy (4 vs 8), filter twice and average.
+                    for (int side = 0; side < 2; side++) { // 0:left, 1: right
+                        // Calculate filter kernel center.
+                        const double kernel_center = side + 0.5 + 2*subp + 8*(NUM_TAPS/2);
 
-                    for (int p = 0; p < 8; p++) {
-                        const double x = p + 8.0*tap;
-                        double level0 = NTSCsignal(color, phase0+p);
-                        double level1 = NTSCsignal(color, phase1+p);
-
-                        double my = box(YW2, kernel_center, x) / 8.0;
-                        double mc = box(CW2, kernel_center, x) / 8.0;
-                        level0 = ((level0-BLACK) / (WHITE-BLACK));
-                        level1 = ((level1-BLACK) / (WHITE-BLACK));
-                        double y = my * (level0+level1) / 2.0;
-                        double c = mc * (level0-level1) / 2.0;
-                        yiq[0] += y;
-                        yiq[1] += 1.40*c * cos(M_PI * (shift+p) / 6.0);
-                        yiq[2] += 1.48*c * sin(M_PI * (shift+p) / 6.0);
+                        // Accumulate filter sum over all 8 samples of the pixel.
+                        for (int p = 0; p < 8; p++) {
+                            // Calculate x in kernel.
+                            const double x = p + 8.0*tap;
+                            // Filter luma and chroma with different filter widths.
+                            double my = box(YW2, kernel_center, x) / (2.0 * 8.0);
+                            double mc = box(CW2, kernel_center, x) / (2.0 * 8.0);
+                            // Lookup YIQ signal level and accumulate.
+                            i = 8*(color + phase*NUM_COLORS) + p;
+                            yiq[0] += my * ys[i];
+                            yiq[1] += mc * is[i];
+                            yiq[2] += mc * qs[i];
+                        }
                     }
 
                     for (int i = 0; i < 3; i++) {
@@ -138,7 +176,7 @@ static void genKernelTex(es2n *p)
                         s_maxs[i] = fmax(s_maxs[i], yiq[i]);
                     }
 
-                    const int k = 3 * (color*NUM_CYCLES*NUM_SUBPS*NUM_TAPS + cycle*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
+                    const int k = 3 * (color*NUM_PHASES*NUM_SUBPS*NUM_TAPS + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
                     yiqs[k+0] = yiq[0];
                     yiqs[k+1] = yiq[1];
                     yiqs[k+2] = yiq[2];
@@ -147,13 +185,12 @@ static void genKernelTex(es2n *p)
         }
     }
 
-	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
     for (int color = 0; color < NUM_COLORS; color++) {
-        for (int cycle = 0; cycle < NUM_CYCLES; cycle++) {
+        for (int phase = 0; phase < NUM_PHASES; phase++) {
             for (int subp = 0; subp < NUM_SUBPS; subp++) {
                 for (int tap = 0; tap < NUM_TAPS; tap++) {
-                    const int ik = 3 * (color*NUM_CYCLES*NUM_SUBPS*NUM_TAPS + cycle*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
-                    const int ok = 3 * (color*LOOKUP_W + cycle*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
+                    const int ik = 3 * (color*NUM_PHASES*NUM_SUBPS*NUM_TAPS + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
+                    const int ok = 3 * (color*LOOKUP_W + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
                     for (int i = 0; i < 3; i++) {
                         const double clamped = (yiqs[ik+i]-s_mins[i]) / (s_maxs[i]-s_mins[i]);
                         result[ok+i] = (unsigned char) (255.0 * clamped + 0.5);
@@ -172,6 +209,9 @@ static void genKernelTex(es2n *p)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
+	free(ys);
+	free(is);
+	free(qs);
 	free(yiqs);
 	free(result);
 }
