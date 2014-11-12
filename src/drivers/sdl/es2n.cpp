@@ -44,10 +44,100 @@
 // Half-width of Y and C box filter kernels.
 #define YW2 6.0
 #define CW2 12.0
+// CRT mesh X and Y half-resolution.
+#define CRT_XN 8
+#define CRT_YN 6
 
-// TODO: move to es2n struct
-static float s_mins[3];
-static float s_maxs[3];
+static GLuint compileShader(GLenum type, const char *src)
+{
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &src, 0);
+    glCompileShader(shader);
+    return shader;
+}
+
+static GLuint linkShader(GLuint vert_shader, GLuint frag_shader)
+{
+    GLuint prog = glCreateProgram();
+    glAttachShader(prog, vert_shader);
+    glAttachShader(prog, frag_shader);
+    glLinkProgram(prog);
+    glDetachShader(prog, vert_shader);
+    glDetachShader(prog, frag_shader);
+    glUseProgram(prog);
+    return prog;
+}
+
+static GLuint buildShader(const char *vert_src, const char *frag_src)
+{
+    GLuint vert_shader = compileShader(GL_VERTEX_SHADER, vert_src);
+    GLuint frag_shader = compileShader(GL_FRAGMENT_SHADER, frag_src);
+    GLuint result = linkShader(vert_shader, frag_shader);
+    glDeleteShader(vert_shader);
+    glDeleteShader(frag_shader);
+    return result;
+}
+
+static void deleteShader(GLuint *prog)
+{
+    if (prog && *prog) {
+        glDeleteProgram(*prog);
+        *prog = 0;
+    }
+}
+
+static void createBuffer(GLuint *buf, GLenum binding, size_t size, const void *data)
+{
+    glGenBuffers(1, buf);
+    glBindBuffer(binding, *buf);
+    glBufferData(binding, size, data, GL_STATIC_DRAW);
+}
+
+static void deleteBuffer(GLuint *buf)
+{
+    if (buf && *buf) {
+        glDeleteBuffers(1, buf);
+        *buf = 0;
+    }
+}
+
+static void createTex(GLuint *tex, int w, int h, GLenum format, GLenum filter, void *data)
+{
+    glGenTextures(1, tex);
+    glBindTexture(GL_TEXTURE_2D, *tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+}
+
+static void deleteTex(GLuint *tex)
+{
+    if (tex && *tex) {
+        glDeleteTextures(1, tex);
+        *tex = 0;
+    }
+}
+
+static void makeFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filter)
+{
+    createTex(tex, w, h, format, filter, 0);
+
+    glGenFramebuffers(1, fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, *fb);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *tex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+static void deleteFBTex(GLuint *tex, GLuint *fb)
+{
+    deleteTex(tex);
+    if (fb && *fb) {
+        glDeleteFramebuffers(1, fb);
+        *fb = 0;
+    }
+}
 
 // Box filter kernel.
 static double box(double w2, double center, double x)
@@ -103,9 +193,6 @@ static void genKernelTex(es2n *p)
     double *qs = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
 	double *yiqs = (double*) calloc(3 * NUM_PHASES*NUM_SUBPS*NUM_TAPS * NUM_COLORS, sizeof(double));
 	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
-
- 	s_mins[0] = s_mins[1] = s_mins[2] = 0.0f;
- 	s_maxs[0] = s_maxs[1] = s_maxs[2] = 0.0f;
 
     // Generate temporary lookup containing samplings of separated and normalized YIQ components
     // for each phase and color combination. Separation is performed using a simulated 1D comb filter.
@@ -173,8 +260,8 @@ static void genKernelTex(es2n *p)
                     }
 
                     for (int i = 0; i < 3; i++) {
-                        s_mins[i] = fmin(s_mins[i], yiq[i]);
-                        s_maxs[i] = fmax(s_maxs[i], yiq[i]);
+                        p->yiq_mins[i] = fmin(p->yiq_mins[i], yiq[i]);
+                        p->yiq_maxs[i] = fmax(p->yiq_maxs[i], yiq[i]);
                     }
 
                     const int k = 3 * (color*NUM_PHASES*NUM_SUBPS*NUM_TAPS + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
@@ -193,7 +280,7 @@ static void genKernelTex(es2n *p)
                     const int ik = 3 * (color*NUM_PHASES*NUM_SUBPS*NUM_TAPS + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
                     const int ok = 3 * (color*LOOKUP_W + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
                     for (int i = 0; i < 3; i++) {
-                        const double clamped = (yiqs[ik+i]-s_mins[i]) / (s_maxs[i]-s_mins[i]);
+                        const double clamped = (yiqs[ik+i]-p->yiq_mins[i]) / (p->yiq_maxs[i]-p->yiq_mins[i]);
                         result[ok+i] = (unsigned char) (255.0 * clamped + 0.5);
                     }
                 }
@@ -201,17 +288,11 @@ static void genKernelTex(es2n *p)
         }
     }
 
-//    printf("mins: %.3f %.3f %.3f\n", s_mins[0], s_mins[1], s_mins[2]);
-//    printf("maxs: %.3f %.3f %.3f\n", s_maxs[0], s_maxs[1], s_maxs[2]);
+//    printf("mins: %.3f %.3f %.3f\n", _mins[0], _mins[1], _mins[2]);
+//    printf("maxs: %.3f %.3f %.3f\n", _maxs[0], _maxs[1], _maxs[2]);
 
 	glActiveTexture(TEX(LOOKUP_I));
-    glGenTextures(1, &p->lookup_tex);
-    glBindTexture(GL_TEXTURE_2D, p->lookup_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, LOOKUP_W, NUM_COLORS, 0, GL_RGB, GL_UNSIGNED_BYTE, result);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    createTex(&p->lookup_tex, LOOKUP_W, NUM_COLORS, GL_RGB, GL_NEAREST, result);
 
 	free(ys);
 	free(is);
@@ -220,67 +301,83 @@ static void genKernelTex(es2n *p)
 	free(result);
 }
 
-static GLuint compileShader(GLenum type, const char *src)
+static void updateControlUniforms(const es2n_controls *c)
 {
-    GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &src, 0);
-    glCompileShader(shader);
-    return shader;
+    GLfloat v;
+
+    v = 0.333f * c->brightness;
+    glUniform1f(c->_brightness_loc, v);
+    v = 1.0f + 0.5f*c->contrast;
+    glUniform1f(c->_contrast_loc, v);
+    v = 1.0f + c->color;
+    glUniform1f(c->_color_loc, v);
+    v = 2.5f/2.2f + 0.5f*c->gamma;
+    glUniform1f(c->_gamma_loc, v);
 }
 
-static GLuint linkShader(GLuint vert_shader, GLuint frag_shader)
-{
-    GLuint prog = glCreateProgram();
-    glAttachShader(prog, vert_shader);
-    glAttachShader(prog, frag_shader);
-    glLinkProgram(prog);
-    glDetachShader(prog, vert_shader);
-    glDetachShader(prog, frag_shader);
-    glUseProgram(prog);
-    return prog;
-}
-
-GLuint buildShader(const char *vert_src, const char *frag_src)
-{
-    GLuint vert_shader = compileShader(GL_VERTEX_SHADER, vert_src);
-    GLuint frag_shader = compileShader(GL_FRAGMENT_SHADER, frag_src);
-    GLuint result = linkShader(vert_shader, frag_shader);
-    glDeleteShader(vert_shader);
-    glDeleteShader(frag_shader);
-    return result;
-}
-
-void makeFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filter)
-{
-    glGenTextures(1, tex);
-    glBindTexture(GL_TEXTURE_2D, *tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-
-    glGenFramebuffers(1, fb);
-    glBindFramebuffer(GL_FRAMEBUFFER, *fb);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *tex, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-static void setUniforms(GLuint prog)
+static void initUniformsRGB(es2n *p)
 {
     GLint k;
+    GLuint prog = p->rgb_prog;
+
     k = glGetUniformLocation(prog, "u_idxTex");
     glUniform1i(k, IDX_I);
     k = glGetUniformLocation(prog, "u_deempTex");
     glUniform1i(k, DEEMP_I);
     k = glGetUniformLocation(prog, "u_lookupTex");
     glUniform1i(k, LOOKUP_I);
+    k = glGetUniformLocation(prog, "u_mins");
+    glUniform3fv(k, 1, p->yiq_mins);
+    k = glGetUniformLocation(prog, "u_maxs");
+    glUniform3fv(k, 1, p->yiq_maxs);
+
+    es2n_controls *c = &p->controls;
+    c->_brightness_loc = glGetUniformLocation(prog, "u_brightness");
+    c->_contrast_loc = glGetUniformLocation(prog, "u_contrast");
+    c->_color_loc = glGetUniformLocation(prog, "u_color");
+    c->_gamma_loc = glGetUniformLocation(prog, "u_gamma");
+    updateControlUniforms(&p->controls);
+}
+
+static void initUniformsDisp(es2n *p)
+{
+    GLint k;
+    GLuint prog = p->disp_prog;
+
     k = glGetUniformLocation(prog, "u_rgbTex");
     glUniform1i(k, RGB_I);
-    k = glGetUniformLocation(prog, "u_mins");
-    glUniform3fv(k, 1, s_mins);
-    k = glGetUniformLocation(prog, "u_maxs");
-    glUniform3fv(k, 1, s_maxs);
+}
+
+static void renderRGB(es2n *p)
+{
+    glBindBuffer(GL_ARRAY_BUFFER, p->quad_buf);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, p->rgb_fb);
+    glViewport(0, 8, RGB_W, 224);
+    glUseProgram(p->rgb_prog);
+    updateControlUniforms(&p->controls);
+
+    glEnable(GL_BLEND);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisable(GL_BLEND);
+}
+
+static void renderDisp(es2n *p)
+{
+    if (p->crt_enabled) {
+        glBindBuffer(GL_ARRAY_BUFFER, p->crt_verts_buf);
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
+    glUseProgram(p->disp_prog);
+    if (p->crt_enabled) {
+        glDrawElements(GL_TRIANGLE_STRIP, 2 * (2*CRT_XN+1+1) * (2*CRT_YN), GL_UNSIGNED_SHORT, 0);
+    } else {
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
 }
 
 // TODO: reformat inputs to something more meaningful
@@ -308,16 +405,10 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         -1.0f,  1.0f, left  / 256.0f, top / 256.0f, 
          1.0f,  1.0f, right / 256.0f, top / 256.0f
     };
-
-    // Create quad vertex buffer.
-    glGenBuffers(1, &p->quadbuf);
-    glBindBuffer(GL_ARRAY_BUFFER, p->quadbuf);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadverts), quadverts, GL_STATIC_DRAW);
+    createBuffer(&p->quad_buf, GL_ARRAY_BUFFER, sizeof(quadverts), quadverts);
 
     // Create CRT vertex buffer.
-#define N 8
-#define M 6
-    const size_t size_verts = sizeof(GLfloat) * 4 * (2*N+1) * (2*M+1);
+    const size_t size_verts = sizeof(GLfloat) * 4 * (2*CRT_XN+1) * (2*CRT_YN+1);
     GLfloat *crt_verts = (GLfloat*) malloc(size_verts);
     const double dx = 8.9;
     const double dy = 3.6;
@@ -325,11 +416,11 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     const double dy2 = dy*dy;
     const double mx = sqrt(1.0 + dx2);
     const double my = sqrt(1.0 + dy2);
-    for (int j = -M; j <= M; j++) {
-        for (int i = -N; i <= N; i++) {
-            int k = 4 * ((j+M) * (2*N+1) + i+N);
-            const double x = (double) i/N;
-            const double y = (double) j/M;
+    for (int j = -CRT_YN; j <= CRT_YN; j++) {
+        for (int i = -CRT_XN; i <= CRT_XN; i++) {
+            int k = 4 * ((j+CRT_YN) * (2*CRT_XN+1) + i+CRT_XN);
+            const double x = (double) i/CRT_XN;
+            const double y = (double) j/CRT_YN;
             const double r2 = x*x + y*y;
             crt_verts[k+0] = mx * x / sqrt(dx2 + r2);
             crt_verts[k+1] = my * y / sqrt(dy2 + r2);
@@ -337,48 +428,32 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
             crt_verts[k+3] = ((top-bottom) * (0.5 + 0.5*y) + bottom) / 256.0f;
         }
     }
-    glGenBuffers(1, &p->crt_verts_buf);
-    glBindBuffer(GL_ARRAY_BUFFER, p->crt_verts_buf);
-    glBufferData(GL_ARRAY_BUFFER, size_verts, crt_verts, GL_STATIC_DRAW);
+    createBuffer(&p->crt_verts_buf, GL_ARRAY_BUFFER, size_verts, crt_verts);
     free(crt_verts);
 
-    const size_t size_elems = sizeof(GLushort) * (2 * (2*N+1+1) * (2*M));
+    const size_t size_elems = sizeof(GLushort) * (2 * (2*CRT_XN+1+1) * (2*CRT_YN));
     GLushort *crt_elems = (GLushort*) malloc(size_elems);
     int k = 0;
-    for (int j = 0; j < 2*M; j++) {
-        for (int i = 0; i < 2*N+1; i++) {
-            crt_elems[k+0] = i + (j+0) * (2*N+1);
-            crt_elems[k+1] = i + (j+1) * (2*N+1);
+    for (int j = 0; j < 2*CRT_YN; j++) {
+        for (int i = 0; i < 2*CRT_XN+1; i++) {
+            crt_elems[k+0] = i + (j+0) * (2*CRT_XN+1);
+            crt_elems[k+1] = i + (j+1) * (2*CRT_XN+1);
             k += 2;
         }
         crt_elems[k+0] = crt_elems[k-1];
-        crt_elems[k+1] = crt_elems[k-1 - 2*2*N];
+        crt_elems[k+1] = crt_elems[k-1 - 2*2*CRT_XN];
         k += 2;
     }
-    glGenBuffers(1, &p->crt_elems_buf);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, p->crt_elems_buf);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, size_elems, crt_elems, GL_STATIC_DRAW);
+    createBuffer(&p->crt_elems_buf, GL_ELEMENT_ARRAY_BUFFER, size_elems, crt_elems);
     free(crt_elems);
 
     // Setup input pixels texture.
     glActiveTexture(TEX(IDX_I));
-    glGenTextures(1, &p->idx_tex);
-    glBindTexture(GL_TEXTURE_2D, p->idx_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, IDX_W, 256, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    createTex(&p->idx_tex, IDX_W, 256, GL_LUMINANCE, GL_NEAREST, 0);
 
     // Setup input de-emphasis rows texture.
     glActiveTexture(TEX(DEEMP_I));
-    glGenTextures(1, &p->deemp_tex);
-    glBindTexture(GL_TEXTURE_2D, p->deemp_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, 256, 1, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    createTex(&p->deemp_tex, 256, 1, GL_LUMINANCE, GL_NEAREST, 0);
 
     genKernelTex(p);
 
@@ -409,12 +484,15 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         DEFINE(IDX_W)
         DEFINE(YW2)
         DEFINE(CW2)
-        "#define GAMMA (2.2 / 1.92)\n"
         "uniform sampler2D u_idxTex;\n"
         "uniform sampler2D u_deempTex;\n"
         "uniform sampler2D u_lookupTex;\n"
         "uniform vec3 u_mins;\n"
         "uniform vec3 u_maxs;\n"
+        "uniform float u_brightness;\n"
+        "uniform float u_contrast;\n"
+        "uniform float u_color;\n"
+        "uniform float u_gamma;\n"
         "varying vec2 v_uv[int(NUM_TAPS)];\n"
 #if 1 // 0: texture test pass-through
         "const mat3 c_convMat = mat3(\n"
@@ -430,7 +508,6 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 #endif
         ");\n"
         "\n"
-        "const vec3 c_gamma = vec3(GAMMA);\n"
         "const vec4 one = vec4(1.0);\n"
         "const vec4 nil = vec4(0.0);\n"
         "\n"
@@ -453,9 +530,9 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "SMP(2);\n"
         "SMP(3);\n"
         "SMP(4);\n"
-        "yiq /= (vec3(YW2, CW2, CW2) / (8.0/2.0));\n"
+        "yiq *= vec3((8.0/2.0)/YW2, vec2(u_color*((8.0/2.0)/CW2)));\n"
         "vec3 result = c_convMat * yiq;\n"
-        "gl_FragColor = vec4(pow(result, c_gamma), 1.0);\n"
+        "gl_FragColor = vec4(u_contrast * pow(result, vec3(u_gamma)) + u_brightness, 1.0);\n"
         "}\n";
 #else
         "void main(void) {\n"
@@ -463,7 +540,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "}\n";
 #endif
     p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
-    setUniforms(p->rgb_prog);
+    initUniformsRGB(p);
 
     // Setup display (output) shader.
     const char* disp_vert_src =
@@ -512,7 +589,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 #endif
         "}\n";
     p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
-    setUniforms(p->disp_prog);
+    initUniformsDisp(p);
 
 // TODO: remove from final
 /*
@@ -524,26 +601,16 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
 void es2nDeinit(es2n *p)
 {
-// TODO: cleanup is needed!!!
-/*
-    if (p->idx_tex) {
-        glDeleteTextures(1, &p->idx_tex);
-        p->idx_tex = 0;
-    }
-    if (p->lookup_tex) {
-        glDeleteTextures(1, &p->lookup_tex);
-        p->lookup_tex = 0;
-    }
-    if (p->rgb_prog) {
-        glDeleteProgram(p->rgb_prog);
-        p->rgb_prog = 0;
-    }
-*/
-}
-
-// TODO: remove
-static void updateUniforms(GLuint prog)
-{
+    deleteFBTex(&p->rgb_tex, &p->rgb_fb);
+    deleteTex(&p->idx_tex);
+    deleteTex(&p->deemp_tex);
+    deleteTex(&p->lookup_tex);
+    deleteShader(&p->rgb_prog);
+    deleteShader(&p->disp_prog);
+    deleteBuffer(&p->quad_buf);
+    deleteBuffer(&p->crt_verts_buf);
+    deleteBuffer(&p->crt_elems_buf);
+    free(p->overscan_pixels);
 }
 
 void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
@@ -567,24 +634,7 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_c
     glBindTexture(GL_TEXTURE_2D, p->deemp_tex);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 240, 1, GL_LUMINANCE, GL_UNSIGNED_BYTE, row_deemp);
 
-    glBindBuffer(GL_ARRAY_BUFFER, p->quadbuf);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, p->rgb_fb);
-    glViewport(0, 8, RGB_W, 224);
-    glUseProgram(p->rgb_prog);
-    updateUniforms(p->rgb_prog);
-    glEnable(GL_BLEND);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glDisable(GL_BLEND);
-
-//    glBindBuffer(GL_ARRAY_BUFFER, p->crt_verts_buf);
-//    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
-    glUseProgram(p->disp_prog);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-//    glDrawElements(GL_TRIANGLE_STRIP, 2 * (2*N+1+1) * (2*M), GL_UNSIGNED_SHORT, 0);
+    renderRGB(p);
+    renderDisp(p);
 }
 

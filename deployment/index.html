@@ -12,6 +12,7 @@
         padding: none;
         background-color: #111;
         float: none;
+        color: #CCC;
       }
 
       .emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
@@ -219,8 +220,26 @@
       elem.addEventListener('dragover', dragHandler('over'), false);
       elem.addEventListener('drop', dropHandler, false);
     </script>
+    <script type="text/javascript">
+      function changeControl(name, value) {
+        name += 'Control';
+        Module[name] = value;
+        console.log(name + ':' + Module[name]);
+      }
+      function resetControls() {
+        Module.brightnessControl = 0;
+        Module.contrastControl = 0;
+        Module.colorControl = 0;
+        Module.gammaControl = 0;
+      }
+    </script>
     <script src="//cdn.webglstats.com/stat.js" defer="defer" async="async"></script>
 
-  <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(true, false)">
+  <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(true, false)"/><br/>
+  Brightness <input type="range" min="-1" max="1" value="0" step="0.05" oninput="changeControl('brightness', this.value)" onchange="changeControl('brightness', this.value)"/><br/>
+  Contrast <input type="range" min="-1" max="1" value="0" step="0.05" oninput="changeControl('contrast', this.value)" onchange="changeControl('contrast', this.value)"/><br/>
+  Color <input type="range" min="-1" max="1" value="0" step="0.05" oninput="changeControl('color', this.value)" onchange="changeControl('color', this.value)"/><br/>
+  Gamma <input type="range" min="-1" max="1" value="0" step="0.05" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
+  <input type="button" value="Reset" onclick="resetControls()"/><br/>
   </body>
 </html>
