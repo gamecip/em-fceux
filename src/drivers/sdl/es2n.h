@@ -7,16 +7,19 @@
 
 typedef struct t_es2n_controls
 {
+    // Control values should be in range [-1,1], default is 0.
     GLfloat brightness; // Brightness control.
     GLfloat contrast; // Contrast control.
     GLfloat color; // Color control.
     GLfloat gamma; // Gamma control.
+    GLfloat rgbppu; // RGB PPU control.
 
     // Uniform locations.
     GLint _brightness_loc;
     GLint _contrast_loc;
     GLint _color_loc;
     GLint _gamma_loc;
+    GLint _rgbppu_loc;
 
 } es2n_controls;
 

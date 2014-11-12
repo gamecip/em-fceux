@@ -231,6 +231,7 @@
         Module.contrastControl = 0;
         Module.colorControl = 0;
         Module.gammaControl = 0;
+        Module.rgbppuControl = 0;
       }
     </script>
     <script src="//cdn.webglstats.com/stat.js" defer="defer" async="async"></script>
@@ -240,6 +241,7 @@
   Contrast <input type="range" min="-1" max="1" value="0" step="0.05" oninput="changeControl('contrast', this.value)" onchange="changeControl('contrast', this.value)"/><br/>
   Color <input type="range" min="-1" max="1" value="0" step="0.05" oninput="changeControl('color', this.value)" onchange="changeControl('color', this.value)"/><br/>
   Gamma <input type="range" min="-1" max="1" value="0" step="0.05" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
+  RGB PPU <input type="range" min="-1" max="1" value="0" step="0.05" oninput="changeControl('rgbppu', this.value)" onchange="changeControl('rgbppu', this.value)"/><br/>
   <input type="button" value="Reset" onclick="resetControls()"/><br/>
   </body>
 </html>

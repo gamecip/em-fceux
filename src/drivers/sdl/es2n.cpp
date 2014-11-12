@@ -191,7 +191,7 @@ static void genKernelTex(es2n *p)
     double *ys = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
     double *is = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
     double *qs = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
-	double *yiqs = (double*) calloc(3 * NUM_PHASES*NUM_SUBPS*NUM_TAPS * NUM_COLORS, sizeof(double));
+	double *yiqs = (double*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(double));
 	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
 
     // Generate temporary lookup containing samplings of separated and normalized YIQ components
@@ -199,11 +199,11 @@ static void genKernelTex(es2n *p)
     int i = 0;
     for (int phase = 0; phase < NUM_PHASES; phase++) {
         // PPU color generator outputs 8 samples per pixel, and we have 3 different phases.
-        const int phase0 = 8 * phase; 
+        const int phase0 = 8 * phase;
         // While field 0 is normal, PPU skips 1st screen pixel for field 1 causing offset of 8 samples.
         const int phase1 = phase0 + 8;
-        // Phase (hue) shift for demodulation. Additionally YUV to YIQ conversion needs ~33 degrees shift.
-        const double shift = phase0 + 6.0 - 12.0*33.0/360.0; 
+        // Phase (hue) shift for demodulation. 180-33 degree shift from NTSC standard.
+        const double shift = phase0 + 12.0 * (180.0-33.0) / 360.0;
 
         for (int color = 0; color < NUM_COLORS; color++) {
             // Here we store the eight (8) generated YIQ samples for the pixel.
@@ -221,7 +221,7 @@ static void genKernelTex(es2n *p)
                 // This is fixed in the demodulation.
                 double y = (level0+level1) / 2.0;
                 double c = (level0-level1) / 2.0;
-                double a = M_PI * (shift+s) / 6.0;
+                double a = (2.0*M_PI/12.0) * (shift+s);
                 // Demodulate and store YIQ.
                 ys[i] = y;
                 is[i] = 1.414*c * cos(a);
@@ -264,7 +264,7 @@ static void genKernelTex(es2n *p)
                         p->yiq_maxs[i] = fmax(p->yiq_maxs[i], yiq[i]);
                     }
 
-                    const int k = 3 * (color*NUM_PHASES*NUM_SUBPS*NUM_TAPS + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
+                    const int k = 3 * (color*LOOKUP_W + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
                     yiqs[k+0] = yiq[0];
                     yiqs[k+1] = yiq[1];
                     yiqs[k+2] = yiq[2];
@@ -273,18 +273,43 @@ static void genKernelTex(es2n *p)
         }
     }
 
+    // Make RGB PPU palette similarly but having 12 samples per color.
     for (int color = 0; color < NUM_COLORS; color++) {
-        for (int phase = 0; phase < NUM_PHASES; phase++) {
-            for (int subp = 0; subp < NUM_SUBPS; subp++) {
-                for (int tap = 0; tap < NUM_TAPS; tap++) {
-                    const int ik = 3 * (color*NUM_PHASES*NUM_SUBPS*NUM_TAPS + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
-                    const int ok = 3 * (color*LOOKUP_W + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
-                    for (int i = 0; i < 3; i++) {
-                        const double clamped = (yiqs[ik+i]-p->yiq_mins[i]) / (p->yiq_maxs[i]-p->yiq_mins[i]);
-                        result[ok+i] = (unsigned char) (255.0 * clamped + 0.5);
-                    }
-                }
-            }
+        // For some reason we need additional shift of 1 sample (-30 degrees).
+        const double shift = 12.0 * (180.0-30.0-33.0) / 360.0;
+        float yiq[3] = {0.0f, 0.0f, 0.0f};
+
+        for (int s = 0; s < 12; s++) {
+            // TODO: replicated code, refactor
+            double level0 = NTSCsignal(color, s);
+            double level1 = NTSCsignal(color, s+6); // Perfect chroma cancellation.
+            level0 = ((level0-BLACK) / (WHITE-BLACK)) / 12.0;
+            level1 = ((level1-BLACK) / (WHITE-BLACK)) / 12.0;
+            double y = (level0+level1) / 2.0;
+            double c = (level0-level1) / 2.0;
+            double a = (2.0*M_PI/12.0) * (shift+s);
+            yiq[0] += y;
+            yiq[1] += 1.414*c * cos(a); // TODO: have constants? why these values?
+            yiq[2] += 1.480*c * sin(a);
+        }
+
+        // TODO: replicated code, add function
+        for (int i = 0; i < 3; i++) {
+            p->yiq_mins[i] = fmin(p->yiq_mins[i], yiq[i]);
+            p->yiq_maxs[i] = fmax(p->yiq_maxs[i], yiq[i]);
+        }
+
+        // TODO: replicated?
+        const int k = 3 * (color*LOOKUP_W + LOOKUP_W-1);
+        yiqs[k+0] = yiq[0];
+        yiqs[k+1] = yiq[1];
+        yiqs[k+2] = yiq[2];
+    }
+
+    for (int k = 0; k < 3 * LOOKUP_W * NUM_COLORS; k+=3) {
+        for (int i = 0; i < 3; i++) {
+            const double clamped = (yiqs[k+i]-p->yiq_mins[i]) / (p->yiq_maxs[i]-p->yiq_mins[i]);
+            result[k+i] = (unsigned char) (255.0 * clamped + 0.5);
         }
     }
 
@@ -313,6 +338,8 @@ static void updateControlUniforms(const es2n_controls *c)
     glUniform1f(c->_color_loc, v);
     v = 2.5f/2.2f + 0.5f*c->gamma;
     glUniform1f(c->_gamma_loc, v);
+    v = 0.125f + 0.875f*c->rgbppu;
+    glUniform1f(c->_rgbppu_loc, (v < 0.0f) ? 0.0f : v);
 }
 
 static void initUniformsRGB(es2n *p)
@@ -336,6 +363,7 @@ static void initUniformsRGB(es2n *p)
     c->_contrast_loc = glGetUniformLocation(prog, "u_contrast");
     c->_color_loc = glGetUniformLocation(prog, "u_color");
     c->_gamma_loc = glGetUniformLocation(prog, "u_gamma");
+    c->_rgbppu_loc = glGetUniformLocation(prog, "u_rgbppu");
     updateControlUniforms(&p->controls);
 }
 
@@ -493,19 +521,12 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "uniform float u_contrast;\n"
         "uniform float u_color;\n"
         "uniform float u_gamma;\n"
+        "uniform float u_rgbppu;\n"
         "varying vec2 v_uv[int(NUM_TAPS)];\n"
-#if 1 // 0: texture test pass-through
         "const mat3 c_convMat = mat3(\n"
         "    1.0,        1.0,        1.0,       // Y\n"
-#if 0
-        // from nesdev wiki
         "    0.946882,   -0.274788,  -1.108545, // I\n"
         "    0.623557,   -0.635691,  1.709007   // Q\n"
-#else
-        // from nes_ntsc by blargg, default
-        "    0.956,   -0.272,  -1.105, // I\n"
-        "    0.621,   -0.647,  1.702   // Q\n"
-#endif
         ");\n"
         "\n"
         "const vec4 one = vec4(1.0);\n"
@@ -517,7 +538,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "#define V()    dot((255.0/511.0) * vec2(1.0, 64.0), la)\n"
         "#define UV(i_) uv = vec2(U(i_), V())\n"
         "#define RESCALE(v_) ((v_) * (u_maxs-u_mins) + u_mins)\n"
-        "#define SMP(i_) LA(i_); P(i_); UV(i_); yiq += RESCALE(texture2D(u_lookupTex, UV(i_)).rgb)\n"
+        "#define SMP(i_) LA(i_); P(i_); UV(i_); yiq += RESCALE(texture2D(u_lookupTex, uv).rgb)\n"
         "\n"
         "void main(void) {\n"
         "float subp = mod(floor(NUM_SUBPS*IDX_W*v_uv[int(NUM_TAPS)/2].x), NUM_SUBPS);\n"
@@ -528,17 +549,16 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "SMP(0);\n"
         "SMP(1);\n"
         "SMP(2);\n"
+        // Snatch in RGB PPU; uv.x is already calculated, so just read from lookup tex with u=1.0.
+        "vec3 rgbppu = RESCALE(texture2D(u_lookupTex, vec2(1.0, uv.y)).rgb);\n"
         "SMP(3);\n"
         "SMP(4);\n"
-        "yiq *= vec3((8.0/2.0)/YW2, vec2(u_color*((8.0/2.0)/CW2)));\n"
+        "yiq *= (8.0/2.0) / vec3(YW2, CW2, CW2);\n"
+        "yiq = mix(yiq, rgbppu, u_rgbppu);\n"
+        "yiq.gb *= u_color;\n"
         "vec3 result = c_convMat * yiq;\n"
         "gl_FragColor = vec4(u_contrast * pow(result, vec3(u_gamma)) + u_brightness, 1.0);\n"
         "}\n";
-#else
-        "void main(void) {\n"
-        "gl_FragColor = texture2D(u_lookupTex, v_uv[2]);\n"
-        "}\n";
-#endif
     p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
     initUniformsRGB(p);
 
