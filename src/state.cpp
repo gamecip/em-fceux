@@ -456,13 +456,9 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 
 #ifdef EMSCRIPTEN // tsone: sync IndexedDB for savestates
 // TODO: tsone: what to do on success/fail? pause emulation until sync is done?
-            EM_ASM({
-                console.log('!!!! write sync started');
-                FS.syncfs(function (err) {
-                    assert(!err);
-                    console.log('!!!! write sync success');
-                });
-            });
+    EM_ASM({
+      FS.syncfs(FCEM.onSyncToIDB);
+    });
 #endif
 
 	return error == Z_OK;

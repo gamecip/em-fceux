@@ -52,9 +52,9 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['NOCHEAT'] = 1
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
   env.Replace(PROGSUFFIX = [".js"])
-  exports = '-s EXPORTED_FUNCTIONS=\'["_main","_EmscriptenSaveGameSync"]\''
-  env.Append(CCFLAGS = exports)
+  exports = '-s EXPORTED_FUNCTIONS=\'["_main","_FCEM_onSaveGameInterval"]\''
   env.Append(LINKFLAGS = exports)
+  env.Append(LINKFLAGS = '--preload-file deployment/default/@/default/')
 else:
   env['EMSCRIPTEN'] = 0
 

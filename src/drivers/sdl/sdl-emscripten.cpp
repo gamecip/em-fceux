@@ -98,15 +98,13 @@ int LoadGame(const char *path)
 
 extern "C" {
 // Write savegame and synchronize IDBFS contents to IndexedDB. Must be a C-function.
-void EmscriptenSaveGameSync()
+void FCEM_onSaveGameInterval()
 {
     if (GameInterface) {
         GameInterface(GI_SAVE);
     }
     EM_ASM({
-      FS.syncfs(function (err) {
-        assert(!err);
-      });
+      FS.syncfs(FCEM.onSyncToIDB);
     });
 }
 }
@@ -179,7 +177,7 @@ static void ReloadROM(void* arg)
     LoadGame(filename);
 }
 
-static void EmscriptenDoFun()
+static void FCEM_DoFun()
 {
 // tsone: simple way to communicate with mainloop without "exporting" functions
     int reload = EM_ASM_INT_V({ return Module.romReload||0; });
@@ -312,20 +310,20 @@ void FCEUD_TraceInstruction() {
 	return;
 }
 
-static void EmscriptenInitStuff()
+static void FCEM_InitStuff()
 {
+/*
     EM_ASM({
         // Disable unnecessary SDL surface copy-on-lock feature.
         SDL.defaults.copyOnLock = false;
         // Mount IndexedDB file system (IDBFS) to /fceux.
         FS.mkdir('/fceux');
         FS.mount(IDBFS, {}, '/fceux');
-        FS.syncfs(true, function (err) {
-          assert(!err);
-        });
+        FS.syncfs(true, FCEM.onInitialSyncFromIDB);
         // Write savegame and synchronize IDBFS in intervals.
-        setInterval(Module.cwrap('EmscriptenSaveGameSync'), 1000);
+        setInterval(Module.cwrap('FCEM_onSaveGameInterval'), 1000);
     });
+*/
 }
 
 /**
@@ -335,7 +333,7 @@ int main(int argc, char *argv[])
 {
 	int error, frameskip;
 
-    EmscriptenInitStuff();
+    FCEM_InitStuff();
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
@@ -356,9 +354,10 @@ int main(int argc, char *argv[])
 	error = FCEUI_Initialize();
 	std::string s;
 
-    // override savegame and savestate directory with one mounted to IndexedDB
-    FCEUI_SetDirOverride(FCEUIOD_NV, "fceux");
-    FCEUI_SetDirOverride(FCEUIOD_STATES, "fceux");
+    // override savegame, savestate and rom directory with IndexedDB mount at /fceux
+    FCEUI_SetDirOverride(FCEUIOD_NV, "fceux/sav");
+    FCEUI_SetDirOverride(FCEUIOD_STATES, "fceux/sav");
+//    FCEUI_SetDirOverride(FCEUIOD_ROMS, "fceux/rom");
 
 	g_config->getOption("SDL.InputCfg", &s);
 	if(s.size() != 0)
@@ -435,7 +434,7 @@ int main(int argc, char *argv[])
 	g_config->getOption("SDL.Frameskip", &frameskip);
 
 	// loop playing the game
-    emscripten_set_main_loop(EmscriptenDoFun, 0, true);
+    emscripten_set_main_loop(FCEM_DoFun, 0, true);
 	return 0;
 }
 

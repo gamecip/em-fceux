@@ -98,15 +98,15 @@
         from {transform: rotate(0deg);}
         to {transform: rotate(360deg);}
       }
-      #shelfTab {
+      #stackTab {
         position: absolute;
         top: 0;
-        right: -404px;
-        width: 424px;
+        right: -414px;
+        width: 434px;
         height: 100%;
         transition: right 500ms;
       }
-      #shelfToggleLabel {
+      #stackToggleLabel {
         position: absolute;
         top: 50%;
         margin-top: -64px;
@@ -122,23 +122,24 @@
         -o-transform: scale(.9999); 
         transform: scale(.9999);
       }
-      #shelfToggle:checked + #shelfTab #shelfToggleLabel {
+      #stackToggle:checked + #stackTab #stackToggleLabel {
         border-width: 64px 0px 64px 16px;
       }
-      #shelfToggle:checked ~ #shelfTab {
+      #stackToggle:checked ~ #stackTab {
         right: 0px;
       }
-      #shelfContainer {
+      #stackContainer {
         position: absolute;
         bottom: 0px;
         right: 0px;
-        width: 404px;
+        width: 414px;
         height: 100%;
+        overflow-x: hidden;
         overflow-y: scroll;
       }
-      #shelf {
+      #stack {
         display: table;
-        width: 404px;
+        width: 414px;
         height: 100%;
         border-collapse: collapse;
         //border: 1px solid white;
@@ -184,24 +185,110 @@
 
     </style>
     <script type="text/javascript">
-      function loadROMFile(files) {
-        var f = files[0]; 
-        if (f) {
-          var r = new FileReader();
-          r.onload = function(e) { 
-            var opts = {encoding:'binary'};
-            FS.writeFile(f.name, new Uint8Array(e.target.result), opts);
-            Module.romName = f.name;
-            Module.romReload = 1;
+      var FCEM = {
+        games : [],
+        toggleElem : null,
+        showStack : function(show) {
+          FCEM.toggleElem.checked = show;
+        },
+        onInitialSyncFromIDB : function(er) {
+          console.log("!!!! initial sync, from IDB");
+          assert(!er);
+          try {
+            FS.mkdir('/fceux/sav');
+          } catch (e) {
           }
-          r.readAsArrayBuffer(f);
-        } else { 
-          alert("Failed to load file: " + f.name);
+          try {
+            FS.mkdir('/fceux/rom');
+          } catch (e) {
+          }
+          var savs = findFiles('/default/'); 
+          savs.forEach(function(x) { console.log('!!!! sav: ' + x); });
+          FCEM.updateGames();
+          FCEM.updateStack();
+          FCEM.showStack(true);
+        },
+        onDeleteGameSyncFromIDB : function(er) {
+          console.log("!!!! delete sync, from IDB");
+          assert(!er);
+          FCEM.updateGames();
+          FCEM.updateStack();
+        },
+        onSyncToIDB : function(er) {
+//          console.log("!!!! generic sync, to IDB");
+          assert(!er);
+        },
+        onDOMLoaded : function() {
+          console.log('!!!! DOM loaded');
+          FCEM.toggleElem = document.getElementById('stackToggle');
+          FCEM.showStack(false);
+        },
+        startGame : function(path) {
+          Module.romName = path;
+          Module.romReload = 1;
+        },
+        updateGames : function() {
+          var games = [];
+
+          // default games
+          games.push({label:'2048', path:'/default/2048.nes', offset:calcGameOffset(), deletable:false});
+
+          // games dropped by user
+          var roms = findFiles('/fceux/rom/'); 
+          roms.forEach(function(path) {
+            var label = PATH.basename(path).toUpperCase();
+            var lastDot = label.lastIndexOf('.');
+            if (lastDot !== -1) {
+              label = label.slice(0, lastDot);
+            }
+            var offset = calcGameOffset();
+            console.log("!!!! label: " + label + " path:" + path + " offset:" + offset);
+            games.push({label:label, path:path, offset:offset, deletable:true});
+          });
+  
+          // sort the mess in alphabetic order and assign as new
+          games.sort(function(a, b) {
+            return a < b ? -1 : a > b ? 1 : 0;
+          });
+          FCEM.games = games;
+        },
+        updateStack : function() {
+          var games = FCEM.games;
+          var container = document.getElementById("stackContainer");
+          var scrollPos = container.scrollTop;
+          var list = document.getElementById("stack");
+          var proto = document.getElementById("cartProto");
+        
+          while (list.firstChild != list.lastChild) {
+            list.removeChild(list.lastChild);
+          }
+        
+          for (var i = 0; i < games.length; i++) {
+            var item = games[i];
+            var el = proto.cloneNode(true);
+        
+            el.id = i;
+            el.className = 'cart';
+            el.style.backgroundPosition = item.offset + 'px 0px';
+            list.appendChild(el);
+        
+            var label = el.firstChild.firstChild;
+            label.style.fontSize = '12px';
+            label.style.lineHeight = '16px';
+            label.innerHTML = item.label;
+            if (label.scrollHeight > 18) {
+              label.style.fontSize = '8px';
+              label.style.lineHeight = '9px';
+            }
+
+            if (!item.deletable) {
+              el.lastChild.hidden = true;
+            }
+          }
+        
+          container.scrollTop = scrollPos;
         }
-      }
-      function handleInputChange(ev) {
-        loadROMFile(ev.target.files);
-      }
+      };
       window.onbeforeunload = function (ev) {
         var msg = 'Do you want to close the FCEUX emulator and the current game? Unsaved game data will be lost.';
         (ev || window.event).returnValue = msg; 
@@ -228,7 +315,15 @@
 
       var Module = {
         preRun: [function() {
+          console.log("!!!! preRun");
+          // Disable unnecessary SDL surface copy-on-lock feature.
           SDL.defaults.copyOnLock = false;
+          // Mount IndexedDB file system (IDBFS) to /fceux.
+          FS.mkdir('/fceux');
+          FS.mount(IDBFS, {}, '/fceux');
+          FS.syncfs(true, FCEM.onInitialSyncFromIDB);
+          // Write savegame and synchronize IDBFS in intervals.
+          setInterval(Module.cwrap('FCEM_onSaveGameInterval'), 1000);
         }],
         postRun: [],
         print: function() {
@@ -285,17 +380,28 @@
         return function(ev) {
           ev.stopPropagation();
           ev.preventDefault();
-          console.log('drag:' + text);
+          console.log('!!!! drag:' + text);
         };
       }
       function dropHandler(ev) {
         ev.stopPropagation();
         ev.preventDefault();
-        console.log('drop');
-        loadROMFile(ev.dataTransfer.files);
+        console.log('!!!! drop');
+        var f = ev.dataTransfer.files[0];
+        if (f && confirm('want to add game: ' + f.name + '?')) {
+          var r = new FileReader();
+          r.onload = function(e) { 
+            var opts = {encoding:'binary'};
+            var path = PATH.join2('/fceux/rom/', f.name);
+            console.log('!!!! loadROMFile: ' + path);
+            FS.writeFile(path, new Uint8Array(e.target.result), opts);
+            FCEM.updateGames();
+            FCEM.updateStack();
+            FCEM.startGame(path);
+          }
+          r.readAsArrayBuffer(f);
+        }
       }
-//      document.getElementById('fileinput').addEventListener('change', handleInputChange, false);
-//      var elem = Module.canvas;
       var elem = document.getElementById('visor');
       elem.addEventListener('dragenter', dragHandler('enter'), false);
       elem.addEventListener('dragleave', dragHandler('leave'), false);
@@ -306,7 +412,7 @@
       function changeControl(name, value) {
         name += 'Control';
         Module[name] = value;
-        console.log(name + ':' + Module[name]);
+        console.log('!!!! changeControl: ' + name + ':' + Module[name]);
       }
       function resetControls() {
         Module.brightnessControl = 0;
@@ -328,118 +434,95 @@
     <div hidden="1">
       <div class="cart" id="cartProto" onclick="return askSelectGame(event, this);"><div class="labelContainer"><div class="label"></div></div><div class="cartDelete" onclick="return askDeleteGame(event, this.parentNode);"></div></div>
     </div>
-    <input id="shelfToggle" type="checkbox" hidden="1" />
-    <div id="shelfTab">
-        <label id="shelfToggleLabel" for="shelfToggle"></label>
-        <div id="shelfContainer"><div id="shelf"><div></div></div></div>
+    <input id="stackToggle" type="checkbox" hidden="1" />
+    <div id="stackTab">
+        <label id="stackToggleLabel" for="stackToggle"></label>
+        <div id="stackContainer"><div id="stack"><div></div></div></div>
     </div>
-    <input type="button" value="hide stack" onclick="showStack(false);" />
+    <input type="button" value="hide stack" onclick="FCEM.showStack(false)" />
+    <input type="button" value="dump FS" onclick="var f = findFiles('/'); f.forEach(function(x) { console.log('!!!! dump: ' + x); })" />
 
     <script type="text/javascript">
-      var games = [
-          ['Lorem ipsum dolor sit amet, consectetur elit adipiscing elit. Nulla consectetur euismod risus nec tempor. Nulla finibus purus a nibh cursus, non tincidunt neque ornare. Mauris dignissim libero justo, non malesuada lorem imperdiet non. Morbi accumsan ex a est eleifend, sit amet dignissim orci vehicula.'],
-          ['TEENAGE MUTANT NINJA TURTLES III: THE MANHATTAN PROJECT'],
-          ['SUPER MARIO BROS.'],
-          ['STACK UP'],
-          ['TETRIS'],
-          ['TENNIS'],
-          ['RYGAR'],
-          ['THE LEGEND OF ZELDA'],
-          ['MARIO BROS.'],
-          ['DONKEY KONG'],
-          ['POPEYE'],
-          ['DR. MARIO'],
-          ['MEGA MAN'],
-          ['DUCK TALES'],
-          ['MEGA MAN 5']
-      ];
-      var DISPLACEMENT = 8;
       var current = 0;
 
-      function init() {
-          // TODO: this is done when game is added
-          for (var i = 0; i < games.length; i++) {
-              games[i][0] = games[i][0].toUpperCase();
-              games[i][1] = (DISPLACEMENT * Math.random()) | 0;
-          }
-      }
-      
-      function updateStack() {
-          var container = document.getElementById("shelfContainer");
-          var scrollPos = container.scrollTop;
-      
-          var list = document.getElementById("shelf");
-          var proto = document.getElementById("cartProto");
-      
-          while (list.firstChild != list.lastChild) {
-              list.removeChild(list.lastChild);
-          }
-      
-          for (var i = 0; i < games.length; i++) {
-              var item = games[i];
-              var el = proto.cloneNode(true);
-      
-              el.id = i;
-              el.className = 'cart';
-              el.style.backgroundPosition = item[1] + 'px 0px';
-              list.appendChild(el);
-      
-              var label = el.firstChild.firstChild;
-              label.style.fontSize = '12px';
-              label.style.lineHeight = '16px';
-              label.innerHTML = item[0];
-              if (label.scrollHeight > 18) {
-                  label.style.fontSize = '8px';
-                  label.style.lineHeight = '9px';
-              }
-          }
-      
-          container.scrollTop = scrollPos;
+      function calcGameOffset() {
+        return (8 * Math.random()) |0;
       }
       
       function askConfirmGame(ev, el, q) {
-          ev.stopPropagation();
-          ev.preventDefault();
-          var idx = current + (el.id | 0);
-          var name = games[idx][0];
-          if (name && confirm(q + ' ' + name + '?')) {
-              return idx;
-          } else {
-              return -1;
-          }
+        var games = FCEM.games;
+        ev.stopPropagation();
+        ev.preventDefault();
+        var idx = current + (el.id |0);
+        if ((idx >= 0) && (idx < games.length) && confirm(q + ' ' + games[idx].label + '?')) {
+          return idx;
+        } else {
+          return -1;
+        }
       }
       
       function askSelectGame(ev, el) {
-          var idx = askConfirmGame(ev, el, 'want to start');
-          // TODO: load game from file and start it
-          return false;
+        var idx = askConfirmGame(ev, el, 'want to start');
+        if (idx != -1) {
+          FCEM.startGame(FCEM.games[idx].path);
+          setTimeout(function() { FCEM.showStack(false); }, 1000);
+        }
+        return false;
       }
       
       function askDeleteGame(ev, el) {
-          var idx = askConfirmGame(ev, el, 'want to delete');
-          if (idx != -1) {
-              // TODO: delete game file etc.
-              games.splice(idx, 1);
-              updateStack();
+        var idx = askConfirmGame(ev, el, 'want to delete');
+        if (idx != -1) {
+          var item = FCEM.games.slice(idx, idx+1)[0];
+          console.log("!!!! delete game:" + item.path);
+          FS.unlink(item.path);
+          FS.syncfs(FCEM.onDeleteGameSyncFromIDB);
+        }
+        return false;
+      }
+
+      function findFiles(startPath) {
+        var entries = [];
+
+        function isRealDir(p) {
+          return p !== '.' && p !== '..';
+        };
+        function toAbsolute(root) {
+          return function(p) {
+            return PATH.join2(root, p);
           }
-          return false;
+        };
+
+        try {
+            return FS.readdir(startPath).filter(isRealDir).map(toAbsolute(startPath));
+        } catch (e) {
+            return [];
+        }
+// TODO: remove, this is for recursive search
+/*
+      while (check.length) {
+        var path = check.pop();
+        var stat;
+
+        try {
+          stat = FS.stat(path);
+        } catch (e) {
+          return [];
+        }
+
+        if (FS.isDir(stat.mode)) {
+          check.push.apply(check, FS.readdir(path).filter(isRealDir).map(toAbsolute(path)));
+        }
+
+        entries.push(path);
       }
-      
-      var toggleEl;
-      
-      function showStack(show) {
-          toggleEl.checked = show;
-      }
-      
-      function onDOMLoaded() {
-          console.log('!!!! ready');
-          init();
-          updateStack();
-          toggleEl = document.getElementById('shelfToggle');
-          showStack(true);
-      }
-      
-      document.addEventListener('DOMContentLoaded', onDOMLoaded, false);
+
+      return entries;
+*/
+    }
+
+
+      document.addEventListener('DOMContentLoaded', FCEM.onDOMLoaded, false);
     </script>
 
     <script src="//cdn.webglstats.com/stat.js" defer="defer" async="async"></script>
