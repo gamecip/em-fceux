@@ -229,24 +229,20 @@
         },
         updateGames : function() {
           var games = [];
+          var addGamesIn = function(path, deletable) {
+            var files = findFiles(path); 
+            files.forEach(function(filename) {
+              var split = PATH.splitPath(filename);
+              var label = split[2].slice(0, -split[3].length).toUpperCase();
+              var offset = calcGameOffset();
+              games.push({label:label, path:filename, offset:offset, deletable:deletable});
+            });
+          };
 
-          // default games
-          games.push({label:'2048', path:'/default/2048.nes', offset:calcGameOffset(), deletable:false});
+          addGamesIn('/default/', false);
+          addGamesIn('/fceux/rom/', true);
 
-          // games dropped by user
-          var roms = findFiles('/fceux/rom/'); 
-          roms.forEach(function(path) {
-            var label = PATH.basename(path).toUpperCase();
-            var lastDot = label.lastIndexOf('.');
-            if (lastDot !== -1) {
-              label = label.slice(0, lastDot);
-            }
-            var offset = calcGameOffset();
-            console.log("!!!! label: " + label + " path:" + path + " offset:" + offset);
-            games.push({label:label, path:path, offset:offset, deletable:true});
-          });
-  
-          // sort the mess in alphabetic order and assign as new
+          // sort in alphabetic order and assign as new games list
           games.sort(function(a, b) {
             return a < b ? -1 : a > b ? 1 : 0;
           });
