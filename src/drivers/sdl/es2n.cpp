@@ -12,6 +12,7 @@
 #define DEEMP_I     1
 #define LOOKUP_I    2
 #define RGB_I       3
+#define STRETCH_I   4
 #define TEX(i_)     (GL_TEXTURE0+(i_))
 
 #define PERSISTENCE_R 0.165 // Red phosphor persistence.
@@ -38,6 +39,7 @@
 #define OVERSCAN_W 12
 #define IDX_W (256 + 2*OVERSCAN_W)
 #define RGB_W (NUM_SUBPS * IDX_W)
+#define STRETCH_H (4 * 256)
 // Half-width of Y and C box filter kernels.
 #define YW2 6.0
 #define CW2 12.0
@@ -117,7 +119,7 @@ static void deleteTex(GLuint *tex)
     }
 }
 
-static void makeFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filter)
+static void createFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filter)
 {
     createTex(tex, w, h, format, filter, 0);
 
@@ -212,7 +214,7 @@ static void adjustYIQLimits(es2n *p, double *yiq)
 #define BOX_FILTER(w2_, center_, x_) (abs((x_) - (center_)) < (w2_) ? 1.0 : 0.0)
 
 // Generate lookup texture.
-static void genKernelTex(es2n *p)
+static void genLookupTex(es2n *p)
 {
     double *ys = (double*) calloc(3*8 * NUM_PHASES*NUM_COLORS, sizeof(double));
 	double *yiqs = (double*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(double));
@@ -358,12 +360,21 @@ static void initUniformsRGB(es2n *p)
     updateControlUniforms(&p->controls);
 }
 
+static void initUniformsStretch(es2n *p)
+{
+    GLint k;
+    GLuint prog = p->stretch_prog;
+
+    k = glGetUniformLocation(prog, "u_rgbTex");
+    glUniform1i(k, STRETCH_I);
+}
+
 static void initUniformsDisp(es2n *p)
 {
     GLint k;
     GLuint prog = p->disp_prog;
 
-    k = glGetUniformLocation(prog, "u_rgbTex");
+    k = glGetUniformLocation(prog, "u_stretchTex");
     glUniform1i(k, RGB_I);
 }
 
@@ -380,6 +391,15 @@ static void renderRGB(es2n *p)
     glEnable(GL_BLEND);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glDisable(GL_BLEND);
+}
+
+static void renderStretch(es2n *p)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, p->stretch_fb);
+// TODO: check defines
+    glViewport(0, 4*8, RGB_W, 4*224);
+    glUseProgram(p->stretch_prog);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
 static void renderDisp(es2n *p)
@@ -474,11 +494,11 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glActiveTexture(TEX(DEEMP_I));
     createTex(&p->deemp_tex, 256, 1, GL_LUMINANCE, GL_NEAREST, 0);
 
-    genKernelTex(p);
+    genLookupTex(p);
 
     // Configure RGB framebuffer.
     glActiveTexture(TEX(RGB_I));
-    makeFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, 256, GL_RGB, GL_LINEAR);
+    createFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, 256, GL_RGB, GL_LINEAR);
     const char* rgb_vert_src =
         "precision highp float;\n"
         DEFINE(NUM_TAPS)
@@ -551,8 +571,10 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
     initUniformsRGB(p);
 
-    // Setup display (output) shader.
-    const char* disp_vert_src =
+    // Setup stretch framebuffer.
+    glActiveTexture(TEX(STRETCH_I));
+    createFBTex(&p->stretch_tex, &p->stretch_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR);
+    const char* stretch_vert_src =
         "precision highp float;\n"
         DEFINE(RGB_W)
         "attribute vec4 vert;\n"
@@ -567,7 +589,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "TAP(4, 2.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
-    const char* disp_frag_src =
+    const char* stretch_frag_src =
         "precision highp float;\n"
         "uniform sampler2D u_rgbTex;\n"
         "varying vec2 v_uv[5];\n"
@@ -597,6 +619,30 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "gl_FragColor = texture2D(u_rgbTex, uv);\n"
 #endif
         "}\n";
+    p->stretch_prog = buildShader(stretch_vert_src, stretch_frag_src);
+    initUniformsStretch(p);
+
+    // Setup display (output) shader.
+    const char* disp_vert_src =
+        "precision highp float;\n"
+        DEFINE(RGB_W)
+        "attribute vec4 vert;\n"
+        "varying vec2 v_uv[1];\n"
+        "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0) \n"
+        "void main() {\n"
+        "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
+        "TAP(0, 0.0);\n"
+        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
+        "}\n";
+    const char* disp_frag_src =
+        "precision highp float;\n"
+        "uniform sampler2D u_stretchTex;\n"
+        "varying vec2 v_uv[1];\n"
+        "#define SMP(i_, m_) color += (m_) * texture2D(u_rgbTex, v_uv[i_]).rgb\n"
+        "void main(void) {\n"
+        "vec2 uv = v_uv[0];\n"
+        "gl_FragColor = texture2D(u_stretchTex, uv);\n"
+        "}\n";
     p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
     initUniformsDisp(p);
 
@@ -611,10 +657,12 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 void es2nDeinit(es2n *p)
 {
     deleteFBTex(&p->rgb_tex, &p->rgb_fb);
+    deleteFBTex(&p->stretch_tex, &p->stretch_fb);
     deleteTex(&p->idx_tex);
     deleteTex(&p->deemp_tex);
     deleteTex(&p->lookup_tex);
     deleteShader(&p->rgb_prog);
+    deleteShader(&p->stretch_prog);
     deleteShader(&p->disp_prog);
     deleteBuffer(&p->quad_buf);
     deleteBuffer(&p->crt_verts_buf);
@@ -644,6 +692,7 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_c
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 240, 1, GL_LUMINANCE, GL_UNSIGNED_BYTE, row_deemp);
 
     renderRGB(p);
+    renderStretch(p);
     renderDisp(p);
 }
 

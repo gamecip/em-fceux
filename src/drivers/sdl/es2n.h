@@ -35,6 +35,10 @@ typedef struct t_es2n
     GLuint rgb_tex;     // Output RGB texture (1024x256x3).
     GLuint rgb_prog;    // Shader for RGB.
 
+    GLuint stretch_fb;   // Framebuffer for stretched RGB texture.
+    GLuint stretch_tex;  // Output stretched RGB texture (1024x1024x3).
+    GLuint stretch_prog; // Shader for stretched RGB.
+
     GLuint disp_prog;   // Shader for final display.
 
     GLint viewport[4];  // Original viewport.
