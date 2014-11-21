@@ -18,9 +18,6 @@
 #define PERSISTENCE_G 0.205 // Green "
 #define PERSISTENCE_B 0.225 // Blue "
 
-// This source code is modified (and fixed!) from original at:
-// http://wiki.nesdev.com/w/index.php/NTSC_video
-
 // Bounds for signal level normalization
 #define ATTENUATION 0.746
 #define LOWEST      (0.350 * ATTENUATION)
@@ -139,20 +136,15 @@ static void deleteFBTex(GLuint *tex, GLuint *fb)
     }
 }
 
-// Box filter kernel.
-static double box(double w2, double center, double x)
-{
-    return abs(x - center) < w2 ? 1.0 : 0.0;
-}
+// Square wave generator as function of NES pal chroma index and phase.
+#define IN_COLOR_PHASE(color_, phase_) (((color_) + (phase_)) % 12 < 6)
 
-// Generate the square wave
-static bool inColorPhase(int color, int phase)
-{
-    return (color + phase) % 12 < 6;
-};
-
-// pixel = Pixel color (9-bit) given as input. Bitmask format: "eeellcccc".
-// phase = Signal phase. It is a variable that increases by 8 each pixel.
+// This source code is modified from original at:
+// http://wiki.nesdev.com/w/index.php/NTSC_video
+// This version includes a fix to emphasis and applies normalization.
+// Inputs:
+//   pixel = Pixel color (9-bit) given as input. Bitmask format: "eeellcccc".
+//   phase = Signal phase. It is a variable that increases by 8 each pixel.
 static double NTSCsignal(int pixel, int phase)
 {
     // Voltage levels, relative to synch voltage
@@ -168,29 +160,61 @@ static double NTSCsignal(int pixel, int phase)
     if (color > 0x0D) { level = 1; } // Level 1 forced for colors $0E..$0F
 
     // The square wave for this color alternates between these two voltages:
-    float low  = levels[0 + level];
-    float high = levels[4 + level];
+    double low  = levels[0 + level];
+    double high = levels[4 + level];
     if (color == 0) { low = high; } // For color 0, only high level is emitted
     if (color > 0x0C) { high = low; } // For colors $0D..$0F, only low level is emitted
 
-    double signal = inColorPhase(color, phase) ? high : low;
+    double signal = IN_COLOR_PHASE(color, phase) ? high : low;
 
     // When de-emphasis bits are set, some parts of the signal are attenuated:
     if ((color < 0x0E) && ( // Not for colors $0E..$0F (Wiki sample code doesn't have this)
-        ((emphasis & 1) && inColorPhase(0, phase))
-        || ((emphasis & 2) && inColorPhase(4, phase))
-        || ((emphasis & 4) && inColorPhase(8, phase)))) {
+        ((emphasis & 1) && IN_COLOR_PHASE(0, phase))
+        || ((emphasis & 2) && IN_COLOR_PHASE(4, phase))
+        || ((emphasis & 4) && IN_COLOR_PHASE(8, phase)))) {
         signal = signal * ATTENUATION;
     }
+
+    // Normalize to desired black and white range. This is a linear operation.
+    signal = ((signal-BLACK) / (WHITE-BLACK));
 
     return signal;
 }
 
+// 1D comb filter which relies on the inverse phase of the adjacent even and odd fields.
+// Ideally this allows extracting accurate luma and chroma. With NES PPU however, phase of
+// the fields is slightly off. More specifically, we'd need 6 samples phase difference
+// (=half chroma wavelength), but we get 8 which comes from the discarded 1st pixel of
+// the odd field. The error is 2 samples or 60 degrees. The error is fixed by adjusting
+// the phase of the cos-sin (demodulator).
+static void comb1D(double *result, double level0, double level1, double x)
+{
+    // Apply the 1D comb to separate luma and chroma.
+    double y = (level0+level1) / 2.0;
+    double c = (level0-level1) / 2.0;
+    double a = (2.0*M_PI/12.0) * x;
+    // Demodulate and store YIQ result.
+    result[0] = y;
+// TODO: have constants for these color scalers?
+    result[1] = 1.414*c * cos(a);
+    result[2] = 1.480*c * sin(a);
+}
+
+static void adjustYIQLimits(es2n *p, double *yiq)
+{
+    for (int i = 0; i < 3; i++) {
+        p->yiq_mins[i] = fmin(p->yiq_mins[i], yiq[i]);
+        p->yiq_maxs[i] = fmax(p->yiq_maxs[i], yiq[i]);
+    }
+}
+
+// Box filter kernel.
+#define BOX_FILTER(w2_, center_, x_) (abs((x_) - (center_)) < (w2_) ? 1.0 : 0.0)
+
+// Generate lookup texture.
 static void genKernelTex(es2n *p)
 {
-    double *ys = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
-    double *is = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
-    double *qs = (double*) calloc(8 * NUM_PHASES*NUM_COLORS, sizeof(double));
+    double *ys = (double*) calloc(3*8 * NUM_PHASES*NUM_COLORS, sizeof(double));
 	double *yiqs = (double*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(double));
 	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
 
@@ -200,10 +224,10 @@ static void genKernelTex(es2n *p)
     for (int phase = 0; phase < NUM_PHASES; phase++) {
         // PPU color generator outputs 8 samples per pixel, and we have 3 different phases.
         const int phase0 = 8 * phase;
-        // While field 0 is normal, PPU skips 1st screen pixel for field 1 causing offset of 8 samples.
+        // While even field is normal, PPU skips 1st pixel of the odd field, causing offset of 8 samples.
         const int phase1 = phase0 + 8;
         // Phase (hue) shift for demodulation. 180-33 degree shift from NTSC standard.
-        const double shift = phase0 + 12.0 * (180.0-33.0) / 360.0;
+        const double shift = phase0 + (12.0/360.0) * (180.0-33.0);
 
         for (int color = 0; color < NUM_COLORS; color++) {
             // Here we store the eight (8) generated YIQ samples for the pixel.
@@ -211,22 +235,8 @@ static void genKernelTex(es2n *p)
                 // Obtain NTSC signal level from PPU color generator for both fields.
                 double level0 = NTSCsignal(color, phase0+s);
                 double level1 = NTSCsignal(color, phase1+s);
-                // Normalize to our desired black-white range. It's linear operation, no problem.
-                level0 = ((level0-BLACK) / (WHITE-BLACK));
-                level1 = ((level1-BLACK) / (WHITE-BLACK));
-                // 1D comb filter which relies on the inverse phase of the two fields. Ideally this allows
-                // extracting accurate luma and chroma. Here however, the phase is slightly off. We'd need 6
-                // samples phase difference (=half chroma wavelength), but we get 8 which comes from the
-                // discarded 1st pixel of field 1. The error is 2 samples, 60 degrees.
-                // This is fixed in the demodulation.
-                double y = (level0+level1) / 2.0;
-                double c = (level0-level1) / 2.0;
-                double a = (2.0*M_PI/12.0) * (shift+s);
-                // Demodulate and store YIQ.
-                ys[i] = y;
-                is[i] = 1.414*c * cos(a);
-                qs[i] = 1.480*c * sin(a);
-                i++;
+                comb1D(&ys[i], level0, level1, shift + s);
+                i += 3;
             }
         }
     }
@@ -237,7 +247,8 @@ static void genKernelTex(es2n *p)
         for (int phase = 0; phase < NUM_PHASES; phase++) {
             for (int subp = 0; subp < NUM_SUBPS; subp++) {
                 for (int tap = 0; tap < NUM_TAPS; tap++) {
-                    float yiq[3] = {0.0f, 0.0f, 0.0f};
+                    const int k = 3 * (color*LOOKUP_W + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
+                    double *yiq = &yiqs[k];
 
                     // Because of half subpixel accuracy (4 vs 8), filter twice and average.
                     for (int side = 0; side < 2; side++) { // 0:left, 1: right
@@ -249,25 +260,17 @@ static void genKernelTex(es2n *p)
                             // Calculate x in kernel.
                             const double x = p + 8.0*tap;
                             // Filter luma and chroma with different filter widths.
-                            double my = box(YW2, kernel_center, x) / (2.0 * 8.0);
-                            double mc = box(CW2, kernel_center, x) / (2.0 * 8.0);
+                            double my = BOX_FILTER(YW2, kernel_center, x) / (2.0 * 8.0);
+                            double mc = BOX_FILTER(CW2, kernel_center, x) / (2.0 * 8.0);
                             // Lookup YIQ signal level and accumulate.
-                            i = 8*(color + phase*NUM_COLORS) + p;
-                            yiq[0] += my * ys[i];
-                            yiq[1] += mc * is[i];
-                            yiq[2] += mc * qs[i];
+                            i = 3 * (8*(color + phase*NUM_COLORS) + p);
+                            yiq[0] += my * ys[i+0];
+                            yiq[1] += mc * ys[i+1];
+                            yiq[2] += mc * ys[i+2];
                         }
                     }
 
-                    for (int i = 0; i < 3; i++) {
-                        p->yiq_mins[i] = fmin(p->yiq_mins[i], yiq[i]);
-                        p->yiq_maxs[i] = fmax(p->yiq_maxs[i], yiq[i]);
-                    }
-
-                    const int k = 3 * (color*LOOKUP_W + phase*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + tap);
-                    yiqs[k+0] = yiq[0];
-                    yiqs[k+1] = yiq[1];
-                    yiqs[k+2] = yiq[2];
+                    adjustYIQLimits(p, yiq);
                 }
             }
         }
@@ -276,52 +279,40 @@ static void genKernelTex(es2n *p)
     // Make RGB PPU palette similarly but having 12 samples per color.
     for (int color = 0; color < NUM_COLORS; color++) {
         // For some reason we need additional shift of 1 sample (-30 degrees).
-        const double shift = 12.0 * (180.0-30.0-33.0) / 360.0;
-        float yiq[3] = {0.0f, 0.0f, 0.0f};
+        const double shift = (12.0/360.0) * (180.0-30.0-33.0);
+        double yiq[3] = {0.0f, 0.0f, 0.0f};
 
         for (int s = 0; s < 12; s++) {
-            // TODO: replicated code, refactor
-            double level0 = NTSCsignal(color, s);
-            double level1 = NTSCsignal(color, s+6); // Perfect chroma cancellation.
-            level0 = ((level0-BLACK) / (WHITE-BLACK)) / 12.0;
-            level1 = ((level1-BLACK) / (WHITE-BLACK)) / 12.0;
-            double y = (level0+level1) / 2.0;
-            double c = (level0-level1) / 2.0;
-            double a = (2.0*M_PI/12.0) * (shift+s);
-            yiq[0] += y;
-            yiq[1] += 1.414*c * cos(a); // TODO: have constants? why these values?
-            yiq[2] += 1.480*c * sin(a);
+            double level0 = NTSCsignal(color, s) / 12.0;
+            double level1 = NTSCsignal(color, s+6) / 12.0; // Perfect chroma cancellation.
+            double t[3];
+            comb1D(t, level0, level1, shift + s);
+            yiq[0] += t[0];
+            yiq[1] += t[1];
+            yiq[2] += t[2];
         }
 
-        // TODO: replicated code, add function
-        for (int i = 0; i < 3; i++) {
-            p->yiq_mins[i] = fmin(p->yiq_mins[i], yiq[i]);
-            p->yiq_maxs[i] = fmax(p->yiq_maxs[i], yiq[i]);
-        }
+        adjustYIQLimits(p, yiq);
 
-        // TODO: replicated?
         const int k = 3 * (color*LOOKUP_W + LOOKUP_W-1);
         yiqs[k+0] = yiq[0];
         yiqs[k+1] = yiq[1];
         yiqs[k+2] = yiq[2];
     }
 
+    // Create lookup texture RGB as bytes by mapping voltages to the min-max range.
+    // The conversion to bytes will lose some precision, which is unnoticeable however.
     for (int k = 0; k < 3 * LOOKUP_W * NUM_COLORS; k+=3) {
         for (int i = 0; i < 3; i++) {
-            const double clamped = (yiqs[k+i]-p->yiq_mins[i]) / (p->yiq_maxs[i]-p->yiq_mins[i]);
-            result[k+i] = (unsigned char) (255.0 * clamped + 0.5);
+            const double v = (yiqs[k+i]-p->yiq_mins[i]) / (p->yiq_maxs[i]-p->yiq_mins[i]);
+            result[k+i] = (unsigned char) (255.0*v + 0.5);
         }
     }
-
-//    printf("mins: %.3f %.3f %.3f\n", _mins[0], _mins[1], _mins[2]);
-//    printf("maxs: %.3f %.3f %.3f\n", _maxs[0], _maxs[1], _maxs[2]);
 
 	glActiveTexture(TEX(LOOKUP_I));
     createTex(&p->lookup_tex, LOOKUP_W, NUM_COLORS, GL_RGB, GL_NEAREST, result);
 
 	free(ys);
-	free(is);
-	free(qs);
 	free(yiqs);
 	free(result);
 }
@@ -529,9 +520,6 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "    0.623557,   -0.635691,  1.709007   // Q\n"
         ");\n"
         "\n"
-        "const vec4 one = vec4(1.0);\n"
-        "const vec4 nil = vec4(0.0);\n"
-        "\n"
         "#define P(i_)  p = floor(IDX_W*v_uv[i_])\n"
         "#define U(i_)  (mod(p.x - p.y, 3.0)*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + float(i_)) / (LOOKUP_W-1.0)\n"
         "#define LA(i_) la = vec2(texture2D(u_idxTex, v_uv[i_]).r, texture2D(u_deempTex, vec2(v_uv[i_].y, 0.0)).r)\n"
@@ -553,7 +541,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "vec3 rgbppu = RESCALE(texture2D(u_lookupTex, vec2(1.0, uv.y)).rgb);\n"
         "SMP(3);\n"
         "SMP(4);\n"
-        "yiq *= (8.0/2.0) / vec3(YW2, CW2, CW2);\n"
+// TODO: Working multiplier for filtered chroma to match PPU is 2/5 (for CW2=12). Reason unknown?
+        "yiq *= (8.0/2.0) / vec3(YW2, CW2-2.0, CW2-2.0);\n"
         "yiq = mix(yiq, rgbppu, u_rgbppu);\n"
         "yiq.gb *= u_color;\n"
         "vec3 result = c_convMat * yiq;\n"
