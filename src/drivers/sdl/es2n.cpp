@@ -366,7 +366,7 @@ static void initUniformsStretch(es2n *p)
     GLuint prog = p->stretch_prog;
 
     k = glGetUniformLocation(prog, "u_rgbTex");
-    glUniform1i(k, STRETCH_I);
+    glUniform1i(k, RGB_I);
 }
 
 static void initUniformsDisp(es2n *p)
@@ -375,7 +375,7 @@ static void initUniformsDisp(es2n *p)
     GLuint prog = p->disp_prog;
 
     k = glGetUniformLocation(prog, "u_stretchTex");
-    glUniform1i(k, RGB_I);
+    glUniform1i(k, STRETCH_I);
 }
 
 static void renderRGB(es2n *p)
@@ -578,46 +578,33 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "precision highp float;\n"
         DEFINE(RGB_W)
         "attribute vec4 vert;\n"
-        "varying vec2 v_uv[5];\n"
-        "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0) \n"
+        "varying vec2 v_uv[3];\n"
+        "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
         "void main() {\n"
         "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
-        "TAP(0,-2.0);\n"
-        "TAP(1,-1.0);\n"
-        "TAP(2, 0.0);\n"
-        "TAP(3, 1.0);\n"
-        "TAP(4, 2.0);\n"
+        "TAP(0,-2.5);\n"
+        "TAP(1, 0.0);\n"
+        "TAP(2, 2.5);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* stretch_frag_src =
         "precision highp float;\n"
         "uniform sampler2D u_rgbTex;\n"
-        "varying vec2 v_uv[5];\n"
-        "#define SMP(i_, m_) color += (m_) * texture2D(u_rgbTex, v_uv[i_]).rgb\n"
+        // Filter nearest on y, linear on x. This is a slower dependent texture read.
+        "#define UV(i_) uv = vec2(v_uv[i_].x, floor(256.0*v_uv[i_].y) / 256.0 + 0.5/256.0)\n"
+        "#define SMP(i_, m_) UV(i_); color += (m_) * texture2D(u_rgbTex, uv).rgb\n"
+        "varying vec2 v_uv[3];\n"
         "void main(void) {\n"
+        "vec2 uv;\n"
+        "vec3 color = vec3(0.0);\n"
 #if 0
-        "vec3 color = vec3(0.0);\n"
-        "SMP(0, vec3(0.25, 0.00, 0.00));\n"
-        "SMP(1, vec3(0.50, 0.25, 0.00));\n"
-        "SMP(2, vec3(0.25, 0.50, 0.25));\n"
-        "SMP(3, vec3(0.00, 0.25, 0.50));\n"
-        "SMP(4, vec3(0.00, 0.00, 0.25));\n"
-        "gl_FragColor = vec4(color, 1.0);\n"
-#elif 0
-        // Sharpen
-        "vec3 color = vec3(0.0);\n"
-        "SMP(0, vec3(-0.500));\n"
-//        "SMP(1, vec3(-0.250));\n"
-        "SMP(2, vec3( 2.000));\n"
-//        "SMP(3, vec3(-0.250));\n"
-        "SMP(4, vec3(-0.500));\n"
-        "gl_FragColor = vec4(color, 1.0);\n"
+        "SMP(0, vec3(1.0, 0.0, 0.0));\n"
+        "SMP(1, vec3(0.0, 1.0, 0.0));\n"
+        "SMP(2, vec3(0.0, 0.0, 1.0));\n"
 #else
-        // Filter nearest on y, linear on x.
-        "vec2 uv = v_uv[2];\n"
-        "uv.y = floor(256.0 * uv.y)/256.0 + 0.5/256.0;\n"
-        "gl_FragColor = texture2D(u_rgbTex, uv);\n"
+        "SMP(1, 1.0);\n"
 #endif
+        "gl_FragColor = vec4(color, 1.0);\n"
         "}\n";
     p->stretch_prog = buildShader(stretch_vert_src, stretch_frag_src);
     initUniformsStretch(p);
@@ -627,31 +614,37 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "precision highp float;\n"
         DEFINE(RGB_W)
         "attribute vec4 vert;\n"
-        "varying vec2 v_uv[1];\n"
-        "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0) \n"
+        "varying vec2 v_uv[5];\n"
+        "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
         "void main() {\n"
         "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
-        "TAP(0, 0.0);\n"
+        "TAP(0,-7.0);\n"
+        "TAP(1,-3.5);\n"
+        "TAP(2, 0.0);\n"
+        "TAP(3, 3.5);\n"
+        "TAP(4, 7.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* disp_frag_src =
         "precision highp float;\n"
         "uniform sampler2D u_stretchTex;\n"
-        "varying vec2 v_uv[1];\n"
-        "#define SMP(i_, m_) color += (m_) * texture2D(u_rgbTex, v_uv[i_]).rgb\n"
+        "varying vec2 v_uv[5];\n"
         "void main(void) {\n"
-        "vec2 uv = v_uv[0];\n"
-        "gl_FragColor = texture2D(u_stretchTex, uv);\n"
+#if 1
+        "#define SMP(i_, m_) color += (m_) * texture2D(u_stretchTex, v_uv[i_]).rgb\n"
+        "vec3 color = vec3(0.0);\n"
+        "SMP(0, vec3( 0.00,-0.20, 0.00));\n"
+        "SMP(1, vec3( 1.00, 0.00, 0.00));\n"
+        "SMP(2, vec3( 0.00, 1.40, 0.00));\n"
+        "SMP(3, vec3( 0.00, 0.00, 1.00));\n"
+        "SMP(4, vec3( 0.00,-0.20, 0.00));\n"
+        "gl_FragColor = vec4(color, 1.0);\n"
+#else
+        "gl_FragColor = texture2D(u_stretchTex, v_uv[2]);\n"
+#endif
         "}\n";
     p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
     initUniformsDisp(p);
-
-// TODO: remove from final
-/*
-    GLfloat mousePos[2] = { 0.0f, 0.0f };
-    GLint uMousePosLoc = glGetUniformLocation(p->rgb_prog, "u_mousePos");
-    glUniform2fv(uMousePosLoc, 1, mousePos);
-*/
 }
 
 void es2nDeinit(es2n *p)
