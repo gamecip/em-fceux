@@ -27,6 +27,7 @@ void BlitOpenGL(uint8 *buf)
     s_es2n.controls.color = EM_ASM_DOUBLE_V({ return Module.colorControl||0; });
     s_es2n.controls.gamma = EM_ASM_DOUBLE_V({ return Module.gammaControl||0; });
     s_es2n.controls.rgbppu = EM_ASM_DOUBLE_V({ return Module.rgbppuControl||0; });
+    s_es2n.crt_enabled = EM_ASM_INT_V({ return Module.crtControl||0; });
 
     es2nRender(&s_es2n, buf, deempScan, PALRAM[0]);
 	SDL_GL_SwapBuffers();

@@ -310,30 +310,12 @@ void FCEUD_TraceInstruction() {
 	return;
 }
 
-static void FCEM_InitStuff()
-{
-/*
-    EM_ASM({
-        // Disable unnecessary SDL surface copy-on-lock feature.
-        SDL.defaults.copyOnLock = false;
-        // Mount IndexedDB file system (IDBFS) to /fceux.
-        FS.mkdir('/fceux');
-        FS.mount(IDBFS, {}, '/fceux');
-        FS.syncfs(true, FCEM.onInitialSyncFromIDB);
-        // Write savegame and synchronize IDBFS in intervals.
-        setInterval(Module.cwrap('FCEM_onSaveGameInterval'), 1000);
-    });
-*/
-}
-
 /**
  * The main loop for the SDL.
  */
 int main(int argc, char *argv[])
 {
 	int error, frameskip;
-
-    FCEM_InitStuff();
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
