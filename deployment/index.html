@@ -26,14 +26,14 @@
         top: 50%;
         left: 50%;
         border: 0px none;
-        width: 585px;
+        width: 640px;
         height: 448px;
-        margin-left: -292px;
+        margin-left: -320px;
         margin-top: -224px;
         background-color: #111;
       }
       canvas.emscripten {
-        position: absolute;
+        position: relative;
         border: 0px none;
       }
       #visor {
@@ -51,15 +51,15 @@
         position: absolute;
         top: 50%;
         left: 50%;
-        width: 585px;
+        width: 640px;
         height: 88px;
-        margin-left: -292px;
+        margin-left: -320px;
         margin-top: -44px;
         background-color: #111;
       }
       #controls {
         position: absolute;
-        width: 585px;
+        width: 640px;
         height: 448px;
         background-color: #111;
       }
@@ -418,16 +418,20 @@
         Module.gammaControl = 0;
         Module.rgbppuControl = 0;
         Module.crtControl = 1;
+        Module.convergenceControl = 0;
+        Module.sharpnessControl = 0;
       }
     </script>
 
     <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(true, false)"/><br/>
-    Brightness <input type="range" min="-1" max="1" value="0" step="0.1" oninput="changeControl('brightness', this.value)" onchange="changeControl('brightness', this.value)"/><br/>
-    Contrast <input type="range" min="-1" max="1" value="0" step="0.1" oninput="changeControl('contrast', this.value)" onchange="changeControl('contrast', this.value)"/><br/>
-    Color <input type="range" min="-1" max="1" value="0" step="0.1" oninput="changeControl('color', this.value)" onchange="changeControl('color', this.value)"/><br/>
-    Gamma <input type="range" min="-1" max="1" value="0" step="0.1" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
-    RGB PPU <input type="range" min="-0.1" max="1" value="0" step="0.1" oninput="changeControl('rgbppu', this.value)" onchange="changeControl('rgbppu', this.value)"/><br/>
-    Tube/Flat <input type="checkbox" checked="1" oninput="changeControl('crt', this.checked)" onchange="changeControl('crt', this.checked)"/><br/>
+    Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('brightness', this.value)" onchange="changeControl('brightness', this.value)"/><br/>
+    Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('contrast', this.value)" onchange="changeControl('contrast', this.value)"/><br/>
+    Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('color', this.value)" onchange="changeControl('color', this.value)"/><br/>
+    Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
+    Sharpness <input type="range" min="-0.4" max="0.6" value="0" step="0.1" oninput="changeControl('sharpness', this.value)" onchange="changeControl('sharpness', this.value)"/><br/>
+    RGB PPU <input type="range" min="-0.1" max="0.9" value="0" step="0.1" oninput="changeControl('rgbppu', this.value)" onchange="changeControl('rgbppu', this.value)"/><br/>
+    CRT Emulation <input type="checkbox" checked="1" oninput="changeControl('crt', this.checked)" onchange="changeControl('crt', this.checked)"/><br/>
+    CRT Convergence <input type="range" min="-0.2" max="0.8" value="0" step="0.1" oninput="changeControl('convergence', this.value)" onchange="changeControl('convergence', this.value)"/><br/>
     <input type="button" value="Reset" onclick="resetControls()"/><br/>
 
     <div hidden="1">

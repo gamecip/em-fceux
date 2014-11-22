@@ -21,13 +21,17 @@ void SetOpenGLPalette(uint8*)
 void BlitOpenGL(uint8 *buf)
 {
 // TODO: possibly move somewhere else?
-    // Update CRT emulation controls from js.
+    // Update NTSC controls (from js).
     s_es2n.controls.brightness = EM_ASM_DOUBLE_V({ return Module.brightnessControl||0; });
     s_es2n.controls.contrast = EM_ASM_DOUBLE_V({ return Module.contrastControl||0; });
     s_es2n.controls.color = EM_ASM_DOUBLE_V({ return Module.colorControl||0; });
     s_es2n.controls.gamma = EM_ASM_DOUBLE_V({ return Module.gammaControl||0; });
     s_es2n.controls.rgbppu = EM_ASM_DOUBLE_V({ return Module.rgbppuControl||0; });
-    s_es2n.crt_enabled = EM_ASM_INT_V({ return Module.crtControl||0; });
+    s_es2n.controls.sharpness = EM_ASM_DOUBLE_V({ return Module.sharpnessControl||0; });
+
+    // Update CRT emulation controls (from js).
+    s_es2n.controls.crt_enabled = EM_ASM_INT_V({ return Module.crtControl||0; });
+    s_es2n.controls.convergence = EM_ASM_DOUBLE_V({ return Module.convergenceControl||0; });
 
     es2nRender(&s_es2n, buf, deempScan, PALRAM[0]);
 	SDL_GL_SwapBuffers();

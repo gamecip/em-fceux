@@ -7,12 +7,17 @@
 
 typedef struct t_es2n_controls
 {
-    // Control values should be in range [-1,1], default is 0.
+    // All controls should be in range [-1,1]. Default is 0.
     GLfloat brightness; // Brightness control.
-    GLfloat contrast; // Contrast control.
-    GLfloat color; // Color control.
-    GLfloat gamma; // Gamma control.
-    GLfloat rgbppu; // RGB PPU control.
+    GLfloat contrast;   // Contrast control.
+    GLfloat color;      // Color control.
+    GLfloat gamma;      // Gamma control.
+    GLfloat rgbppu;     // RGB PPU control.
+
+    // Controls for CRT emulation. If CRT emulation is disabled, these do nothing.
+    int crt_enabled;    // Set to zero to disable CRT emulation.
+    GLfloat convergence; // CRT red-blue convergence.
+    GLfloat sharpness;  // CRT sharpness control.
 
     // Uniform locations.
     GLint _brightness_loc;
@@ -20,7 +25,9 @@ typedef struct t_es2n_controls
     GLint _color_loc;
     GLint _gamma_loc;
     GLint _rgbppu_loc;
-
+    GLint _convergence_loc;
+    GLint _sharpen_kernel_loc;
+    GLint _scanline_loc;
 } es2n_controls;
 
 typedef struct t_es2n
@@ -45,7 +52,6 @@ typedef struct t_es2n
 
     GLuint crt_verts_buf;   // Vertex buffer for CRT.
     GLuint crt_elems_buf;   // Element buffer for CRT.
-    int crt_enabled;        // Zero to disable CRT display, otherwise enabled.
 
     GLubyte overscan_color;   // Current overscan color (background/zero color).
     GLubyte *overscan_pixels; // Temporary overscan pixels (1x240).
