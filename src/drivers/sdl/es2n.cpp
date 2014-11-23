@@ -44,8 +44,8 @@
 #define YW2 6.0
 #define CW2 12.0
 // CRT mesh X and Y half-resolution.
-#define CRT_XN 8
-#define CRT_YN 6
+#define CRT_XN (3*4)
+#define CRT_YN (3*3)
 
 static GLuint compileShader(GLenum type, const char *src)
 {
@@ -337,16 +337,16 @@ static void updateControlUniformsRGB(const es2n_controls *c)
 static void updateControlUniformsStretch(const es2n_controls *c)
 {
     GLfloat v;
-    v = c->crt_enabled * (8.0f/255.0f);
+    v = c->crt_enabled * (9.5f/255.0f);
     glUniform1f(c->_scanline_loc, v);
 }
 
 static void updateControlUniformsDisp(const es2n_controls *c)
 {
     GLfloat v;
-    v = c->crt_enabled * -3.5f * (c->convergence+0.2f);
+    v = c->crt_enabled * -2.0f * (c->convergence+0.3f);
     glUniform1f(c->_convergence_loc, v);
-    v = 0.25f * (c->sharpness+0.4f);
+    v = (0.9f-c->rgbppu) * 0.4f * (c->sharpness+0.5f);
     GLfloat sharpen_kernel[3 * 3] = {
         0.0f, -v, 0.0f, 
         0.0f, 1.0f+2.0f*v, 0.0f, 
@@ -417,7 +417,9 @@ static void renderRGB(es2n *p)
     glUseProgram(p->rgb_prog);
     updateControlUniformsRGB(&p->controls);
 
-    glEnable(GL_BLEND);
+    if (p->controls.crt_enabled) {
+        glEnable(GL_BLEND);
+    }
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glDisable(GL_BLEND);
 }
@@ -529,7 +531,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Configure RGB framebuffer.
     glActiveTexture(TEX(RGB_I));
-    createFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, 256, GL_RGB, GL_LINEAR);
+    createFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, 256, GL_RGB, GL_NEAREST);
     const char* rgb_vert_src =
         "precision highp float;\n"
         DEFINE(NUM_TAPS)
@@ -607,28 +609,22 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     createFBTex(&p->stretch_tex, &p->stretch_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR);
     const char* stretch_vert_src =
         "precision highp float;\n"
-        DEFINE(RGB_W)
         "attribute vec4 vert;\n"
-        "varying vec2 v_uv[1];\n"
-        "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
+        "varying vec2 v_uv[2];\n"
         "void main() {\n"
-        "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
-        "TAP(0, 0.0);\n"
+        "v_uv[0] = vec2(vert.z, (240.0/256.0) - vert.w);\n"
+        "v_uv[1] = vec2(v_uv[0].x, v_uv[0].y - 0.25/256.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* stretch_frag_src =
         "precision highp float;\n"
+        DEFINE(M_PI)
         "uniform float u_scanline;\n"
         "uniform sampler2D u_rgbTex;\n"
-        // Filter nearest on y, linear on x. This is a slower dependent texture read.
-        "#define UV(i_) uv = vec2(v_uv[i_].x, floor(256.0*v_uv[i_].y) / 256.0 + 0.5/256.0)\n"
-        "#define SMP(i_, m_) UV(i_); color += (m_) * texture2D(u_rgbTex, uv).rgb\n"
-        "varying vec2 v_uv[1];\n"
+        "varying vec2 v_uv[2];\n"
         "void main(void) {\n"
-        "vec2 uv;\n"
-        "vec3 color = vec3(0.0);\n"
-        "SMP(0, 1.0);\n"
-        "float scanline = u_scanline * (1.0 - min(mod(floor(4.0*256.0*v_uv[0].y), 4.0), 1.0));\n"
+        "vec3 color = 0.5 * (texture2D(u_rgbTex, v_uv[0]).rgb + texture2D(u_rgbTex, v_uv[1]).rgb);\n"
+        "float scanline = u_scanline - u_scanline * abs(sin(M_PI*256.0 * v_uv[0].y - M_PI*0.125));\n"
         "gl_FragColor = vec4((color - scanline) * (1.0+scanline), 1.0);\n"
         "}\n";
     p->stretch_prog = buildShader(stretch_vert_src, stretch_frag_src);
@@ -644,11 +640,11 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
         "void main() {\n"
         "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
-        "TAP(0,-5.5);\n"
+        "TAP(0,-4.0);\n"
         "TAP(1,-u_convergence);\n"
         "TAP(2, 0.0);\n"
         "TAP(3, u_convergence);\n"
-        "TAP(4, 5.5);\n"
+        "TAP(4, 4.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* disp_frag_src =

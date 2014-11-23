@@ -173,10 +173,10 @@ InitConfig()
 	config->addOption("doublebuf", "SDL.DoubleBuffering", 0);
 	config->addOption("autoscale", "SDL.AutoScale", 1);
 	config->addOption("keepratio", "SDL.KeepRatio", 1);
-    // Scaling for proper NTSC output (3x scaling).
+    // Scale to compensate the 24px overscan.
     config->addOption("xscale", "SDL.XScale", 4.0*(280.0/256.0) + 0.5/256.0);
     config->addOption("yscale", "SDL.YScale", 4.0);
-//	config->addOption("xscale", "SDL.XScale", 2.0*(280.0/240.0) + 0.5/256.0);
+//	config->addOption("xscale", "SDL.XScale", 2.0*(280.0/256.0) + 0.5/256.0);
 //	config->addOption("yscale", "SDL.YScale", 2.0);
 	config->addOption("xstretch", "SDL.XStretch", 0);
 	config->addOption("ystretch", "SDL.YStretch", 0);
