@@ -211,7 +211,7 @@ static void adjustYIQLimits(es2n *p, double *yiq)
 }
 
 // Box filter kernel.
-#define BOX_FILTER(w2_, center_, x_) (abs((x_) - (center_)) < (w2_) ? 1.0 : 0.0)
+#define BOX_FILTER(w2_, center_, x_) (fabs((x_) - (center_)) < (w2_) ? 1.0 : 0.0)
 
 // Generate lookup texture.
 static void genLookupTex(es2n *p)
@@ -255,17 +255,17 @@ static void genLookupTex(es2n *p)
                     // Because of half subpixel accuracy (4 vs 8), filter twice and average.
                     for (int side = 0; side < 2; side++) { // 0:left, 1: right
                         // Calculate filter kernel center.
-                        const double kernel_center = side + 0.5 + 2*subp + 8*(NUM_TAPS/2);
+                        const double kernel_center = (side + 2*subp + 8*(NUM_TAPS/2)) + 0.5;
 
                         // Accumulate filter sum over all 8 samples of the pixel.
-                        for (int p = 0; p < 8; p++) {
+                        for (int s = 0; s < 8; s++) {
                             // Calculate x in kernel.
-                            const double x = p + 8.0*tap;
+                            const double x = s + 8.0*tap;
                             // Filter luma and chroma with different filter widths.
-                            double my = BOX_FILTER(YW2, kernel_center, x) / (2.0 * 8.0);
-                            double mc = BOX_FILTER(CW2, kernel_center, x) / (2.0 * 8.0);
+                            double my = BOX_FILTER(YW2, kernel_center, x) / (2.0*8.0);
+                            double mc = BOX_FILTER(CW2, kernel_center, x) / (2.0*8.0);
                             // Lookup YIQ signal level and accumulate.
-                            i = 3 * (8*(color + phase*NUM_COLORS) + p);
+                            i = 3 * (8*(color + phase*NUM_COLORS) + s);
                             yiq[0] += my * ys[i+0];
                             yiq[1] += mc * ys[i+1];
                             yiq[2] += mc * ys[i+2];
@@ -337,7 +337,7 @@ static void updateControlUniformsRGB(const es2n_controls *c)
 static void updateControlUniformsStretch(const es2n_controls *c)
 {
     GLfloat v;
-    v = c->crt_enabled * (9.5f/255.0f);
+    v = c->crt_enabled * (9.0f/255.0f);
     glUniform1f(c->_scanline_loc, v);
 }
 
@@ -482,8 +482,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     // Create CRT vertex buffer.
     const size_t size_verts = sizeof(GLfloat) * 4 * (2*CRT_XN+1) * (2*CRT_YN+1);
     GLfloat *crt_verts = (GLfloat*) malloc(size_verts);
-    const double dx = 8.9;
-    const double dy = 3.6;
+    const double dx = 12.0;
+    const double dy = 4.3;
     const double dx2 = dx*dx;
     const double dy2 = dy*dy;
     const double mx = sqrt(1.0 + dx2);
@@ -538,14 +538,15 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         DEFINE(IDX_W)
         "attribute vec4 vert;\n"
         "varying vec2 v_uv[int(NUM_TAPS)];\n"
-        "#define S vec2(1.0/IDX_W, 0.0)\n"
-        "#define UV_OUT(i_, o_) v_uv[i_] = vert.zw + (o_)*S\n"
+        "varying vec2 v_deemp_uv;\n"
+        "#define UV_OUT(i_, o_) v_uv[i_] = vec2(vert.z + (o_)/IDX_W, vert.w)\n"
         "void main() {\n"
         "UV_OUT(0,-2.0);\n"
         "UV_OUT(1,-1.0);\n"
         "UV_OUT(2, 0.0);\n"
         "UV_OUT(3, 1.0);\n"
         "UV_OUT(4, 2.0);\n"
+        "v_deemp_uv = vec2(vert.w, 0.0);\n"
         "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
         "}\n";
     const char* rgb_frag_src =
@@ -567,22 +568,22 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "uniform float u_gamma;\n"
         "uniform float u_rgbppu;\n"
         "varying vec2 v_uv[int(NUM_TAPS)];\n"
+        "varying vec2 v_deemp_uv;\n"
         "const mat3 c_convMat = mat3(\n"
         "    1.0,        1.0,        1.0,       // Y\n"
         "    0.946882,   -0.274788,  -1.108545, // I\n"
         "    0.623557,   -0.635691,  1.709007   // Q\n"
         ");\n"
-        "\n"
-        "#define P(i_)  p = floor(IDX_W*v_uv[i_])\n"
+        "#define P(i_)  p = floor(IDX_W * v_uv[i_])\n"
         "#define U(i_)  (mod(p.x - p.y, 3.0)*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + float(i_)) / (LOOKUP_W-1.0)\n"
-        "#define LA(i_) la = vec2(texture2D(u_idxTex, v_uv[i_]).r, texture2D(u_deempTex, vec2(v_uv[i_].y, 0.0)).r)\n"
-        "#define V()    dot((255.0/511.0) * vec2(1.0, 64.0), la)\n"
-        "#define UV(i_) uv = vec2(U(i_), V())\n"
+        "#define V(i_)  ((255.0/511.0) * texture2D(u_idxTex, v_uv[i_]).r + deemp)\n"
+        "#define UV(i_) uv = vec2(U(i_), V(i_))\n"
         "#define RESCALE(v_) ((v_) * (u_maxs-u_mins) + u_mins)\n"
-        "#define SMP(i_) LA(i_); P(i_); UV(i_); yiq += RESCALE(texture2D(u_lookupTex, uv).rgb)\n"
+        "#define SMP(i_) P(i_); UV(i_); yiq += RESCALE(texture2D(u_lookupTex, uv).rgb)\n"
         "\n"
         "void main(void) {\n"
-        "float subp = mod(floor(NUM_SUBPS*IDX_W*v_uv[int(NUM_TAPS)/2].x), NUM_SUBPS);\n"
+        "float deemp = 64.0 * (255.0/511.0) * texture2D(u_deempTex, v_deemp_uv).r;\n"
+        "float subp = mod(floor(NUM_SUBPS*IDX_W * v_uv[int(NUM_TAPS)/2].x), NUM_SUBPS);\n"
         "vec2 p;\n"
         "vec2 la;\n"
         "vec2 uv;\n"
@@ -594,7 +595,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "vec3 rgbppu = RESCALE(texture2D(u_lookupTex, vec2(1.0, uv.y)).rgb);\n"
         "SMP(3);\n"
         "SMP(4);\n"
-// TODO: Working multiplier for filtered chroma to match PPU is 2/5 (for CW2=12). Reason unknown?
+// TODO: Working multiplier for filtered chroma to match PPU is 2/5 (for CW2=12).
+// TODO: Is this because colors are blended together with composite?
         "yiq *= (8.0/2.0) / vec3(YW2, CW2-2.0, CW2-2.0);\n"
         "yiq = mix(yiq, rgbppu, u_rgbppu);\n"
         "yiq.gb *= u_color;\n"
