@@ -4,6 +4,8 @@
 #include <cmath>
 // TODO: remove, not needed
 #include <stdio.h>
+#include "es2utils.h"
+#include "mesh_data.c"
 
 #define STR(s_) _STR(s_)
 #define _STR(s_) #s_
@@ -43,100 +45,6 @@
 // Half-width of Y and C box filter kernels.
 #define YW2 6.0
 #define CW2 12.0
-// CRT mesh X and Y half-resolution.
-#define CRT_XN (3*4)
-#define CRT_YN (3*3)
-
-static GLuint compileShader(GLenum type, const char *src)
-{
-    GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &src, 0);
-    glCompileShader(shader);
-    return shader;
-}
-
-static GLuint linkShader(GLuint vert_shader, GLuint frag_shader)
-{
-    GLuint prog = glCreateProgram();
-    glAttachShader(prog, vert_shader);
-    glAttachShader(prog, frag_shader);
-    glLinkProgram(prog);
-    glDetachShader(prog, vert_shader);
-    glDetachShader(prog, frag_shader);
-    glUseProgram(prog);
-    return prog;
-}
-
-static GLuint buildShader(const char *vert_src, const char *frag_src)
-{
-    GLuint vert_shader = compileShader(GL_VERTEX_SHADER, vert_src);
-    GLuint frag_shader = compileShader(GL_FRAGMENT_SHADER, frag_src);
-    GLuint result = linkShader(vert_shader, frag_shader);
-    glDeleteShader(vert_shader);
-    glDeleteShader(frag_shader);
-    return result;
-}
-
-static void deleteShader(GLuint *prog)
-{
-    if (prog && *prog) {
-        glDeleteProgram(*prog);
-        *prog = 0;
-    }
-}
-
-static void createBuffer(GLuint *buf, GLenum binding, size_t size, const void *data)
-{
-    glGenBuffers(1, buf);
-    glBindBuffer(binding, *buf);
-    glBufferData(binding, size, data, GL_STATIC_DRAW);
-}
-
-static void deleteBuffer(GLuint *buf)
-{
-    if (buf && *buf) {
-        glDeleteBuffers(1, buf);
-        *buf = 0;
-    }
-}
-
-static void createTex(GLuint *tex, int w, int h, GLenum format, GLenum filter, void *data)
-{
-    glGenTextures(1, tex);
-    glBindTexture(GL_TEXTURE_2D, *tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-}
-
-static void deleteTex(GLuint *tex)
-{
-    if (tex && *tex) {
-        glDeleteTextures(1, tex);
-        *tex = 0;
-    }
-}
-
-static void createFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filter)
-{
-    createTex(tex, w, h, format, filter, 0);
-
-    glGenFramebuffers(1, fb);
-    glBindFramebuffer(GL_FRAMEBUFFER, *fb);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *tex, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-static void deleteFBTex(GLuint *tex, GLuint *fb)
-{
-    deleteTex(tex);
-    if (fb && *fb) {
-        glDeleteFramebuffers(1, fb);
-        *fb = 0;
-    }
-}
 
 // Square wave generator as function of NES pal chroma index and phase.
 #define IN_COLOR_PHASE(color_, phase_) (((color_) + (phase_)) % 12 < 6)
@@ -400,11 +308,24 @@ static void initUniformsDisp(es2n *p)
 
     k = glGetUniformLocation(prog, "u_stretchTex");
     glUniform1i(k, STRETCH_I);
+    k = glGetUniformLocation(prog, "u_mvp");
+    glUniformMatrix4fv(k, 1, GL_FALSE, p->mvp_mat);
 
     es2n_controls *c = &p->controls;
     c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
     c->_sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
     updateControlUniformsDisp(&p->controls);
+}
+
+static void initUniformsTV(es2n *p)
+{
+    GLint k;
+    GLuint prog = p->tv_prog;
+
+    k = glGetUniformLocation(prog, "u_stretchTex");
+    glUniform1i(k, STRETCH_I);
+    k = glGetUniformLocation(prog, "u_mvp");
+    glUniformMatrix4fv(k, 1, GL_FALSE, p->mvp_mat);
 }
 
 static void renderRGB(es2n *p)
@@ -436,17 +357,16 @@ static void renderStretch(es2n *p)
 
 static void renderDisp(es2n *p)
 {
-    if (p->controls.crt_enabled) {
-        glBindBuffer(GL_ARRAY_BUFFER, p->crt_verts_buf);
-        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    }
-
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
     glUseProgram(p->disp_prog);
     updateControlUniformsDisp(&p->controls);
+
     if (p->controls.crt_enabled) {
-        glDrawElements(GL_TRIANGLE_STRIP, 2 * (2*CRT_XN+1+1) * (2*CRT_YN), GL_UNSIGNED_SHORT, 0);
+        meshRender(&p->screen_mesh);
+
+        glUseProgram(p->tv_prog);
+        meshRender(&p->tv_mesh);
     } else {
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
@@ -458,6 +378,14 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 //    printf("left:%d right:%d top:%d bottom:%d\n", left, right, top, bottom);
     memset(p, 0, sizeof(es2n));
 
+    // Build MVP matrix.
+    GLfloat trans[3] = { 0, 0, -2.5 };
+    GLfloat proj[4*4];
+    GLfloat view[4*4];
+    mat4Proj(proj, 0.25*M_PI*224.0/280.0, 280.0/224.0, 0.125, 16.0);
+    mat4Trans(view, trans);
+    mat4Mul(p->mvp_mat, proj, view);
+
     p->overscan_pixels = (GLubyte*) malloc(OVERSCAN_W*240);
     p->overscan_color = 0xFE; // Set bogus value to ensure overscan update.
 
@@ -465,6 +393,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
     glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
     glBlendColor(PERSISTENCE_R, PERSISTENCE_G, PERSISTENCE_B, 0.0);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -478,46 +407,6 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
          1.0f,  1.0f, right / 256.0f, top / 256.0f
     };
     createBuffer(&p->quad_buf, GL_ARRAY_BUFFER, sizeof(quadverts), quadverts);
-
-    // Create CRT vertex buffer.
-    const size_t size_verts = sizeof(GLfloat) * 4 * (2*CRT_XN+1) * (2*CRT_YN+1);
-    GLfloat *crt_verts = (GLfloat*) malloc(size_verts);
-    const double dx = 12.0;
-    const double dy = 4.3;
-    const double dx2 = dx*dx;
-    const double dy2 = dy*dy;
-    const double mx = sqrt(1.0 + dx2);
-    const double my = sqrt(1.0 + dy2);
-    for (int j = -CRT_YN; j <= CRT_YN; j++) {
-        for (int i = -CRT_XN; i <= CRT_XN; i++) {
-            int k = 4 * ((j+CRT_YN) * (2*CRT_XN+1) + i+CRT_XN);
-            const double x = (double) i/CRT_XN;
-            const double y = (double) j/CRT_YN;
-            const double r2 = x*x + y*y;
-            crt_verts[k+0] = mx * x / sqrt(dx2 + r2);
-            crt_verts[k+1] = my * y / sqrt(dy2 + r2);
-            crt_verts[k+2] = 0.5 + 0.5*x;
-            crt_verts[k+3] = ((top-bottom) * (0.5 + 0.5*y) + bottom) / 256.0f;
-        }
-    }
-    createBuffer(&p->crt_verts_buf, GL_ARRAY_BUFFER, size_verts, crt_verts);
-    free(crt_verts);
-
-    const size_t size_elems = sizeof(GLushort) * (2 * (2*CRT_XN+1+1) * (2*CRT_YN));
-    GLushort *crt_elems = (GLushort*) malloc(size_elems);
-    int k = 0;
-    for (int j = 0; j < 2*CRT_YN; j++) {
-        for (int i = 0; i < 2*CRT_XN+1; i++) {
-            crt_elems[k+0] = i + (j+0) * (2*CRT_XN+1);
-            crt_elems[k+1] = i + (j+1) * (2*CRT_XN+1);
-            k += 2;
-        }
-        crt_elems[k+0] = crt_elems[k-1];
-        crt_elems[k+1] = crt_elems[k-1 - 2*2*CRT_XN];
-        k += 2;
-    }
-    createBuffer(&p->crt_elems_buf, GL_ELEMENT_ARRAY_BUFFER, size_elems, crt_elems);
-    free(crt_elems);
 
     // Setup input pixels texture.
     glActiveTexture(TEX(IDX_I));
@@ -636,24 +525,39 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     const char* disp_vert_src =
         "precision highp float;\n"
         DEFINE(RGB_W)
-        "attribute vec4 vert;\n"
+        DEFINE(M_PI)
+        "attribute vec4 a_vert;\n"
+        "attribute vec3 a_norm;\n"
+        "attribute vec2 a_uv;\n"
         "uniform float u_convergence;\n"
+        "uniform mat4 u_mvp;\n"
         "varying vec2 v_uv[5];\n"
+        "varying vec3 v_color;\n"
         "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
         "void main() {\n"
-        "vec2 uv = vec2(vert.z, (240.0/256.0) - vert.w);\n"
+        "vec2 uv = vec2(a_uv.x, (8.0/256.0) + (224.0/256.0) * a_uv.y);\n"
         "TAP(0,-4.0);\n"
         "TAP(1,-u_convergence);\n"
         "TAP(2, 0.0);\n"
         "TAP(3, u_convergence);\n"
         "TAP(4, 4.0);\n"
-        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
+        "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
+        "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
+        "vec3 n = normalize(a_norm);\n"
+        "vec3 v = normalize(view_pos - a_vert.xyz);\n"
+        "vec3 l = normalize(light_pos - a_vert.xyz);\n"
+        "vec3 h = normalize(l + v);\n"
+        "float ndotl = max(dot(n, l), 0.0);\n"
+        "float ndoth = max(dot(n, h), 0.0);\n"
+        "v_color = vec3(0.02*ndotl + 0.23*pow(ndoth, 25.0));\n"
+        "gl_Position = u_mvp * a_vert;\n"
         "}\n";
     const char* disp_frag_src =
         "precision highp float;\n"
         "uniform sampler2D u_stretchTex;\n"
         "uniform mat3 u_sharpenKernel;\n"
         "varying vec2 v_uv[5];\n"
+        "varying vec3 v_color;\n"
         "void main(void) {\n"
 #if 1
         "#define SMP(i_, m_) color += (m_) * texture2D(u_stretchTex, v_uv[i_]).rgb\n"
@@ -663,13 +567,69 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         "SMP(2, u_sharpenKernel[1]);\n"
         "SMP(3, vec3(0.0, 0.0, 1.0));\n"
         "SMP(4, u_sharpenKernel[2]);\n"
-        "gl_FragColor = vec4(color, 1.0);\n"
+        "gl_FragColor = vec4(v_color + color, 1.0);\n"
 #else
-        "gl_FragColor = texture2D(u_stretchTex, v_uv[2]);\n"
+//        "gl_FragColor = texture2D(u_stretchTex, v_uv[2]);\n"
+        "gl_FragColor = vec4(vec3(v_uv[2], 1.0), 1.0);\n"
 #endif
         "}\n";
+
     p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
     initUniformsDisp(p);
+    createMesh(&p->screen_mesh, p->disp_prog, mesh_screen_vert_num, 3*mesh_screen_face_num, mesh_screen_verts, mesh_screen_norms, mesh_screen_uvs, mesh_screen_faces);
+
+    // Setup TV shader.
+    const char* tv_vert_src =
+        "precision highp float;\n"
+        "attribute vec4 a_vert;\n"
+        "attribute vec3 a_norm;\n"
+        "uniform mat4 u_mvp;\n"
+        "varying vec3 v_color;\n"
+        "varying vec3 v_p;\n"
+        "varying vec3 v_n;\n"
+        "varying vec3 v_v;\n"
+        "void main() {\n"
+        "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
+        "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
+        "vec4 p = u_mvp * a_vert;\n"
+        "vec3 n = normalize(a_norm);\n"
+        "vec3 v = normalize(view_pos - a_vert.xyz);\n"
+        "vec3 l = normalize(light_pos - a_vert.xyz);\n"
+        "vec3 h = normalize(l + v);\n"
+        "float ndotl = max(dot(n, l), 0.0);\n"
+        "float ndoth = max(dot(n, h), 0.0);\n"
+        "v_color = vec3(0.01 + 0.07*ndotl + 0.04*pow(ndoth, 19.0));\n"
+        "v_n = n;\n"
+        "v_v = -v;\n"
+        "v_p = a_vert.xyz;\n"
+        "gl_Position = p;\n"
+        "}\n";
+    const char* tv_frag_src =
+        "precision highp float;\n"
+        "uniform sampler2D u_stretchTex;\n"
+        "varying vec3 v_color;\n"
+        "varying vec3 v_p;\n"
+        "varying vec3 v_n;\n"
+        "varying vec3 v_v;\n"
+        "void main(void) {\n"
+        "vec3 color;\n"
+        "vec3 r = reflect(normalize(v_v), normalize(vec3(1.0,1.0,1.0)*v_n));\n"
+#if 0
+        "if (r.z <= 0.0) color = vec3(1.0);\n"
+        "else color = vec3(0.3);\n"
+#else
+        "float t = (-0.1 - v_p.z) / r.z;\n"
+        "vec2 uv = (0.5 + 0.5 * vec2(256.0/280.0, 0.70458*224.0/256.0) * (v_p.xy + t*r.xy));\n"
+        "vec3 mirror = 0.5 * texture2D(u_stretchTex, uv).rgb;\n"
+        "if (t <= 0.0 || r.z > 0.0) mirror = vec3(0.0);\n"
+        "color = v_color + mirror;\n"
+#endif
+        "gl_FragColor = vec4(color, 1.0);\n"
+        "}\n";
+
+    p->tv_prog = buildShader(tv_vert_src, tv_frag_src);
+    createMesh(&p->tv_mesh, p->tv_prog, mesh_rim_vert_num, 3*mesh_rim_face_num, mesh_rim_verts, mesh_rim_norms, 0, mesh_rim_faces);
+    initUniformsTV(p);
 }
 
 void es2nDeinit(es2n *p)
@@ -683,8 +643,9 @@ void es2nDeinit(es2n *p)
     deleteShader(&p->stretch_prog);
     deleteShader(&p->disp_prog);
     deleteBuffer(&p->quad_buf);
-    deleteBuffer(&p->crt_verts_buf);
-    deleteBuffer(&p->crt_elems_buf);
+    deleteMesh(&p->screen_mesh);
+    deleteShader(&p->tv_prog);
+    deleteMesh(&p->tv_mesh);
     free(p->overscan_pixels);
 }
 

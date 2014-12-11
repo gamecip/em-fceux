@@ -1,9 +1,6 @@
 #ifndef _ES2N_H_
 #define _ES2N_H_
-
-#include <GLES2/gl2.h>
-#include <GLES2/gl2ext.h>
-#include <GLES2/gl2platform.h>
+#include "es2utils.h"
 
 typedef struct t_es2n_controls
 {
@@ -50,8 +47,11 @@ typedef struct t_es2n
 
     GLint viewport[4];  // Original viewport.
 
-    GLuint crt_verts_buf;   // Vertex buffer for CRT.
-    GLuint crt_elems_buf;   // Element buffer for CRT.
+    GLfloat mvp_mat[4*4]; // MVP matrix for the meshes.
+    es2_mesh screen_mesh;
+   
+    GLuint tv_prog;   // Shader for TV.
+    es2_mesh tv_mesh;
 
     GLubyte overscan_color;   // Current overscan color (background/zero color).
     GLubyte *overscan_pixels; // Temporary overscan pixels (1x240).
