@@ -2,6 +2,10 @@
 #include <string.h>
 #include <math.h>
 
+#define VERT_LOC 0
+#define NORM_LOC 1
+#define UV_LOC   2
+
 void mat4Proj(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar)
 {
     const GLfloat f = 1.0 / tan(fovy / 2.0);
@@ -51,9 +55,10 @@ GLuint linkShader(GLuint vert_shader, GLuint frag_shader)
     GLuint prog = glCreateProgram();
     glAttachShader(prog, vert_shader);
     glAttachShader(prog, frag_shader);
+    glBindAttribLocation(prog, VERT_LOC, "a_vert");
+    glBindAttribLocation(prog, NORM_LOC, "a_norm");
+    glBindAttribLocation(prog, UV_LOC, "a_uv");
     glLinkProgram(prog);
-    glDetachShader(prog, vert_shader);
-    glDetachShader(prog, frag_shader);
     glUseProgram(prog);
     return prog;
 }
@@ -63,6 +68,8 @@ GLuint buildShader(const char *vert_src, const char *frag_src)
     GLuint vert_shader = compileShader(GL_VERTEX_SHADER, vert_src);
     GLuint frag_shader = compileShader(GL_FRAGMENT_SHADER, frag_src);
     GLuint result = linkShader(vert_shader, frag_shader);
+    glDetachShader(result, vert_shader);
+    glDetachShader(result, frag_shader);
     glDeleteShader(vert_shader);
     glDeleteShader(frag_shader);
     return result;
@@ -91,15 +98,23 @@ void deleteBuffer(GLuint *buf)
     }
 }
 
-void createTex(GLuint *tex, int w, int h, GLenum format, GLenum filter, void *data)
+void createTex(GLuint *tex, int w, int h, GLenum format, GLenum min_filter, GLenum mag_filter, void *data)
 {
     glGenTextures(1, tex);
     glBindTexture(GL_TEXTURE_2D, *tex);
     glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
+
+    if ((min_filter == GL_LINEAR_MIPMAP_LINEAR)
+            || (min_filter == GL_LINEAR_MIPMAP_NEAREST)
+            || (min_filter == GL_NEAREST_MIPMAP_LINEAR)
+            || (min_filter == GL_NEAREST_MIPMAP_NEAREST)) {
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
 }
 
 void deleteTex(GLuint *tex)
@@ -110,9 +125,9 @@ void deleteTex(GLuint *tex)
     }
 }
 
-void createFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filter)
+void createFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum min_filter, GLenum mag_filter)
 {
-    createTex(tex, w, h, format, filter, 0);
+    createTex(tex, w, h, format, min_filter, mag_filter, 0);
 
     glGenFramebuffers(1, fb);
     glBindFramebuffer(GL_FRAMEBUFFER, *fb);
@@ -131,21 +146,19 @@ void deleteFBTex(GLuint *tex, GLuint *fb)
 
 void createMesh(es2_mesh *p, GLuint prog, int num_verts, int num_elems, const GLfloat *verts, const GLfloat *norms, const GLfloat *uvs, const GLushort *elems)
 {
-// TODO: should memset(0) ?
+    memset(p, 0, sizeof(es2_mesh));
     p->num_elems = num_elems;
 
     createBuffer(&p->vert_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, verts);
-    createBuffer(&p->norm_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, norms);
+    if (norms) {
+        createBuffer(&p->norm_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, norms);
+    }
     if (uvs) {
         createBuffer(&p->uv_buf, GL_ARRAY_BUFFER, 2*sizeof(GLfloat)*num_verts, uvs);
-    } else {
-// TODO: should memset(0)?
-        p->uv_buf = 0;
     }
-    createBuffer(&p->elem_buf, GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)*num_elems, elems);
-    p->_vert_loc = glGetAttribLocation(prog, "a_vert");
-    p->_norm_loc  = glGetAttribLocation(prog, "a_norm");
-    p->_uv_loc  = glGetAttribLocation(prog, "a_uv");
+    if (elems) {
+        createBuffer(&p->elem_buf, GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)*num_elems, elems);
+    }
 }
 
 void deleteMesh(es2_mesh *p)
@@ -159,24 +172,29 @@ void deleteMesh(es2_mesh *p)
 void meshRender(es2_mesh *p)
 {
     glBindBuffer(GL_ARRAY_BUFFER, p->vert_buf);
-    glVertexAttribPointer(p->_vert_loc, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(VERT_LOC, 3, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glEnableVertexAttribArray(p->_norm_loc);
-    glBindBuffer(GL_ARRAY_BUFFER, p->norm_buf);
-    glVertexAttribPointer(p->_norm_loc, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-    if (p->uv_buf) {
-        glEnableVertexAttribArray(p->_uv_loc);
-        glBindBuffer(GL_ARRAY_BUFFER, p->uv_buf);
-        glVertexAttribPointer(p->_uv_loc, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    if (p->norm_buf) {
+        glEnableVertexAttribArray(NORM_LOC);
+        glBindBuffer(GL_ARRAY_BUFFER, p->norm_buf);
+        glVertexAttribPointer(NORM_LOC, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    } else {
+        glDisableVertexAttribArray(NORM_LOC);
     }
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, p->elem_buf);
-    glDrawElements(GL_TRIANGLES, p->num_elems, GL_UNSIGNED_SHORT, 0);
-
-    glDisableVertexAttribArray(p->_norm_loc);
     if (p->uv_buf) {
-        glDisableVertexAttribArray(p->_uv_loc);
+        glEnableVertexAttribArray(UV_LOC);
+        glBindBuffer(GL_ARRAY_BUFFER, p->uv_buf);
+        glVertexAttribPointer(UV_LOC, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    } else {
+        glDisableVertexAttribArray(UV_LOC);
+    }
+
+    if (p->elem_buf) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, p->elem_buf);
+        glDrawElements(GL_TRIANGLES, p->num_elems, GL_UNSIGNED_SHORT, 0);
+    } else {
+	    glDrawArrays(GL_TRIANGLE_STRIP, 0, p->num_elems);
     }
 }
 

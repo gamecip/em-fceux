@@ -29,8 +29,6 @@ typedef struct t_es2n_controls
 
 typedef struct t_es2n
 {
-    GLuint quad_buf;    // Fullscreen quad vertex buffer.
-
     GLuint idx_tex;     // Input indexed color texture (NES palette, 256x240).
     GLuint deemp_tex;   // Input de-emphasis bits per row (240x1).
     GLuint lookup_tex;  // Palette to voltage levels lookup texture.
@@ -53,6 +51,17 @@ typedef struct t_es2n
     GLuint tv_prog;   // Shader for TV.
     es2_mesh tv_mesh;
 
+// TODO: remove, blur not done 
+#if 0
+    GLuint blur_fb[2];  // Framebuffers for blurring.
+    GLuint blur_tex[2]; // Blur textures.
+    GLuint blur_prog;   // Shader for blur.
+#else
+    GLuint emit_fb;     // Framebuffer for screen emitter.
+    GLuint emit_tex;    // Screen emitter texture.
+#endif
+    es2_mesh quad_mesh;
+
     GLubyte overscan_color;   // Current overscan color (background/zero color).
     GLubyte *overscan_pixels; // Temporary overscan pixels (1x240).
 
@@ -60,6 +69,13 @@ typedef struct t_es2n
     GLfloat yiq_maxs[3];
 
     es2n_controls controls;
+
+// TODO: remove, blur not done 
+#if 0
+    // Uniform locations.
+    GLint _blur_shift_loc;
+    GLint _blur_tex_loc;
+#endif
 } es2n;
 
 void es2nInit(es2n *p, int left, int right, int top, int bottom);

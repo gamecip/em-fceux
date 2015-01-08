@@ -5,7 +5,7 @@
 // TODO: remove, not needed
 #include <stdio.h>
 #include "es2utils.h"
-#include "mesh_data.c"
+#include "meshes.h"
 
 #define STR(s_) _STR(s_)
 #define _STR(s_) #s_
@@ -15,6 +15,13 @@
 #define LOOKUP_I    2
 #define RGB_I       3
 #define STRETCH_I   4
+// TODO: remove, blur not done
+#if 0
+#define BLUR0_I     5
+#define BLUR1_I     6
+#else
+#define EMIT_I      5
+#endif
 #define TEX(i_)     (GL_TEXTURE0+(i_))
 
 #define PERSISTENCE_R 0.165 // Red phosphor persistence.
@@ -42,12 +49,29 @@
 #define IDX_W (256 + 2*OVERSCAN_W)
 #define RGB_W (NUM_SUBPS * IDX_W)
 #define STRETCH_H (4 * 256)
+// TODO: remove
+#if 0
+#define BLUR_S 256
+#else
+#define EMIT_S 256
+#endif
 // Half-width of Y and C box filter kernels.
 #define YW2 6.0
 #define CW2 12.0
 
 // Square wave generator as function of NES pal chroma index and phase.
 #define IN_COLOR_PHASE(color_, phase_) (((color_) + (phase_)) % 12 < 6)
+
+#include "shaders.h"
+
+static const GLint mesh_quad_vert_num = 4;
+static const GLint mesh_quad_face_num = 2;
+static const GLfloat mesh_quad_verts[] = {
+    -1.0f, -1.0f, 0.0f,
+     1.0f, -1.0f, 0.0f,
+    -1.0f,  1.0f, 0.0f,
+     1.0f,  1.0f, 0.0f
+};
 
 // This source code is modified from original at:
 // http://wiki.nesdev.com/w/index.php/NTSC_video
@@ -220,7 +244,7 @@ static void genLookupTex(es2n *p)
     }
 
 	glActiveTexture(TEX(LOOKUP_I));
-    createTex(&p->lookup_tex, LOOKUP_W, NUM_COLORS, GL_RGB, GL_NEAREST, result);
+    createTex(&p->lookup_tex, LOOKUP_W, NUM_COLORS, GL_RGB, GL_NEAREST, GL_NEAREST, result);
 
 	free(ys);
 	free(yiqs);
@@ -262,6 +286,23 @@ static void updateControlUniformsDisp(const es2n_controls *c)
     };
     glUniformMatrix3fv(c->_sharpen_kernel_loc, 1, GL_FALSE, sharpen_kernel);
 }
+
+// TODO: remove
+#if 0
+static void updateUniformsBlur(const es2n *p, int dirSize, int texIdx)
+{
+    GLfloat shift[2];
+    if (dirSize < 0) {
+        shift[0] = 0.0f;
+        shift[1] = -1.0f / (GLfloat) dirSize;
+    } else {
+        shift[0] = 1.0f / (GLfloat) dirSize;
+        shift[1] = 0.0f;
+    }
+    glUniform2fv(p->_blur_shift_loc, 1, shift);
+    glUniform1i(p->_blur_tex_loc, texIdx);
+}
+#endif
 
 static void initUniformsRGB(es2n *p)
 {
@@ -323,25 +364,36 @@ static void initUniformsTV(es2n *p)
     GLuint prog = p->tv_prog;
 
     k = glGetUniformLocation(prog, "u_stretchTex");
-    glUniform1i(k, STRETCH_I);
+// TODO: remove
+//    glUniform1i(k, BLUR0_I);
+    glUniform1i(k, EMIT_I);
     k = glGetUniformLocation(prog, "u_mvp");
     glUniformMatrix4fv(k, 1, GL_FALSE, p->mvp_mat);
 }
 
+// TODO: remove
+#if 0
+static void initUniformsBlur(es2n *p)
+{
+    GLuint prog = p->blur_prog;
+
+    p->_blur_shift_loc = glGetUniformLocation(prog, "u_shift");
+    p->_blur_tex_loc = glGetUniformLocation(prog, "u_blurTex");
+    updateUniformsBlur(p, RGB_W, 0);
+}
+#endif
+
 static void renderRGB(es2n *p)
 {
-    glBindBuffer(GL_ARRAY_BUFFER, p->quad_buf);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
-
     glBindFramebuffer(GL_FRAMEBUFFER, p->rgb_fb);
-    glViewport(0, 8, RGB_W, 224);
+    glViewport(0, 8, RGB_W, 240);
     glUseProgram(p->rgb_prog);
     updateControlUniformsRGB(&p->controls);
 
     if (p->controls.crt_enabled) {
         glEnable(GL_BLEND);
     }
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    meshRender(&p->quad_mesh);
     glDisable(GL_BLEND);
 }
 
@@ -349,7 +401,7 @@ static void renderStretch(es2n *p)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, p->stretch_fb);
 // TODO: check defines
-    glViewport(0, 4*8, RGB_W, 4*224);
+    glViewport(0, 4*8, RGB_W, 4*240);
     glUseProgram(p->stretch_prog);
     updateControlUniformsStretch(&p->controls);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -357,19 +409,59 @@ static void renderStretch(es2n *p)
 
 static void renderDisp(es2n *p)
 {
+#if 1
+    // render emitter (screen)
+//    glBindFramebuffer(GL_FRAMEBUFFER, p->blur_fb[0]);
+//    glViewport(0, 0, BLUR_S, BLUR_S);
+    glBindFramebuffer(GL_FRAMEBUFFER, p->emit_fb);
+    glViewport(0, 0, EMIT_S, EMIT_S);
+    glUseProgram(p->disp_prog);
+    updateControlUniformsDisp(&p->controls);
+    meshRender(&p->screen_mesh);
+    // gen mipmap for emitter tex
+    glActiveTexture(TEX(EMIT_I));
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    // renders screen to disp fb
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
+    meshRender(&p->screen_mesh);
+
+// TODO: remove, no blur needed when using mipmaps
+//    glBindFramebuffer(GL_FRAMEBUFFER, p->blur_fb[1]);
+//    glViewport(0, 0, BLUR_S, BLUR_S);
+//    glUseProgram(p->blur_prog);
+//    updateUniformsBlur(p, BLUR_S, BLUR0_I);
+//    meshRender(&p->quad_mesh);
+
+//    glBindFramebuffer(GL_FRAMEBUFFER, p->blur_fb[0]);
+//    updateUniformsBlur(p, -BLUR_S, BLUR1_I);
+//    meshRender(&p->quad_mesh);
+
+//    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//    glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
+    glUseProgram(p->tv_prog);
+    meshRender(&p->tv_mesh);
+
+// TODO: remove?
+#else
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
     glUseProgram(p->disp_prog);
     updateControlUniformsDisp(&p->controls);
+//    glUseProgram(p->blur_prog);
+//    updateUniformsBlur(p, 0.5f*RGB_W);
+//    updateUniformsBlur(p, 0.5f*-4.0f*256.0f);
 
     if (p->controls.crt_enabled) {
         meshRender(&p->screen_mesh);
 
-        glUseProgram(p->tv_prog);
-        meshRender(&p->tv_mesh);
+//        glUseProgram(p->tv_prog);
+//        meshRender(&p->tv_mesh);
     } else {
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
+#endif
 }
 
 // TODO: reformat inputs to something more meaningful
@@ -391,6 +483,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     glGetIntegerv(GL_VIEWPORT, p->viewport);
 
+    glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
@@ -399,253 +492,84 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glEnableVertexAttribArray(0);
 
-    // Quad vertices, packed as: x, y, u, v
-    const GLfloat quadverts[4 * 4] = {
-        -1.0f, -1.0f, left  / 256.0f, bottom / 256.0f,
-         1.0f, -1.0f, right / 256.0f, bottom / 256.0f,
-        -1.0f,  1.0f, left  / 256.0f, top / 256.0f, 
-         1.0f,  1.0f, right / 256.0f, top / 256.0f
-    };
-    createBuffer(&p->quad_buf, GL_ARRAY_BUFFER, sizeof(quadverts), quadverts);
+    createMesh(&p->quad_mesh, p->rgb_prog, mesh_quad_vert_num, 2*mesh_quad_face_num, mesh_quad_verts, 0, 0, 0);
 
     // Setup input pixels texture.
     glActiveTexture(TEX(IDX_I));
-    createTex(&p->idx_tex, IDX_W, 256, GL_LUMINANCE, GL_NEAREST, 0);
+    createTex(&p->idx_tex, IDX_W, 256, GL_LUMINANCE, GL_NEAREST, GL_NEAREST, 0);
 
     // Setup input de-emphasis rows texture.
     glActiveTexture(TEX(DEEMP_I));
-    createTex(&p->deemp_tex, 256, 1, GL_LUMINANCE, GL_NEAREST, 0);
+    createTex(&p->deemp_tex, 256, 1, GL_LUMINANCE, GL_NEAREST, GL_NEAREST, 0);
 
     genLookupTex(p);
 
     // Configure RGB framebuffer.
     glActiveTexture(TEX(RGB_I));
-    createFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, 256, GL_RGB, GL_NEAREST);
-    const char* rgb_vert_src =
-        "precision highp float;\n"
-        DEFINE(NUM_TAPS)
-        DEFINE(IDX_W)
-        "attribute vec4 vert;\n"
-        "varying vec2 v_uv[int(NUM_TAPS)];\n"
-        "varying vec2 v_deemp_uv;\n"
-        "#define UV_OUT(i_, o_) v_uv[i_] = vec2(vert.z + (o_)/IDX_W, vert.w)\n"
-        "void main() {\n"
-        "UV_OUT(0,-2.0);\n"
-        "UV_OUT(1,-1.0);\n"
-        "UV_OUT(2, 0.0);\n"
-        "UV_OUT(3, 1.0);\n"
-        "UV_OUT(4, 2.0);\n"
-        "v_deemp_uv = vec2(vert.w, 0.0);\n"
-        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
-        "}\n";
-    const char* rgb_frag_src =
-        "precision highp float;\n"
-        DEFINE(NUM_SUBPS)
-        DEFINE(NUM_TAPS)
-        DEFINE(LOOKUP_W)
-        DEFINE(IDX_W)
-        DEFINE(YW2)
-        DEFINE(CW2)
-        "uniform sampler2D u_idxTex;\n"
-        "uniform sampler2D u_deempTex;\n"
-        "uniform sampler2D u_lookupTex;\n"
-        "uniform vec3 u_mins;\n"
-        "uniform vec3 u_maxs;\n"
-        "uniform float u_brightness;\n"
-        "uniform float u_contrast;\n"
-        "uniform float u_color;\n"
-        "uniform float u_gamma;\n"
-        "uniform float u_rgbppu;\n"
-        "varying vec2 v_uv[int(NUM_TAPS)];\n"
-        "varying vec2 v_deemp_uv;\n"
-        "const mat3 c_convMat = mat3(\n"
-        "    1.0,        1.0,        1.0,       // Y\n"
-        "    0.946882,   -0.274788,  -1.108545, // I\n"
-        "    0.623557,   -0.635691,  1.709007   // Q\n"
-        ");\n"
-        "#define P(i_)  p = floor(IDX_W * v_uv[i_])\n"
-        "#define U(i_)  (mod(p.x - p.y, 3.0)*NUM_SUBPS*NUM_TAPS + subp*NUM_TAPS + float(i_)) / (LOOKUP_W-1.0)\n"
-        "#define V(i_)  ((255.0/511.0) * texture2D(u_idxTex, v_uv[i_]).r + deemp)\n"
-        "#define UV(i_) uv = vec2(U(i_), V(i_))\n"
-        "#define RESCALE(v_) ((v_) * (u_maxs-u_mins) + u_mins)\n"
-        "#define SMP(i_) P(i_); UV(i_); yiq += RESCALE(texture2D(u_lookupTex, uv).rgb)\n"
-        "\n"
-        "void main(void) {\n"
-        "float deemp = 64.0 * (255.0/511.0) * texture2D(u_deempTex, v_deemp_uv).r;\n"
-        "float subp = mod(floor(NUM_SUBPS*IDX_W * v_uv[int(NUM_TAPS)/2].x), NUM_SUBPS);\n"
-        "vec2 p;\n"
-        "vec2 la;\n"
-        "vec2 uv;\n"
-        "vec3 yiq = vec3(0.0);\n"
-        "SMP(0);\n"
-        "SMP(1);\n"
-        "SMP(2);\n"
-        // Snatch in RGB PPU; uv.x is already calculated, so just read from lookup tex with u=1.0.
-        "vec3 rgbppu = RESCALE(texture2D(u_lookupTex, vec2(1.0, uv.y)).rgb);\n"
-        "SMP(3);\n"
-        "SMP(4);\n"
-// TODO: Working multiplier for filtered chroma to match PPU is 2/5 (for CW2=12).
-// TODO: Is this because colors are blended together with composite?
-        "yiq *= (8.0/2.0) / vec3(YW2, CW2-2.0, CW2-2.0);\n"
-        "yiq = mix(yiq, rgbppu, u_rgbppu);\n"
-        "yiq.gb *= u_color;\n"
-        "vec3 result = c_convMat * yiq;\n"
-        "gl_FragColor = vec4(u_contrast * pow(result, vec3(u_gamma)) + u_brightness, 1.0);\n"
-        "}\n";
+    createFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, 256, GL_RGB, GL_NEAREST, GL_NEAREST);
     p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
     initUniformsRGB(p);
 
+// TODO: remove
+#if 0
+    // Setup blur framebuffers.
+    glActiveTexture(TEX(BLUR0_I));
+    createFBTex(&p->blur_tex[0], &p->blur_fb[0], BLUR_S, BLUR_S, GL_RGB, GL_LINEAR);
+    glActiveTexture(TEX(BLUR1_I));
+    createFBTex(&p->blur_tex[1], &p->blur_fb[1], BLUR_S, BLUR_S, GL_RGB, GL_LINEAR);
+#else
+    // Setup emitter framebuffer.
+    glActiveTexture(TEX(EMIT_I));
+    createFBTex(&p->emit_tex, &p->emit_fb, EMIT_S, EMIT_S, GL_RGB, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+#endif
+
     // Setup stretch framebuffer.
     glActiveTexture(TEX(STRETCH_I));
-    createFBTex(&p->stretch_tex, &p->stretch_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR);
-    const char* stretch_vert_src =
-        "precision highp float;\n"
-        "attribute vec4 vert;\n"
-        "varying vec2 v_uv[2];\n"
-        "void main() {\n"
-        "v_uv[0] = vec2(vert.z, (240.0/256.0) - vert.w);\n"
-        "v_uv[1] = vec2(v_uv[0].x, v_uv[0].y - 0.25/256.0);\n"
-        "gl_Position = vec4(vert.xy, 0.0, 1.0);\n"
-        "}\n";
-    const char* stretch_frag_src =
-        "precision highp float;\n"
-        DEFINE(M_PI)
-        "uniform float u_scanline;\n"
-        "uniform sampler2D u_rgbTex;\n"
-        "varying vec2 v_uv[2];\n"
-        "void main(void) {\n"
-        "vec3 color = 0.5 * (texture2D(u_rgbTex, v_uv[0]).rgb + texture2D(u_rgbTex, v_uv[1]).rgb);\n"
-        "float scanline = u_scanline - u_scanline * abs(sin(M_PI*256.0 * v_uv[0].y - M_PI*0.125));\n"
-        "gl_FragColor = vec4((color - scanline) * (1.0+scanline), 1.0);\n"
-        "}\n";
+    createFBTex(&p->stretch_tex, &p->stretch_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_LINEAR);
     p->stretch_prog = buildShader(stretch_vert_src, stretch_frag_src);
     initUniformsStretch(p);
 
     // Setup display (output) shader.
-    const char* disp_vert_src =
-        "precision highp float;\n"
-        DEFINE(RGB_W)
-        DEFINE(M_PI)
-        "attribute vec4 a_vert;\n"
-        "attribute vec3 a_norm;\n"
-        "attribute vec2 a_uv;\n"
-        "uniform float u_convergence;\n"
-        "uniform mat4 u_mvp;\n"
-        "varying vec2 v_uv[5];\n"
-        "varying vec3 v_color;\n"
-        "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
-        "void main() {\n"
-        "vec2 uv = vec2(a_uv.x, (8.0/256.0) + (224.0/256.0) * a_uv.y);\n"
-        "TAP(0,-4.0);\n"
-        "TAP(1,-u_convergence);\n"
-        "TAP(2, 0.0);\n"
-        "TAP(3, u_convergence);\n"
-        "TAP(4, 4.0);\n"
-        "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
-        "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
-        "vec3 n = normalize(a_norm);\n"
-        "vec3 v = normalize(view_pos - a_vert.xyz);\n"
-        "vec3 l = normalize(light_pos - a_vert.xyz);\n"
-        "vec3 h = normalize(l + v);\n"
-        "float ndotl = max(dot(n, l), 0.0);\n"
-        "float ndoth = max(dot(n, h), 0.0);\n"
-        "v_color = vec3(0.02*ndotl + 0.23*pow(ndoth, 25.0));\n"
-        "gl_Position = u_mvp * a_vert;\n"
-        "}\n";
-    const char* disp_frag_src =
-        "precision highp float;\n"
-        "uniform sampler2D u_stretchTex;\n"
-        "uniform mat3 u_sharpenKernel;\n"
-        "varying vec2 v_uv[5];\n"
-        "varying vec3 v_color;\n"
-        "void main(void) {\n"
-#if 1
-        "#define SMP(i_, m_) color += (m_) * texture2D(u_stretchTex, v_uv[i_]).rgb\n"
-        "vec3 color = vec3(0.0);\n"
-        "SMP(0, u_sharpenKernel[0]);\n"
-        "SMP(1, vec3(1.0, 0.0, 0.0));\n"
-        "SMP(2, u_sharpenKernel[1]);\n"
-        "SMP(3, vec3(0.0, 0.0, 1.0));\n"
-        "SMP(4, u_sharpenKernel[2]);\n"
-        "gl_FragColor = vec4(v_color + color, 1.0);\n"
-#else
-//        "gl_FragColor = texture2D(u_stretchTex, v_uv[2]);\n"
-        "gl_FragColor = vec4(vec3(v_uv[2], 1.0), 1.0);\n"
-#endif
-        "}\n";
-
     p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
-    initUniformsDisp(p);
     createMesh(&p->screen_mesh, p->disp_prog, mesh_screen_vert_num, 3*mesh_screen_face_num, mesh_screen_verts, mesh_screen_norms, mesh_screen_uvs, mesh_screen_faces);
+    initUniformsDisp(p);
 
     // Setup TV shader.
-    const char* tv_vert_src =
-        "precision highp float;\n"
-        "attribute vec4 a_vert;\n"
-        "attribute vec3 a_norm;\n"
-        "uniform mat4 u_mvp;\n"
-        "varying vec3 v_color;\n"
-        "varying vec3 v_p;\n"
-        "varying vec3 v_n;\n"
-        "varying vec3 v_v;\n"
-        "void main() {\n"
-        "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
-        "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
-        "vec4 p = u_mvp * a_vert;\n"
-        "vec3 n = normalize(a_norm);\n"
-        "vec3 v = normalize(view_pos - a_vert.xyz);\n"
-        "vec3 l = normalize(light_pos - a_vert.xyz);\n"
-        "vec3 h = normalize(l + v);\n"
-        "float ndotl = max(dot(n, l), 0.0);\n"
-        "float ndoth = max(dot(n, h), 0.0);\n"
-        "v_color = vec3(0.01 + 0.07*ndotl + 0.04*pow(ndoth, 19.0));\n"
-        "v_n = n;\n"
-        "v_v = -v;\n"
-        "v_p = a_vert.xyz;\n"
-        "gl_Position = p;\n"
-        "}\n";
-    const char* tv_frag_src =
-        "precision highp float;\n"
-        "uniform sampler2D u_stretchTex;\n"
-        "varying vec3 v_color;\n"
-        "varying vec3 v_p;\n"
-        "varying vec3 v_n;\n"
-        "varying vec3 v_v;\n"
-        "void main(void) {\n"
-        "vec3 color;\n"
-        "vec3 r = reflect(normalize(v_v), normalize(vec3(1.0,1.0,1.0)*v_n));\n"
-#if 0
-        "if (r.z <= 0.0) color = vec3(1.0);\n"
-        "else color = vec3(0.3);\n"
-#else
-        "float t = (-0.1 - v_p.z) / r.z;\n"
-        "vec2 uv = (0.5 + 0.5 * vec2(256.0/280.0, 0.70458*224.0/256.0) * (v_p.xy + t*r.xy));\n"
-        "vec3 mirror = 0.5 * texture2D(u_stretchTex, uv).rgb;\n"
-        "if (t <= 0.0 || r.z > 0.0) mirror = vec3(0.0);\n"
-        "color = v_color + mirror;\n"
-#endif
-        "gl_FragColor = vec4(color, 1.0);\n"
-        "}\n";
-
     p->tv_prog = buildShader(tv_vert_src, tv_frag_src);
     createMesh(&p->tv_mesh, p->tv_prog, mesh_rim_vert_num, 3*mesh_rim_face_num, mesh_rim_verts, mesh_rim_norms, 0, mesh_rim_faces);
     initUniformsTV(p);
+
+// TODO: remove
+#if 0
+    // Setup blur shader.
+    p->blur_prog = buildShader(blur_vert_src, blur_frag_src);
+    initUniformsBlur(p);
+#endif
 }
 
 void es2nDeinit(es2n *p)
 {
     deleteFBTex(&p->rgb_tex, &p->rgb_fb);
     deleteFBTex(&p->stretch_tex, &p->stretch_fb);
+// TODO: remove, blur not used
+#if 0
+    deleteFBTex(&p->blur_tex[0], &p->blur_fb[0]);
+    deleteFBTex(&p->blur_tex[1], &p->blur_fb[1]);
+#else
+    deleteFBTex(&p->emit_tex, &p->emit_fb);
+#endif
     deleteTex(&p->idx_tex);
     deleteTex(&p->deemp_tex);
     deleteTex(&p->lookup_tex);
     deleteShader(&p->rgb_prog);
     deleteShader(&p->stretch_prog);
     deleteShader(&p->disp_prog);
-    deleteBuffer(&p->quad_buf);
     deleteMesh(&p->screen_mesh);
+    deleteMesh(&p->quad_mesh);
     deleteShader(&p->tv_prog);
     deleteMesh(&p->tv_mesh);
+// TODO: remove
+//    deleteShader(&p->blur_prog);
     free(p->overscan_pixels);
 }
 
