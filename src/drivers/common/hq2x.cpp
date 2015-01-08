@@ -42,10 +42,13 @@ static inline void Interp2(unsigned char * pc, int c1, int c2, int c3)
   *((int*)pc) = (c1*2+c2+c3) >> 2;
 }
 
+// tsone: unused
+#ifndef EMSCRIPTEN
 static inline void Interp5(unsigned char * pc, int c1, int c2)
 {
   *((int*)pc) = (c1+c2) >> 1;
 }
+#endif
 
 static inline void Interp6(unsigned char * pc, int c1, int c2, int c3)
 {
