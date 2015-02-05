@@ -33,7 +33,6 @@ static const char* rgb_frag_src =
     "uniform float u_brightness;\n"
     "uniform float u_contrast;\n"
     "uniform float u_color;\n"
-    "uniform float u_gamma;\n"
     "uniform float u_rgbppu;\n"
     "varying vec2 v_uv[int(NUM_TAPS)];\n"
     "varying vec2 v_deemp_uv;\n"
@@ -69,7 +68,9 @@ static const char* rgb_frag_src =
     "yiq = mix(yiq, rgbppu, u_rgbppu);\n"
     "yiq.gb *= u_color;\n"
     "vec3 result = c_convMat * yiq;\n"
-    "gl_FragColor = vec4(u_contrast * pow(result, vec3(u_gamma)) + u_brightness, 1.0);\n"
+// TODO: Decode gamma by squaring. Can't use gamma > 2.0 because it loses too much precision.
+    "result *= result;\n"
+    "gl_FragColor = vec4(u_contrast * result + u_brightness, 1.0);\n"
     "}\n";
 
 static const char* stretch_vert_src =
@@ -89,6 +90,7 @@ static const char* stretch_frag_src =
     "uniform sampler2D u_rgbTex;\n"
     "varying vec2 v_uv[2];\n"
     "void main(void) {\n"
+// TODO: _Blend_ adjacent scanlines together and then _subtract_ scanline mask.
     "vec3 color = 0.5 * (texture2D(u_rgbTex, v_uv[0]).rgb + texture2D(u_rgbTex, v_uv[1]).rgb);\n"
     "float scanline = u_scanline - u_scanline * abs(sin(M_PI*256.0 * v_uv[0].y - M_PI*0.125));\n"
     "gl_FragColor = vec4((color - scanline) * (1.0+scanline), 1.0);\n"
@@ -113,6 +115,8 @@ static const char* disp_vert_src =
     "TAP(2, 0.0);\n"
     "TAP(3, u_convergence);\n"
     "TAP(4, 4.0);\n"
+// TODO: tsone: have some light on screen or not?
+#if 0
     "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
     "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
     "vec3 n = normalize(a_norm);\n"
@@ -121,13 +125,17 @@ static const char* disp_vert_src =
     "vec3 h = normalize(l + v);\n"
     "float ndotl = max(dot(n, l), 0.0);\n"
     "float ndoth = max(dot(n, h), 0.0);\n"
-    "v_color = vec3(0.02*ndotl + 0.23*pow(ndoth, 25.0));\n"
+    "v_color = vec3(0.006*ndotl + 0.04*pow(ndoth, 21.0));\n"
+#else
+    "v_color = vec3(0.0);\n"
+#endif
     "gl_Position = u_mvp * a_vert;\n"
     "}\n";
 static const char* disp_frag_src =
     "precision highp float;\n"
     "uniform sampler2D u_stretchTex;\n"
     "uniform mat3 u_sharpenKernel;\n"
+    "uniform float u_gamma;\n"
     "varying vec2 v_uv[5];\n"
     "varying vec3 v_color;\n"
     "void main(void) {\n"
@@ -139,7 +147,9 @@ static const char* disp_frag_src =
     "SMP(2, u_sharpenKernel[1]);\n"
     "SMP(3, vec3(0.0, 0.0, 1.0));\n"
     "SMP(4, u_sharpenKernel[2]);\n"
-    "gl_FragColor = vec4(v_color + color, 1.0);\n"
+    "color = clamp(color, 0.0, 1.0);\n"
+//    "gl_FragColor = vec4(v_color + color, 1.0);\n"
+    "gl_FragColor = vec4(pow(v_color + color, vec3(u_gamma)), 1.0);\n"
 #else
 //        "gl_FragColor = texture2D(u_stretchTex, v_uv[2]);\n"
     "gl_FragColor = vec4(vec3(v_uv[2], 1.0), 1.0);\n"
@@ -173,7 +183,7 @@ static const char* tv_vert_src =
     "vec3 h = normalize(l + v);\n"
     "float ndotl = max(dot(n, l), 0.0);\n"
     "float ndoth = max(dot(n, h), 0.0);\n"
-    "v_color = vec3(0.007 + 0.05*ndotl + 0.03*pow(ndoth, 19.0));\n"
+    "v_color = vec3(0.007 + 0.05*ndotl + 0.00*pow(ndoth, 19.0));\n"
     "v_n = n;\n"
     "v_v = -v;\n"
     "v_p = a_vert.xyz;\n"
@@ -183,16 +193,44 @@ static const char* tv_vert_src =
     "vec3 q = max(abs(vc) - (c_size - vec3(0.05, 0.05, 0.0)), 0.0);\n"
     "float dxy = max(length(q.xy) - 0.05, 0.0);\n"
     "float dxyz = length(q);\n"
-    "float erp = max(1.0 - 7.5*dxy, 0.0);\n"
-    "v_uv = 0.5 + 0.5 * erp*erp * vec2(0.895, 0.825) * (vc.xy/c_size.xy);\n"
-    "v_bias = 4.2 + 8.0*11.0 * dxy;\n"
+    "float erp = max(1.0 - 6.0*dxy, 0.0);\n"
+
+//    "v_uv = 0.5 + 0.5 * erp*erp * vec2(0.895, 0.825) * (vc.xy/c_size.xy);\n"
+//    "v_bias = //4.2 + 8.0*11.0 * dxy;\n"
+    "v_uv = 0.5 + 0.5 * erp * vec2(0.895, 0.825) * clamp(vc.xy/c_size.xy, -1.0, 1.0);\n"
+    "v_bias = 4.5 + 8.0*10.0 * dxy;\n"
+
+#if 0
     "vec3 p0 = normalize(c_center + vec3( c_size.x,  c_size.y, 0.0) - a_vert.xyz);\n"
     "vec3 p1 = normalize(c_center + vec3( c_size.x, -c_size.y, 0.0) - a_vert.xyz);\n"
     "vec3 p2 = normalize(c_center + vec3(-c_size.x,  c_size.y, 0.0) - a_vert.xyz);\n"
     "vec3 p3 = normalize(c_center + vec3(-c_size.x, -c_size.y, 0.0) - a_vert.xyz);\n"
     "float vola = max(max(max(dot(n, p0), dot(n, p1)), max(dot(n, p2), dot(n, p3))), 0.0);\n"
     "v_emis = min(0.0053 * vola*vola / (dxyz*dxyz), 1.0);\n"
-
+#elif 0
+    "vec3 p0 = (c_center + vec3( c_size.x,  c_size.y, 0.0) - a_vert.xyz);\n"
+    "vec3 p1 = (c_center + vec3( c_size.x, -c_size.y, 0.0) - a_vert.xyz);\n"
+    "vec3 p2 = (c_center + vec3(-c_size.x,  c_size.y, 0.0) - a_vert.xyz);\n"
+    "vec3 p3 = (c_center + vec3(-c_size.x, -c_size.y, 0.0) - a_vert.xyz);\n"
+    "float p0d = length(p0);\n"
+//    "p0d = p0d*p0d*p0d;\n"
+    "float p1d = length(p1);\n"
+//    "p1d = p1d*p1d*p1d;\n"
+    "float p2d = length(p2);\n"
+//    "p2d = p2d*p2d*p2d;\n"
+    "float p3d = length(p3);\n"
+//    "p3d = p3d*p3d*p3d;\n"
+    "float vola = 0.25 * (max(dot(n, p0)/p0d, 0.0) + max(dot(n, p1)/p1d, 0.0) + max(dot(n, p2)/p2d, 0.0) + max(dot(n, p3)/p3d, 0.0));\n"
+    "v_emis = min(0.5 * vola, 1.0);\n"
+#else
+    "vec3 closest = clamp(a_vert.xyz, c_center-c_size, c_center+c_size);\n"
+//    "vec3 closest = clamp(a_vert.xyz, -c_size, c_size);\n"
+    "vec3 delt = a_vert.xyz - closest;\n"
+    "float ddelt = length(delt);\n"
+    "float vola = max(0.5 + 0.5 * dot(n, delt) / ddelt, 0.0);\n"
+//    "v_emis = min(vola, 1.0);\n"
+    "v_emis = min(0.03*vola / (ddelt*ddelt), 1.0);\n"
+#endif
     "}\n";
 static const char* tv_frag_src =
     "precision highp float;\n"
@@ -237,7 +275,9 @@ static const char* tv_frag_src =
 //    "if (r.z > 0.0) mirror = vec3(0.0);\n"
     "color = mirror;// * min(0.008 / (dxyz*dxyz), 1.0);\n"
 #elif 1
-    "color = v_color + v_emis * texture2D(u_stretchTex, v_uv, v_bias).rgb;\n"
+//    "color = v_color + v_emis * texture2D(u_stretchTex, v_uv, v_bias).rgb;\n"
+//    "color = v_color + texture2D(u_stretchTex, v_uv, v_bias).rgb;\n"
+    "color = vec3(v_emis);\n"
 #else
     "vec3 n = normalize(v_n);\n"
     "vec3 d = -normalize(v_p);\n"

@@ -260,8 +260,6 @@ static void updateControlUniformsRGB(const es2n_controls *c)
     glUniform1f(c->_contrast_loc, v);
     v = 1.0f + c->color;
     glUniform1f(c->_color_loc, v);
-    v = 2.5f/2.2f + 0.5f*c->gamma;
-    glUniform1f(c->_gamma_loc, v);
     v = c->rgbppu + 0.1f;
     glUniform1f(c->_rgbppu_loc, v);
 }
@@ -269,7 +267,7 @@ static void updateControlUniformsRGB(const es2n_controls *c)
 static void updateControlUniformsStretch(const es2n_controls *c)
 {
     GLfloat v;
-    v = c->crt_enabled * (9.0f/255.0f);
+    v = c->crt_enabled * (4.0f/255.0f);
     glUniform1f(c->_scanline_loc, v);
 }
 
@@ -278,6 +276,8 @@ static void updateControlUniformsDisp(const es2n_controls *c)
     GLfloat v;
     v = c->crt_enabled * -2.0f * (c->convergence+0.3f);
     glUniform1f(c->_convergence_loc, v);
+    v = 0.55f + 0.1f*c->gamma;
+    glUniform1f(c->_gamma_loc, v);
     v = (0.9f-c->rgbppu) * 0.4f * (c->sharpness+0.5f);
     GLfloat sharpen_kernel[3 * 3] = {
         0.0f, -v, 0.0f, 
@@ -324,7 +324,6 @@ static void initUniformsRGB(es2n *p)
     c->_brightness_loc = glGetUniformLocation(prog, "u_brightness");
     c->_contrast_loc = glGetUniformLocation(prog, "u_contrast");
     c->_color_loc = glGetUniformLocation(prog, "u_color");
-    c->_gamma_loc = glGetUniformLocation(prog, "u_gamma");
     c->_rgbppu_loc = glGetUniformLocation(prog, "u_rgbppu");
     updateControlUniformsRGB(&p->controls);
 }
@@ -355,6 +354,7 @@ static void initUniformsDisp(es2n *p)
     es2n_controls *c = &p->controls;
     c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
     c->_sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
+    c->_gamma_loc = glGetUniformLocation(prog, "u_gamma");
     updateControlUniformsDisp(&p->controls);
 }
 
