@@ -1,5 +1,5 @@
 #
-# SConstruct - build script for the SDL port of fceux
+# SConstruct - build script for the emscripten/SDL port of fceux
 #
 # You can adjust the BoolVariables below to include/exclude features 
 # at compile-time.  You may also use arguments to specify the parameters.

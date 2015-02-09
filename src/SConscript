@@ -32,6 +32,8 @@ for dir in subdirs:
   file_list.append(subdir_files)
 if env['PLATFORM'] == 'win32':
   platform_files = SConscript('drivers/win/SConscript')
+elif env['EMSCRIPTEN']:
+  platform_files = SConscript('drivers/em/SConscript')
 else:
   platform_files = SConscript('drivers/sdl/SConscript')
 file_list.append(platform_files)

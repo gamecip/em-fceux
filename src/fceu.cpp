@@ -73,6 +73,8 @@ extern void RefreshThrottleFPS();
 #include "drivers/win/ramwatch.h"
 #include "drivers/win/memwatch.h"
 #include "drivers/win/tracer.h"
+#elif EMSCRIPTEN
+#include "drivers/em/em.h"
 #else
 #include "drivers/sdl/sdl.h"
 #endif

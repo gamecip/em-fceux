@@ -1,5 +1,5 @@
-#include "sdl.h"
-#include "sdl-es2.h"
+#include "em.h"
+#include "em-es2.h"
 #include "../../utils/memory.h"
 #include "es2n.h"
 #include "emscripten.h"

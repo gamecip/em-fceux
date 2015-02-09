@@ -23,8 +23,8 @@
 #include "input.h"
 #include "config.h"
 
-#include "sdl-video.h"
-#include "sdl.h"
+#include "em-video.h"
+#include "em.h"
 
 #include "../common/cheat.h"
 #include "../../movie.h"

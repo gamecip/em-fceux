@@ -1,7 +1,7 @@
-#include "sdl.h"
+#include "em.h"
 #include "input.h"
 #include <SDL_net.h>
-#include "sdl-netplay.h"
+#include "em-netplay.h"
 
 char *ServerHost;
 int magic;

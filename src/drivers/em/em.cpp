@@ -10,8 +10,8 @@
 #include "input.h"
 #include "dface.h"
 
-#include "sdl.h"
-#include "sdl-video.h"
+#include "em.h"
+#include "em-video.h"
 
 #include "../common/configSys.h"
 #include "../../oldmovie.h"

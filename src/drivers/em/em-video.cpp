@@ -22,8 +22,8 @@
 /// \file
 /// \brief Handles the graphical game display for the SDL implementation.
 
-#include "sdl.h"
-#include "sdl-es2.h"
+#include "em.h"
+#include "em-es2.h"
 //#include "../common/vidblit.h"
 #include "../../fceu.h"
 #include "../../version.h"
@@ -31,11 +31,11 @@
 
 #include "../../utils/memory.h"
 
-#include "sdl-icon.h"
+#include "em-icon.h"
 #include "dface.h"
 
 #include "../common/configSys.h"
-#include "sdl-video.h"
+#include "em-video.h"
 
 #include <cstdio>
 #include <cstring>
