@@ -29,16 +29,34 @@
 #include <cstring>
 #include <cstdlib>
 
+// TODO: tsone: define to output test sine tone
+#define TEST_SINE_AT_FILL	0
+#define TEST_SINE_AT_WRITE	0
+
+// Note: Emulated sound is mono.
+#define SOUND_RATE 	22050	// Sampling rate of both FCEUX and audio interface (in Hz).
+#define BUFFER_SIZE	(6*256)	// Internal sound buffer size (in samples).
+#define HW_BUFFER_SIZE	256	// HW sound buffer size (in samples).
+// TODO: tsone: Will it work with higher quality?
+#define SOUND_QUALITY	0	// FCEUX sound quality setting, 0: lowest.
+
 extern Config *g_config;
 
-static volatile int *s_Buffer = 0;
-static unsigned int s_BufferSize;
-static unsigned int s_BufferRead;
-static unsigned int s_BufferWrite;
-static volatile unsigned int s_BufferIn;
+static int *s_Buffer = 0;
+static int s_BufferMax = 0;
+static int s_BufferRead = 0;
+static int s_BufferWrite = 0;
+static int s_BufferCount = 0;
 
+// TODO: tsone: required for sound muting
+#ifndef EMSCRIPTEN
 static int s_mute = 0;
+#endif
 
+#if TEST_SINE_AT_FILL || TEST_SINE_AT_WRITE
+#include <math.h>
+static double testSinePhase = 0.0;
+#endif
 
 /**
  * Callback from the SDL to get and play audio data.
@@ -48,15 +66,28 @@ fillaudio(void *udata,
 			uint8 *stream,
 			int len)
 {
+#if TEST_SINE_AT_FILL
+
+	// Sine wave test outputs a 440Hz tone.
+	len >>= 1;
+	int16* str = (int16*) stream;
+	for (int i = 0; i < len; ++i) {
+		str[i] = 0xFFF * sin(testSinePhase * (2.0*M_PI * 440.0/SOUND_RATE));
+		++testSinePhase;
+	}
+	s_BufferCount -= len;
+
+#else
+
 #ifndef EMSCRIPTEN
 	int16 *tmps = (int16*)stream;
 	len >>= 1;
 	while(len) {
 		int16 sample = 0;
-		if(s_BufferIn) {
+		if(s_BufferCount) {
 			sample = s_Buffer[s_BufferRead];
-			s_BufferRead = (s_BufferRead + 1) % s_BufferSize;
-			s_BufferIn--;
+			s_BufferRead = (s_BufferRead + 1) % s_BufferMax;
+			s_BufferCount--;
 		} else {
 			sample = 0;
 		}
@@ -69,32 +100,54 @@ fillaudio(void *udata,
 	len >>= 1;
 	for (int i = 0; i < len; i++) {
 		int16 sample = 0;
-		if(s_BufferIn) {
+		if(s_BufferCount) {
 			sample = s_Buffer[s_BufferRead];
-			s_BufferRead = (s_BufferRead + 1) % s_BufferSize;
-			s_BufferIn--;
+			s_BufferRead = (s_BufferRead + 1) % s_BufferMax;
+			s_BufferCount--;
 		} else {
 			sample = 0;
 		}
 
 		((int16*)stream)[i] = sample;
 	}
-#else
+#elif 0
+	int16* str = (int16*) stream;
     len >>= 1;
-    int i = 0;
-    int d = (s_BufferIn > len) ? len : s_BufferIn;
-	for (; i < d; i++) {
-		((int16*) stream)[i] = s_Buffer[s_BufferRead];
-		s_BufferRead = (s_BufferRead + 1) % s_BufferSize;
-	}
-    s_BufferIn -= d;
-//    if (s_BufferIn == 0) {
-//        printf("Sound buffer exhausted (needed %d samples).\n", len);
+//    if (s_BufferCount < len) {
+//        printf("Sound buffer exhausted (has %d samples, needs %d).\n", s_BufferCount, len);
 //    }
-	for (; i < len; i++) {
-		((int16*) stream)[i] = 0;
+    int i = -1;
+    int j = (s_BufferCount > len) ? len : s_BufferCount;
+	int k = len - j;
+    s_BufferCount -= j;
+	++j;
+	++k;
+	while (--j) {
+		str[++i] = s_Buffer[s_BufferRead];
+		s_BufferRead = (s_BufferRead + 1) % s_BufferMax;
 	}
+	while (--k) {
+		str[++i] = 0;
+	}
+#else
+	int16* str = (int16*) stream;
+    len >>= 1;
+//    if (s_BufferCount < len) {
+//        printf("Sound buffer exhausted (has %d samples, needs %d).\n", s_BufferCount, len);
+//    }
+    int i = 0;
+    int d = (s_BufferCount > len) ? len : s_BufferCount;
+	for (; i < d; ++i) {
+		str[i] = s_Buffer[s_BufferRead];
+		s_BufferRead = (s_BufferRead + 1) % s_BufferMax;
+	}
+	for (; i < len; ++i) {
+		str[i] = 0;
+	}
+    s_BufferCount -= d;
 #endif
+
+#endif // TEST_SINE_AT_FILL
 }
 
 /**
@@ -103,13 +156,8 @@ fillaudio(void *udata,
 int
 InitSound()
 {
-	int sound, soundrate, soundbufsize, soundvolume, soundtrianglevolume, soundsquare1volume, soundsquare2volume, soundnoisevolume, soundpcmvolume, soundq;
+	int soundvolume, soundtrianglevolume, soundsquare1volume, soundsquare2volume, soundnoisevolume, soundpcmvolume;
 	SDL_AudioSpec spec;
-
-	g_config->getOption("SDL.Sound", &sound);
-	if(!sound) {
-		return 0;
-	}
 
 	memset(&spec, 0, sizeof(spec));
 	if(SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
@@ -125,43 +173,36 @@ InitSound()
 	fprintf(stderr, "Loading SDL sound with %s driver...\n", driverName);
 #endif
 
-	// load configuration variables
-	g_config->getOption("SDL.Sound.Rate", &soundrate);
-	g_config->getOption("SDL.Sound.BufSize", &soundbufsize);
-	g_config->getOption("SDL.Sound.Volume", &soundvolume);
-	g_config->getOption("SDL.Sound.Quality", &soundq);
-	g_config->getOption("SDL.Sound.TriangleVolume", &soundtrianglevolume);
-	g_config->getOption("SDL.Sound.Square1Volume", &soundsquare1volume);
-	g_config->getOption("SDL.Sound.Square2Volume", &soundsquare2volume);
-	g_config->getOption("SDL.Sound.NoiseVolume", &soundnoisevolume);
-	g_config->getOption("SDL.Sound.PCMVolume", &soundpcmvolume);
+	soundvolume = 150;
+	soundtrianglevolume = 256;
+	soundsquare1volume = 256;
+	soundsquare2volume = 256;
+	soundnoisevolume = 256;
+	soundpcmvolume = 256;
 
-	spec.freq = soundrate;
 	spec.format = AUDIO_S16SYS;
 	spec.channels = 1;
-#ifndef EMSCRIPTEN
-	spec.samples = 512;
-#else
-	spec.samples = 1024;
-#endif
+	spec.freq = SOUND_RATE;
+	spec.samples = HW_BUFFER_SIZE;
+
 	spec.callback = fillaudio;
 	spec.userdata = 0;
 
-	s_BufferSize = (soundbufsize * soundrate) / 1000;
+	s_BufferMax = BUFFER_SIZE;
 
 	// For safety, set a bare minimum:
-	if (s_BufferSize < spec.samples * 2)
-	s_BufferSize = spec.samples * 2;
+	if (s_BufferMax < HW_BUFFER_SIZE * 2) {
+		s_BufferMax = HW_BUFFER_SIZE * 2;
+	}
 
-    printf("Sound buffersize: %d (requested: %d, HW: %d)\n", 
-        s_BufferSize, (soundbufsize * soundrate) / 1000, spec.samples);
+	printf("Sound buffersize: %d (requested: %d, HW: %d)\n", s_BufferMax, BUFFER_SIZE, spec.samples);
 
-	s_Buffer = (int *)FCEU_dmalloc(sizeof(int) * s_BufferSize);
+	s_Buffer = (int *)FCEU_dmalloc(sizeof(int) * s_BufferMax);
 	if (!s_Buffer)
 		return 0;
-	s_BufferRead = s_BufferWrite = s_BufferIn = 0;
+	s_BufferRead = s_BufferWrite = s_BufferCount = 0;
 
-	if(SDL_OpenAudio(&spec, 0) < 0)
+	if(SDL_OpenAudio(&spec, 0))
 	{
 		puts(SDL_GetError());
 		KillSound();
@@ -170,8 +211,8 @@ InitSound()
 	SDL_PauseAudio(0);
 
 	FCEUI_SetSoundVolume(soundvolume);
-	FCEUI_SetSoundQuality(soundq);
-	FCEUI_Sound(soundrate);
+	FCEUI_SetSoundQuality(SOUND_QUALITY);
+	FCEUI_Sound(SOUND_RATE);
 	FCEUI_SetTriangleVolume(soundtrianglevolume);
 	FCEUI_SetSquare1Volume(soundsquare1volume);
 	FCEUI_SetSquare2Volume(soundsquare2volume);
@@ -184,23 +225,21 @@ InitSound()
 /**
  * Returns the size of the audio buffer.
  */
-uint32
-GetMaxSound(void)
+int GetMaxSound(void)
 {
-	return(s_BufferSize);
+	return(s_BufferMax);
 }
 
 /**
  * Returns the amount of free space in the audio buffer.
  */
-uint32
-GetWriteSound(void)
+int GetWriteSound(void)
 {
-    if (s_BufferSize < s_BufferIn)
+    if (s_BufferMax < s_BufferCount)
     {
-        printf("!!!! GetWriteSound: %4d < %4d\n", s_BufferSize, s_BufferIn);
+        printf("!!!! GetWriteSound: %4d < %4d\n", s_BufferMax, s_BufferCount);
     }
-	return(s_BufferSize - s_BufferIn);
+	return(s_BufferMax - s_BufferCount);
 }
 
 /**
@@ -211,43 +250,45 @@ WriteSound(int32 *buf,
            int Count)
 {
 	extern int EmulationPaused;
-	if (EmulationPaused == 0)
-    {
-#ifndef EMSCRIPTEN
-		while(Count)
-		{
-			while(s_BufferIn == s_BufferSize) 
-			{
-				SDL_Delay(1);
-			}
+	if (EmulationPaused != 0) {
+		return;
+	}
+	if (Count <= 0) {
+		printf("!!!! WriteSound: Unable to write %d samples.\n", Count);
+		return;
+	}
+	int freeCount = GetWriteSound();
+	if (Count > freeCount) {
+		printf("!!!! WriteSound: Tried to write %d samples while buffer has %d free.\n", Count, freeCount);
+		Count = freeCount;
+	}
 
-			s_Buffer[s_BufferWrite] = *buf;
-			Count--;
-			s_BufferWrite = (s_BufferWrite + 1) % s_BufferSize;
-            
-			SDL_LockAudio();
-			s_BufferIn++;
-			SDL_UnlockAudio();
-            
-			buf++;
-		}
+#if TEST_SINE_AT_WRITE
+
+	// Sine wave test outputs a 440Hz tone.
+	s_BufferCount += Count;
+	++Count;
+	while (--Count) {
+		s_Buffer[s_BufferWrite] = 0xFFF * sin(testSinePhase * (2.0*M_PI * 440.0/SOUND_RATE));
+		s_BufferWrite = (s_BufferWrite + 1) % s_BufferMax;
+		++testSinePhase;
+	}
+
 #else
-        if (Count > s_BufferSize - s_BufferIn)
+        if (Count > s_BufferMax - s_BufferCount)
         {
-            printf("Had to limit sound: %d (got: %d)\n", s_BufferSize - s_BufferIn, Count);
-            Count = s_BufferSize - s_BufferIn;
+            printf("Had to limit sound: %d (got: %d)\n", s_BufferMax - s_BufferCount, Count);
+            Count = s_BufferMax - s_BufferCount;
         }
-//        printf("Bufsize: %5d, Count: %5d\n", s_BufferSize - s_BufferIn, Count);
-        for (int i = 0; i < Count; i++)
-        {
-			s_Buffer[s_BufferWrite] = buf[i];
-			s_BufferWrite = (s_BufferWrite + 1) % s_BufferSize;
-        }
-		SDL_LockAudio();
-        s_BufferIn += Count;
-		SDL_UnlockAudio();
-#endif
-    }
+//        printf("Bufsize: %5d, Count: %5d\n", s_BufferMax - s_BufferCount, Count);
+	for (int i = 0; i < Count; ++i) {
+		s_Buffer[s_BufferWrite] = buf[i];
+		s_BufferWrite = (s_BufferWrite + 1) % s_BufferMax;
+	}
+//		SDL_LockAudio();
+	s_BufferCount += Count;
+//		SDL_UnlockAudio();
+#endif // TEST_SINE_AT_WRITE
 }
 
 /**
@@ -283,6 +324,8 @@ KillSound(void)
 void
 FCEUD_SoundVolumeAdjust(int n)
 {
+// TODO: tsone: set way to adjust volume?
+#ifndef EMSCRIPTEN
 	int soundvolume;
 	g_config->getOption("SDL.SoundVolume", &soundvolume);
 
@@ -309,6 +352,7 @@ FCEUD_SoundVolumeAdjust(int n)
 	g_config->setOption("SDL.SoundVolume", soundvolume);
 
 	FCEU_DispMessage("Sound volume %d.",0, soundvolume);
+#endif
 }
 
 /**
@@ -317,6 +361,8 @@ FCEUD_SoundVolumeAdjust(int n)
 void
 FCEUD_SoundToggle(void)
 {
+// TODO: tsone: set way to toggle sound?
+#ifndef EMSCRIPTEN
 	if(s_mute) {
 		int soundvolume;
 		g_config->getOption("SDL.SoundVolume", &soundvolume);
@@ -329,4 +375,5 @@ FCEUD_SoundToggle(void)
 		FCEUI_SetSoundVolume(0);
 		FCEU_DispMessage("Sound mute on.",0);
 	}
+#endif
 }

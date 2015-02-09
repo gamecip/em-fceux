@@ -420,7 +420,7 @@ static void renderDisp(es2n *p)
     meshRender(&p->screen_mesh);
     // gen mipmap for emitter tex
     glActiveTexture(TEX(EMIT_I));
-    glGenerateMipmap(GL_TEXTURE_2D);
+//    glGenerateMipmap(GL_TEXTURE_2D);
 
     // renders screen to disp fb
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -483,7 +483,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     glGetIntegerv(GL_VIEWPORT, p->viewport);
 
-    glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
+//    glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
@@ -520,7 +520,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 #else
     // Setup emitter framebuffer.
     glActiveTexture(TEX(EMIT_I));
-    createFBTex(&p->emit_tex, &p->emit_fb, EMIT_S, EMIT_S, GL_RGB, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+//    createFBTex(&p->emit_tex, &p->emit_fb, EMIT_S, EMIT_S, GL_RGB, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+    createFBTex(&p->emit_tex, &p->emit_fb, EMIT_S, EMIT_S, GL_RGB, GL_LINEAR, GL_LINEAR);
 #endif
 
     // Setup stretch framebuffer.

@@ -45,8 +45,6 @@ int isloaded;
 
 bool turbo = false;
 
-int closeFinishedMovie = 0;
-
 int eoptions=0;
 int noGui = 1;
 
@@ -136,37 +134,79 @@ static void DoFun(int frameskip, int periodic_saves)
 	uint8 *gfx;
 	int32 *sound;
 	int32 ssize;
-	static int fskipc = 0;
 	static int opause = 0;
 
+#if 1
+
+	int numSkipFrames = (GetWriteSound() / (22050/60)) - 1;
+
+	if (numSkipFrames < 0) return;
+
+//	if (numSkipFrames > 1) {
+//		printf("!!!! DoFun: Skipping %d frames.\n", numSkipFrames);
+//	}
+
+	while (numSkipFrames) {
+		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
+		FCEUD_Update(gfx, sound, ssize);
+		--numSkipFrames;
+	};
+
+	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
+	FCEUD_Update(gfx, sound, ssize);
+
+	FCEUD_UpdateInput();
+
+	if (gfx && (inited&4)) {
+		BlitScreen(gfx);
+	}
+
+	if(opause!=FCEUI_EmulationPaused()) {
+		opause=FCEUI_EmulationPaused();
+		SilenceSound(opause);
+	}
+
+#else
+	if (GetWriteSound() <= 22050/60) {
+//		printf("!!!! DoFun: Sound full, waiting.. (%d free samples).\n", GetWriteSound());
+		return;
+	}
+
 #ifdef FRAMESKIP
+	static int fskipc = 0;
 	fskipc = (fskipc + 1) % (frameskip + 1);
 #endif
 
 	if(NoWaiting) {
 		gfx = 0;
 	}
-	FCEUI_Emulate(&gfx, &sound, &ssize, fskipc);
+
+//	FCEUI_Emulate(&gfx, &sound, &ssize, fskipc);
+	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
 	FCEUD_Update(gfx, sound, ssize);
 
-#ifdef EMSCRIPTEN
+// TODO: tsone: something wrong is here...?
 // tsone: need some extra sound samples in the buffering
-    if (GetWriteSound() > 3 * ssize) {
-	    FCEUI_Emulate(&gfx, &sound, &ssize, fskipc);
-	    FCEUD_Update(gfx, sound, ssize);
-    }
-#endif
+    while (GetWriteSound() > 22050/60) {
+//    while (GetWriteSound() > GetMaxSound()/2) {
 
-    FCEUD_UpdateInput();
+//	while (GetWriteSound() > 2 * ssize) {
+		uint8 *dummygfx = 0;
+		FCEUI_Emulate(&dummygfx, &sound, &ssize, 1); //<= skip=1 to skip video emulation; sound is only emulated.
+		FCEUD_Update(dummygfx, sound, ssize);
+	}
 
-    if (gfx && (inited&4)) {
-        BlitScreen(gfx);
-    }
+	FCEUD_UpdateInput();
+
+	if (gfx && (inited&4)) {
+		BlitScreen(gfx);
+	}
 
 	if(opause!=FCEUI_EmulationPaused()) {
 		opause=FCEUI_EmulationPaused();
 		SilenceSound(opause);
 	}
+#endif
 }
 
 static void ReloadROM(void* arg)
@@ -239,23 +279,9 @@ DriverKill()
  * Update the video, audio, and input subsystems with the provided
  * video (XBuf) and audio (Buffer) information.
  */
-void
-FCEUD_Update(uint8 *XBuf,
-			 int32 *Buffer,
-			 int Count)
+void FCEUD_Update(uint8 *XBuf, int32 *Buffer, int Count)
 {
-	if(Count) {
-		int32 can = GetWriteSound();
-
-        if (can > GetMaxSound()) {
-            can = GetMaxSound();
-        }
-		if(can > Count) {
-            can = Count;
-        }
-
-		WriteSound(Buffer, can);
-    }
+	WriteSound(Buffer, Count);
 }
 
 /**

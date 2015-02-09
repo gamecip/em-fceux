@@ -11,8 +11,8 @@ void DoDriverArgs(void);
 int InitSound();
 void WriteSound(int32 *Buffer, int Count);
 int KillSound(void);
-uint32 GetMaxSound(void);
-uint32 GetWriteSound(void);
+int GetMaxSound(void);
+int GetWriteSound(void);
 
 void SilenceSound(int s); /* DOS and SDL */
 

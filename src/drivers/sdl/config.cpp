@@ -9,11 +9,6 @@
 
 #include "sdl.h"
 #include "sdl-video.h"
-#include "unix-netplay.h"
-
-#ifdef WIN32
-#include <windows.h>
-#endif
 
 #include <unistd.h>
 
@@ -66,20 +61,11 @@ CreateDirs(const std::string &dir)
 	std::string subdir;
 	int x;
 
-#if defined(WIN32) || defined(NEED_MINGW_HACKS)
-	mkdir(dir.c_str());
-	chmod(dir.c_str(), 755);
-	for(x = 0; x < 6; x++) {
-		subdir = dir + PSS + subs[x];
-		mkdir(subdir.c_str());
-	}
-#else
 	mkdir(dir.c_str(), S_IRWXU);
 	for(x = 0; x < 6; x++) {
 		subdir = dir + PSS + subs[x];
 		mkdir(subdir.c_str(), S_IRWXU);
 	}
-#endif
 }
 
 /**
@@ -94,20 +80,7 @@ GetBaseDirectory(std::string &dir)
 	if(home) {
 		dir = std::string(home) + "/.fceux";
 	} else {
-#ifdef WIN32
-		home = new char[MAX_PATH + 1];
-		GetModuleFileName(NULL, home, MAX_PATH + 1);
-
-		char *lastBS = strrchr(home,'\\');
-		if(lastBS) {
-			*lastBS = 0;
-		}
-
-		dir = std::string(home);
-		delete[] home;
-#else
 		dir = "";
-#endif
 	}
 }
 
@@ -127,24 +100,6 @@ InitConfig()
 	config = new Config(dir);
 
 	// sound options
-	config->addOption('s', "sound", "SDL.Sound", 1);
-	config->addOption("volume", "SDL.Sound.Volume", 150);
-	config->addOption("trianglevol", "SDL.Sound.TriangleVolume", 256);
-	config->addOption("square1vol", "SDL.Sound.Square1Volume", 256);
-	config->addOption("square2vol", "SDL.Sound.Square2Volume", 256);
-	config->addOption("noisevol", "SDL.Sound.NoiseVolume", 256);
-	config->addOption("pcmvol", "SDL.Sound.PCMVolume", 256);
-	config->addOption("soundrate", "SDL.Sound.Rate", 44100);
-#ifndef EMSCRIPTEN
-	config->addOption("soundq", "SDL.Sound.Quality", 1);
-#else
-	// tsone: set for slower javascript VM
-	config->addOption("soundq", "SDL.Sound.Quality", 0);
-#endif
-	config->addOption("soundrecord", "SDL.Sound.RecordFile", "");
-	config->addOption("soundbufsize", "SDL.Sound.BufSize", 128);
-	config->addOption("lowpass", "SDL.Sound.LowPass", 0);
-    
 	config->addOption('g', "gamegenie", "SDL.GameGenie", 0);
 	config->addOption("pal", "SDL.PAL", 0);
 	config->addOption("frameskip", "SDL.Frameskip", 0);
@@ -254,17 +209,6 @@ InitConfig()
 
     //TODO implement this
     config->addOption("periodicsaves", "SDL.PeriodicSaves", 0);
-
-    
-    #ifdef _GTK
-	char* home_dir = getenv("HOME");
-	// prefixed with _ because they are internal (not cli options)
-	config->addOption("_lastopenfile", "SDL.LastOpenFile", home_dir);
-	config->addOption("_laststatefrom", "SDL.LastLoadStateFrom", home_dir);
-	config->addOption("_lastopennsf", "SDL.LastOpenNSF", home_dir);
-	config->addOption("_lastsavestateas", "SDL.LastSaveStateAs", home_dir);
-	config->addOption("_lastloadlua", "SDL.LastLoadLua", home_dir);
-    #endif
     
 	// fcm -> fm2 conversion
 	config->addOption("fcmconvert", "SDL.FCMConvert", "");
@@ -433,8 +377,7 @@ UpdateEMUCore(Config *config)
 	config->getOption("SDL.GameGenie", &flag);
 	FCEUI_SetGameGenie(flag ? 1 : 0);
 
-	config->getOption("SDL.Sound.LowPass", &flag);
-	FCEUI_SetLowPass(flag ? 1 : 0);
+	FCEUI_SetLowPass(0);
 
 	config->getOption("SDL.DisableSpriteLimit", &flag);
 	FCEUI_DisableSpriteLimitation(flag ? 1 : 0);

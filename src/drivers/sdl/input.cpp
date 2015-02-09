@@ -23,7 +23,6 @@
 #include "input.h"
 #include "config.h"
 
-
 #include "sdl-video.h"
 #include "sdl.h"
 
@@ -32,16 +31,6 @@
 #include "../../fceu.h"
 #include "../../driver.h"
 #include "../../utils/xstring.h"
-#ifdef _S9XLUA_H
-#include "../../fceulua.h"
-#endif
-
-#ifdef _GTK
-#include "gui.h"
-#ifdef SDL_VIDEO_DRIVER_X11
-#include <gdk/gdkx.h>
-#endif
-#endif
 
 #ifdef EMSCRIPTEN
 #include <html5.h>
@@ -53,7 +42,7 @@
 /** GLOBALS **/
 int NoWaiting = 1;
 extern Config *g_config;
-extern bool bindSavestate, frameAdvanceLagSkip, lagCounterDisplay;
+extern bool frameAdvanceLagSkip, lagCounterDisplay;
 
 
 /* UsrInputType[] is user-specified.  CurInputType[] is current
@@ -227,209 +216,12 @@ TogglePause ()
 	return;
 }
 
-/*** 
- * This function opens a file chooser dialog and returns the filename the 
- * user selected.
- * */
-std::string GetFilename (const char *title, bool save, const char *filter)
-{
-	if (FCEUI_EmulationPaused () == 0)
-		FCEUI_ToggleEmulationPause ();
-	std::string fname = "";
+// TODO: tsone: dummy functions
+void FCEUD_MovieRecordTo() {}
 
-#ifdef WIN32
-	OPENFILENAME ofn;		// common dialog box structure
-	char szFile[260];		// buffer for file name
-	HWND hwnd;			// owner window
-	HANDLE hf;			// file handle
+void FCEUD_SaveStateAs() {}
 
-	// Initialize OPENFILENAME
-	memset (&ofn, 0, sizeof (ofn));
-	ofn.lStructSize = sizeof (ofn);
-	ofn.hwndOwner = hwnd;
-	ofn.lpstrFile = szFile;
-	// Set lpstrFile[0] to '\0' so that GetOpenFileName does not 
-	// use the contents of szFile to initialize itself.
-	ofn.lpstrFile[0] = '\0';
-	ofn.nMaxFile = sizeof (szFile);
-	ofn.lpstrFilter = "All\0*.*\0";
-	ofn.nFilterIndex = 1;
-	ofn.lpstrFileTitle = NULL;
-	ofn.nMaxFileTitle = 0;
-	ofn.lpstrInitialDir = NULL;
-	ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-
-	// Display the Open dialog box. 
-	fname = GetOpenFileName (&ofn);
-
-#endif
-#ifdef _GTK
-	int fullscreen = 0;
-	g_config->getOption ("SDL.Fullscreen", &fullscreen);
-	if (fullscreen)
-		ToggleFS ();
-
-	GtkWidget *fileChooser;
-
-	GtkFileFilter *filterX;
-	GtkFileFilter *filterAll;
-
-	filterX = gtk_file_filter_new ();
-	gtk_file_filter_add_pattern (filterX, filter);
-	gtk_file_filter_set_name (filterX, filter);
-
-
-	filterAll = gtk_file_filter_new ();
-	gtk_file_filter_add_pattern (filterAll, "*");
-	gtk_file_filter_set_name (filterAll, "All Files");
-
-	if (save)
-		fileChooser = gtk_file_chooser_dialog_new ("Save as", NULL,
-							GTK_FILE_CHOOSER_ACTION_SAVE,
-							GTK_STOCK_CANCEL,
-							GTK_RESPONSE_CANCEL,
-							GTK_STOCK_SAVE_AS,
-							GTK_RESPONSE_ACCEPT, NULL);
-	else
-		fileChooser = gtk_file_chooser_dialog_new ("Open", NULL,
-							GTK_FILE_CHOOSER_ACTION_OPEN,
-							GTK_STOCK_CANCEL,
-							GTK_RESPONSE_CANCEL,
-							GTK_STOCK_OPEN,
-							GTK_RESPONSE_ACCEPT, NULL);
-
-	// TODO: make file filters case insensitive     
-	//gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(fileChooser), filterX);
-	gtk_file_chooser_add_filter (GTK_FILE_CHOOSER (fileChooser), filterAll);
-	int response = gtk_dialog_run (GTK_DIALOG (fileChooser));
-
-	// flush gtk events
-	while (gtk_events_pending ())
-		gtk_main_iteration_do (TRUE);
-
-	if (response == GTK_RESPONSE_ACCEPT)
-		fname = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (fileChooser));
-
-	gtk_widget_destroy (fileChooser);
-
-	while (gtk_events_pending ())
-		gtk_main_iteration_do (TRUE);
-#endif
-	FCEUI_ToggleEmulationPause ();
-	return fname;
-}
-
-/**
- * This function opens a text entry dialog and returns the user's input
- */
-std::string GetUserText (const char *title)
-{
-#ifdef _GTK
-/*	prg318 - 10/13/11 - this is broken in recent build and causes 
- *	segfaults/very weird behavior i'd rather remove it for now than it cause 
- *	accidental segfaults
- *	TODO fix it
-*/
-#if 0
-
-	GtkWidget* d;
-	GtkWidget* entry;
-	
-	d = gtk_dialog_new_with_buttons(title, NULL, GTK_DIALOG_MODAL, GTK_STOCK_OK, GTK_RESPONSE_OK); 
-	
-	entry = gtk_entry_new();
-
-	GtkWidget* vbox = gtk_dialog_get_content_area(GTK_DIALOG(d));
-	
-	gtk_container_add(GTK_CONTAINER(vbox), entry);
-	
-	gtk_widget_show_all(d);
-	
-	gtk_dialog_run(GTK_DIALOG(d));
-	
-	// flush gtk events
-	while(gtk_events_pending())
-			gtk_main_iteration_do(TRUE);
-
-		std::string input = gtk_entry_get_text(GTK_ENTRY(entry));
-	
-		if (FCEUI_EmulationPaused() == 0)
-        	FCEUI_ToggleEmulationPause(); // pause emulation
-	
-		int fullscreen = 0; 
-		g_config->getOption("SDL.Fullscreen", &fullscreen);
-		if(fullscreen)
-			ToggleFS(); // disable fullscreen emulation
-	
-	FILE *fpipe;
-	std::string command = "zenity --entry --title=\"";
-	command.append(title);
-	command.append("\" --text=\"");
-	command.append(title);
-	command.append(":\"");
-	
-	if (!(fpipe = (FILE*)popen(command.c_str(),"r"))) // If fpipe is NULL
-		FCEUD_PrintError("Pipe error on opening zenity");
-	int c;
-	std::string input;
-	while((c = fgetc(fpipe)))
-	{
-		if (c == EOF || c == '\n')
-			break;
-		input += c;
-	}
-    	pclose(fpipe);
-     gtk_widget_destroy(d);
-
-
-     while(gtk_events_pending())
-     gtk_main_iteration_do(TRUE);
-
-     FCEUI_ToggleEmulationPause(); // unpause emulation
-     return input;
-#endif // #if 0
-#endif
-  return "";
-}
-
-
-/**
-* Lets the user start a new .fm2 movie file
-**/
-void FCEUD_MovieRecordTo ()
-{
-	std::string fname = GetFilename ("Save FM2 movie for recording", true, "FM2 movies|*.fm2");
-	if (!fname.size ())
-		return;			// no filename selected, quit the whole thing
-	std::wstring author = mbstowcs (GetUserText ("Author name"));	// the author can be empty, so no need to check here
-
-	FCEUI_SaveMovie (fname.c_str (), MOVIE_FLAG_FROM_POWERON, author);
-}
-
-
-/**
-* Lets the user save a savestate to a specific file
-**/
-void FCEUD_SaveStateAs ()
-{
-	std::string fname = GetFilename ("Save savestate as...", true, "Savestates|*.fc0");
-	if (!fname.size ())
-		return;			// no filename selected, quit the whole thing
-
-	FCEUI_SaveState (fname.c_str ());
-}
-
-/**
-* Lets the user load a savestate from a specific file
-*/
-void FCEUD_LoadStateFrom ()
-{
-	std::string fname = GetFilename ("Load savestate from...", false, "Savestates|*.fc?");
-	if (!fname.size ())
-		return;			// no filename selected, quit the whole thing
-
-	FCEUI_LoadState (fname.c_str ());
-}
+void FCEUD_LoadStateFrom() {}
 
 /**
 * Hook for transformer board
@@ -452,7 +244,6 @@ static void KeyboardCommands ()
 {
 	int is_shift, is_alt;
 
-	char *movie_fname = "";
 	// get the keyboard input
 #if SDL_VERSION_ATLEAST(1, 3, 0)
 	g_keyState = (Uint8*)SDL_GetKeyboardState (NULL);
@@ -533,40 +324,12 @@ static void KeyboardCommands ()
 		}
 	}
 
+// TODO: tsone: not yet implemented
 #ifndef EMSCRIPTEN
 	// Alt-Enter to toggle full-screen
 	if (keyonly (ENTER) && is_alt)
 	{
 		ToggleFS ();
-	}
-
-
-
-	// Toggle Movie auto-backup
-	if (keyonly (M) && is_shift)
-	{
-		autoMovieBackup ^= 1;
-		FCEUI_DispMessage ("Automatic movie backup %sabled.", 0,
-			 autoMovieBackup ? "en" : "dis");
-	}
-
-	// Start recording an FM2 movie on Alt+R
-	if (keyonly (R) && is_alt)
-	{
-		FCEUD_MovieRecordTo ();
-	}
-#endif
-
-	// Save a state from a file
-	if (keyonly (S) && is_alt)
-	{
-		FCEUD_SaveStateAs ();
-	}
-
-	// Load a state from a file
-	if (keyonly (L) && is_alt)
-	{
-		FCEUD_LoadStateFrom ();
 	}
 
 		// Famicom disk-system games
@@ -581,11 +344,6 @@ static void KeyboardCommands ()
 			FCEUI_FDSInsert ();
 		}
 	}
-#ifndef EMSCRIPTEN
-	if (_keyonly (Hotkeys[HK_SCREENSHOT]))
-	{
-		FCEUI_SaveSnapshot ();
-	}
 #endif
 
 	// if not NES Sound Format
@@ -598,56 +356,16 @@ static void KeyboardCommands ()
 		}
 #endif
 
-		// f5 (default) save key, hold shift to save movie
+		// f5 (default) save key
 		if (_keyonly (Hotkeys[HK_SAVE_STATE]))
 		{
-#ifndef EMSCRIPT
-			if (is_shift)
-			{
-				movie_fname =
-				const_cast <char *>(FCEU_MakeFName (FCEUMKF_MOVIE, 0, 0).c_str ());
-				FCEUI_printf ("Recording movie to %s\n", movie_fname);
-				FCEUI_SaveMovie (movie_fname, MOVIE_FLAG_NONE, L"");
-			}
-			else
-#endif
-			{
-				FCEUI_SaveState (NULL);
-			}
+			FCEUI_SaveState(NULL);
 		}
 
-		// f7 to load state, Shift-f7 to load movie
+		// f7 to load state
 		if (_keyonly (Hotkeys[HK_LOAD_STATE]))
 		{
-#ifndef EMSCRIPTEN
-			if (is_shift)
-			{
-				FCEUI_StopMovie ();
-				std::string fname;
-				fname =
-				GetFilename ("Open FM2 movie for playback...", false,
-								"FM2 movies|*.fm2");
-				if (fname != "")
-				{
-					if (fname.find (".fm2") != std::string::npos
-					|| fname.find (".fm3") != std::string::npos)
-					{
-						FCEUI_printf ("Playing back movie located at %s\n",
-										fname.c_str ());
-						FCEUI_LoadMovie (fname.c_str (), false, false);
-					}
-					else
-					{
-						FCEUI_printf
-							("Only .fm2 and .fm3 movies are supported.\n");
-					}
-				}
-			}
-			else
-#endif
-			{
-				FCEUI_LoadState(NULL);
-			}
+			FCEUI_LoadState(NULL);
 		}
 	}
 
@@ -678,14 +396,6 @@ static void KeyboardCommands ()
 	if (_keyonly (Hotkeys[HK_MOVIE_TOGGLE_RW]))
 	{
 		FCEUI_SetMovieToggleReadOnly (!FCEUI_GetMovieToggleReadOnly ());
-	}
-#endif
-
-#ifdef CREATE_AVI
-	if (_keyonly (Hotkeys[HK_MUTE_CAPTURE]))
-	{
-		extern int mutecapture;
-		mutecapture ^= 1;
 	}
 #endif
 
@@ -744,22 +454,10 @@ static void KeyboardCommands ()
 		}
 	}
 	else
-#ifdef _S9XLUA_H
-	if (_keyonly (Hotkeys[HK_LOAD_LUA]))
-	{
-		std::string fname;
-		fname = GetFilename ("Open LUA script...", false, "Lua scripts|*.lua");
-		if (fname != "")
-		FCEU_LoadLuaCode (fname.c_str ());
-	}
-#endif
 
 	for (int i = 0; i < 10; i++)
 		if (_keyonly (Hotkeys[HK_SELECT_STATE_0 + i]))
 		{
-#ifdef _GTK
-			gtk_radio_action_set_current_value (stateSlot, i);
-#endif
 			FCEUI_SelectState (i, 1);
 		}
 
@@ -773,13 +471,6 @@ static void KeyboardCommands ()
 		FCEUI_SelectStateNext (-1);
 	}
 
-	if (_keyonly (Hotkeys[HK_BIND_STATE]))
-	{
-		bindSavestate ^= 1;
-		FCEUI_DispMessage ("Savestate binding to movie %sabled.", 0,
-		bindSavestate ? "en" : "dis");
-	}
-
 	if (_keyonly (Hotkeys[HK_FA_LAG_SKIP]))
 	{
 		frameAdvanceLagSkip ^= 1;
@@ -791,16 +482,6 @@ static void KeyboardCommands ()
 	{
 		lagCounterDisplay ^= 1;
 	}
-
-#ifndef EMSCRIPTEN
-	if (_keyonly (Hotkeys[HK_TOGGLE_SUBTITLE]))
-	{
-		extern int movieSubtitles;
-		movieSubtitles ^= 1;
-		FCEUI_DispMessage ("Movie subtitles o%s.", 0,
-		movieSubtitles ? "n" : "ff");
-	}
-#endif
 
 	// VS Unisystem games
 	if (gametype == GIT_VSUNI)
@@ -827,19 +508,22 @@ static void KeyboardCommands ()
 	}
 	else
 	{
-		static uint8 bbuf[32];
-		static int bbuft;
-		static int barcoder = 0;
-
-		if (keyonly (H))
-			FCEUI_NTSCSELHUE ();
-		if (keyonly (T))
-			FCEUI_NTSCSELTINT ();
-
 		if (_keyonly (Hotkeys[HK_DECREASE_SPEED]))
 			FCEUI_NTSCDEC ();
 		if (_keyonly (Hotkeys[HK_INCREASE_SPEED]))
 			FCEUI_NTSCINC ();
+
+// TODO: tsone: disabled barcode
+#ifdef EMSCRIPTEN
+		DIPSless:
+		for(int i=0; i<10;i++)
+		{
+			keyonly(i);
+		}
+#else  // !EMSCRIPTEN
+		static uint8 bbuf[32];
+		static int bbuft;
+		static int barcoder = 0;
 
 		if ((CurInputType[2] == SIFC_BWORLD) || (cspec == SIS_DATACH))
 		{
@@ -871,24 +555,21 @@ static void KeyboardCommands ()
 			barcoder = 0;
 		}
 
-#define SSM(x)                                    \
-do {                                              \
-	if(barcoder) {                                \
-		if(bbuft < 13) {                          \
-			bbuf[bbuft++] = '0' + x;              \
-			bbuf[bbuft] = 0;                      \
-		}                                         \
-		FCEUI_DispMessage("Barcode: %s",0, bbuf); \
-	}                                             \
-} while(0)
-
 		DIPSless:
 		for(int i=0; i<10;i++)
 		{
-			if (keyonly (i))
-				SSM (i);
+			if (keyonly (i)) {
+				if(barcoder) {
+					if(bbuft < 13) {
+						bbuf[bbuft++] = '0' + i;
+						bbuf[bbuft] = 0;
+					}
+					FCEUI_DispMessage("Barcode: %s",0, bbuf);
+				}
+			}
 		}
-#undef SSM
+
+#endif // EMSCRIPTEN
 	}
 }
 
@@ -902,29 +583,8 @@ GetMouseData (uint32 (&d)[3])
 	int x, y;
 	uint32 t;
 
-#ifndef EMSCRIPTEN
-	// Don't get input when a movie is playing back
-	if (FCEUMOV_Mode (MOVIEMODE_PLAY))
-		return;
-#endif
-
 	// retrieve the state of the mouse from SDL
 	t = SDL_GetMouseState (&x, &y);
-#ifdef _GTK
-	if (noGui == 0)
-	{
-		// don't ask for gtk mouse info when in fullscreen
-		// we can use sdl directly in fullscreen
-		int fullscreen = 0;
-		g_config->getOption ("SDL.Fullscreen", &fullscreen);
-		if (fullscreen == 0)
-		{
-			x = GtkMouseData[0];
-			y = GtkMouseData[1];
-			t = GtkMouseData[2];
-		}
-	}
-#endif
 
 	d[2] = 0;
 	if (t & SDL_BUTTON (1))
@@ -976,112 +636,6 @@ UpdatePhysicalInput ()
 		}
 	}
 	//SDL_PumpEvents();
-}
-
-#ifndef EMSCRIPTEN
-static int bcpv, bcpj;
-#endif
-
-/**
- *  Begin configuring the buttons by placing the video and joystick
- *  subsystems into a well-known state.  Button configuration really
- *  needs to be cleaned up after the new config system is in place.
- */
-int ButtonConfigBegin ()
-{
-#ifndef EMSCRIPTEN
-//dont shut down video subsystem if we are using gtk to prevent the sdl window from becoming detached to GTK window
-// prg318 - 10-2-2011
-#ifdef _GTK
-	int noGui;
-	g_config->getOption ("SDL.NoGUI", &noGui);
-	if (noGui == 1)
-	{
-		SDL_QuitSubSystem (SDL_INIT_VIDEO);
-		bcpv = KillVideo ();
-	}
-#else
-	// XXX soules - why are we doing this right before KillVideo()?
-	SDL_QuitSubSystem (SDL_INIT_VIDEO);
-
-	// shut down the video and joystick subsystems
-	bcpv = KillVideo ();
-#endif
-	SDL_Surface *screen;
-
-	bcpj = KillJoysticks ();
-
-	// reactivate the video subsystem
-	if (!SDL_WasInit (SDL_INIT_VIDEO))
-	{
-		if (!bcpv)
-		{
-			InitVideo (GameInfo);
-		}
-		else
-		{
-#if defined(_GTK) && defined(SDL_VIDEO_DRIVER_X11)
-			if (noGui == 0)
-			{
-				while (gtk_events_pending ())
-					gtk_main_iteration_do (FALSE);
-
-				char SDL_windowhack[128];
-				if (gtk_widget_get_window (evbox))
-					sprintf (SDL_windowhack, "SDL_WINDOWID=%u",
-					(unsigned int) GDK_WINDOW_XID (gtk_widget_get_window (evbox)));
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-					// TODO - SDL2
-#else
-					SDL_putenv (SDL_windowhack);
-#endif
-			}
-#endif
-			if (SDL_InitSubSystem (SDL_INIT_VIDEO) == -1)
-			{
-				FCEUD_Message (SDL_GetError ());
-				return 0;
-			}
-
-			// set the screen and notify the user of button configuration
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-			// TODO - SDL2
-#else
-			screen = SDL_SetVideoMode (420, 200, 8, 0);
-			SDL_WM_SetCaption ("Button Config", 0);
-#endif
-		}
-	}
-
-	// XXX soules - why did we shut this down?
-	// initialize the joystick subsystem
-	InitJoysticks ();
-#endif
-	return 1;
-}
-
-/**
- *  Finish configuring the buttons by reverting the video and joystick
- *  subsystems to their previous state.  Button configuration really
- *  needs to be cleaned up after the new config system is in place.
- */
-void
-ButtonConfigEnd ()
-{
-#ifndef EMSCRIPTEN
-	// shutdown the joystick and video subsystems
-	KillJoysticks ();
-	//SDL_QuitSubSystem(SDL_INIT_VIDEO); 
-
-	// re-initialize joystick and video subsystems if they were active before
-	/*if(!bcpv) {
-		InitVideo(GameInfo);
-		} */
-	if (!bcpj)
-	{
-		InitJoysticks ();
-	}
-#endif
 }
 
 /**
@@ -1144,7 +698,7 @@ ButtConfig GamePadConfig[4][10] = {
 	GPZ ()
 };
 
-#ifdef EMSCRIPTEN
+// TODO: tsone: this was added as new way to test buttons
 // idx 0..9 matches: a, b, select, start, up, down, left, right, turbo a, turbo b
 static int EmscriptenTestButton(const EmscriptenGamepadEvent *p, int idx)
 {
@@ -1173,7 +727,6 @@ static int EmscriptenTestButton(const EmscriptenGamepadEvent *p, int idx)
         return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] > 0.5)));
     }
 }
-#endif
 
 /**
  * Update the status of the gamepad input devices.
@@ -1181,14 +734,6 @@ static int EmscriptenTestButton(const EmscriptenGamepadEvent *p, int idx)
 static void
 UpdateGamepad(void)
 {
-#ifndef EMSCRIPTEN
-	// don't update during movie playback
-	if (FCEUMOV_Mode (MOVIEMODE_PLAY))
-	{
-		return;
-	 }
-#endif
-
 	static int rapid = 0;
 	uint32 JS = 0;
 	int x;
@@ -1199,7 +744,7 @@ UpdateGamepad(void)
 	int opposite_dirs;
 	g_config->getOption("SDL.Input.EnableOppositeDirectionals", &opposite_dirs);
 
-#ifdef EMSCRIPTEN
+// TODO: tsone: Read gamepads.
     // Four possibly connected joysticks/gamepads are read here, each matching a NES gamepad.
     EmscriptenGamepadEvent gamepads[4];
     for (int i = 0; i < 4; i++) {
@@ -1208,8 +753,6 @@ UpdateGamepad(void)
             gamepads[i].connected = 0;
         }
     }
-    
-#endif
 
 	// go through each of the four game pads
 	for (wg = 0; wg < 4; wg++)
@@ -1219,12 +762,7 @@ UpdateGamepad(void)
 		// a, b, select, start, up, down, left, right
 		for (x = 0; x < 8; x++)
 		{
-#ifndef EMSCRIPTEN
-			if (DTestButton (&GamePadConfig[wg][x]))
-			{
-#else
 			if (DTestButton(&GamePadConfig[wg][x]) || EmscriptenTestButton(&gamepads[wg], x)) {
-#endif
 				if(opposite_dirs == 0)
 				{
 					// test for left+right and up+down
@@ -1260,12 +798,7 @@ UpdateGamepad(void)
 		{
 			for (x = 0; x < 2; x++)
 			{
-#ifndef EMSCRIPTEN
-				if (DTestButton (&GamePadConfig[wg][8 + x]))
-                {
-#else
     			if (DTestButton(&GamePadConfig[wg][8+x]) || EmscriptenTestButton(&gamepads[wg], 8+x)) {
-#endif
 					JS |= (1 << x) << (wg << 3);
 				}
 			}
@@ -1303,14 +836,6 @@ static uint32 powerpadbuf[2] = { 0, 0 };
 static uint32
 UpdatePPadData (int w)
 {
-#ifndef EMSCRIPTEN
-	// don't update if a movie is playing
-	if (FCEUMOV_Mode (MOVIEMODE_PLAY))
-	{
-		return 0;
-	}
-#endif
-
 	uint32 r = 0;
 	ButtConfig *ppadtsc = powerpadsc[w];
 	int x;
@@ -1669,88 +1194,27 @@ UpdateFTrainer ()
 	}
 }
 
-/**
- * Get the display name of the key or joystick button mapped to a specific 
- * NES gamepad button.
- * @param bc the NES gamepad's button config
- * @param which the index of the button
- */
-const char * ButtonName (const ButtConfig * bc, int which)
-{
-	static char name[256];
+//
+// TODO: tsone: one may with to revisit input config code later...?
+//
+#ifdef EMSCRIPTEN
 
-	switch (bc->ButtType[which])
-	{
-		case BUTTC_KEYBOARD:
-#if SDL_VERSION_ATLEAST(2,0,0)
-			return SDL_GetKeyName (bc->ButtonNum[which]);
-#else
-			return SDL_GetKeyName ((SDLKey) bc->ButtonNum[which]);
-#endif
-		case BUTTC_JOYSTICK:
-			int joyNum, inputNum;
-			const char *inputType, *inputDirection;
+void InputCfg(const std::string &) {} // dummy
 
-			joyNum = bc->DeviceNum[which];
-
-			if (bc->ButtonNum[which] & 0x8000)
-			{
-				inputType = "Axis";
-				inputNum = bc->ButtonNum[which] & 0x3FFF;
-				inputDirection = bc->ButtonNum[which] & 0x4000 ? "-" : "+";
-			}
-			else if (bc->ButtonNum[which] & 0x2000)
-			{
-				int inputValue;
-				char direction[128] = "";
-
-				inputType = "Hat";
-				inputNum = (bc->ButtonNum[which] >> 8) & 0x1F;
-				inputValue = bc->ButtonNum[which] & 0xF;
-
-				if (inputValue & SDL_HAT_UP)
-					strncat (direction, "Up ", sizeof (direction) - 1);
-				if (inputValue & SDL_HAT_DOWN)
-					strncat (direction, "Down ", sizeof (direction) - 1);
-				if (inputValue & SDL_HAT_LEFT)
-					strncat (direction, "Left ", sizeof (direction) - 1);
-				if (inputValue & SDL_HAT_RIGHT)
-					strncat (direction, "Right ", sizeof (direction) - 1);
-
-				if (direction[0])
-					inputDirection = direction;
-				else
-					inputDirection = "Center";
-			}
-			else
-			{
-				inputType = "Button";
-				inputNum = bc->ButtonNum[which];
-				inputDirection = "";
-			}
-	}
-
-	return name;
-}
+#else // !EMSCRIPTEN
 
 /**
  * Waits for a button input and returns the information as to which
  * button was pressed.  Used in button configuration.
  */
-#ifdef EMSCRIPTEN
 #include "../../utils/memory.h"
 static int32 (*LastAx)[64] = 0;
-#endif
 int DWaitButton (const uint8 * text, ButtConfig * bc, int wb)
 {
 	SDL_Event event;
-#ifndef EMSCRIPTEN
-	static int32 LastAx[64][64];
-#else
     if (!LastAx) {
         LastAx = (int32 (*)[64]) FCEU_malloc(sizeof(int32)*64*64);
     }
-#endif
 	int x, y;
 
 	if (text)
@@ -1773,81 +1237,66 @@ int DWaitButton (const uint8 * text, ButtConfig * bc, int wb)
 		}
 	}
 
-#ifndef EMSCRIPTEN
-	while (1)
+	int done = 0;
+	while (SDL_PollEvent (&event))
 	{
-#endif
-		int done = 0;
-#ifdef _GTK
-		while (gtk_events_pending ())
-			gtk_main_iteration_do (FALSE);
-#endif
-		while (SDL_PollEvent (&event))
+		done++;
+		switch (event.type)
 		{
-			done++;
-			switch (event.type)
-			{
-				case SDL_KEYDOWN:
-					bc->ButtType[wb] = BUTTC_KEYBOARD;
-					bc->DeviceNum[wb] = 0;
-					bc->ButtonNum[wb] = event.key.keysym.sym;
-					return (1);
-#ifndef EMSCRIPTEN
-				case SDL_JOYBUTTONDOWN:
+			case SDL_KEYDOWN:
+				bc->ButtType[wb] = BUTTC_KEYBOARD;
+				bc->DeviceNum[wb] = 0;
+				bc->ButtonNum[wb] = event.key.keysym.sym;
+				return (1);
+			case SDL_JOYBUTTONDOWN:
+				bc->ButtType[wb] = BUTTC_JOYSTICK;
+				bc->DeviceNum[wb] = event.jbutton.which;
+				bc->ButtonNum[wb] = event.jbutton.button;
+				return (1);
+			case SDL_JOYHATMOTION:
+				if (event.jhat.value == SDL_HAT_CENTERED)
+					done--;
+				else
+				{
 					bc->ButtType[wb] = BUTTC_JOYSTICK;
-					bc->DeviceNum[wb] = event.jbutton.which;
-					bc->ButtonNum[wb] = event.jbutton.button;
+					bc->DeviceNum[wb] = event.jhat.which;
+					bc->ButtonNum[wb] =
+						(0x2000 | ((event.jhat.hat & 0x1F) << 8) | event.
+						 jhat.value);
 					return (1);
-				case SDL_JOYHATMOTION:
-					if (event.jhat.value == SDL_HAT_CENTERED)
-						done--;
-					else
+				}
+				break;
+			case SDL_JOYAXISMOTION:
+				if (LastAx[event.jaxis.which][event.jaxis.axis] == 0x100000)
+				{
+					if (abs (event.jaxis.value) < 1000)
+					{
+						LastAx[event.jaxis.which][event.jaxis.axis] =
+							event.jaxis.value;
+					}
+					done--;
+				}
+				else
+				{
+					if (abs
+							(LastAx[event.jaxis.which][event.jaxis.axis] -
+							 event.jaxis.value) >= 8192)
 					{
 						bc->ButtType[wb] = BUTTC_JOYSTICK;
-						bc->DeviceNum[wb] = event.jhat.which;
-						bc->ButtonNum[wb] =
-							(0x2000 | ((event.jhat.hat & 0x1F) << 8) | event.
-							 jhat.value);
+						bc->DeviceNum[wb] = event.jaxis.which;
+						bc->ButtonNum[wb] = (0x8000 | event.jaxis.axis |
+								((event.jaxis.value < 0)
+								 ? 0x4000 : 0));
 						return (1);
 					}
-					break;
-				case SDL_JOYAXISMOTION:
-					if (LastAx[event.jaxis.which][event.jaxis.axis] == 0x100000)
-					{
-						if (abs (event.jaxis.value) < 1000)
-						{
-							LastAx[event.jaxis.which][event.jaxis.axis] =
-								event.jaxis.value;
-						}
-						done--;
-					}
 					else
-					{
-						if (abs
-								(LastAx[event.jaxis.which][event.jaxis.axis] -
-								 event.jaxis.value) >= 8192)
-						{
-							bc->ButtType[wb] = BUTTC_JOYSTICK;
-							bc->DeviceNum[wb] = event.jaxis.which;
-							bc->ButtonNum[wb] = (0x8000 | event.jaxis.axis |
-									((event.jaxis.value < 0)
-									 ? 0x4000 : 0));
-							return (1);
-						}
-						else
-							done--;
-					}
-					break;
-#endif
-				default:
-					done--;
-			}
+						done--;
+				}
+				break;
+			default:
+				done--;
 		}
-#ifndef EMSCRIPTEN
-		if (done)
-			break;
 	}
-#endif
 
 	return (0);
 }
@@ -1888,7 +1337,6 @@ extern Config *g_config;
 
 void ConfigDevice (int which, int arg)
 {
-#ifndef EMSCRIPTEN
 	char buf[256];
 	int x;
 	std::string prefix;
@@ -1901,7 +1349,6 @@ void ConfigDevice (int which, int arg)
 	//              don't override these.  This is a temp hack until I
 	//              can clean up this file.
 
-	ButtonConfigBegin ();
 	switch (which)
 	{
 		case FCFGD_QUIZKING:
@@ -2013,64 +1460,45 @@ void ConfigDevice (int which, int arg)
 					GamePadConfig[arg][0].DeviceNum[0]);
 			break;
 	}
-
-	ButtonConfigEnd ();
-#endif
 }
-
 
 /**
  * Update the button configuration for a device, specified by a text string.
  */
 void InputCfg (const std::string & text)
 {
-#ifndef EMSCRIPTEN
-#ifdef _GTK
-	// enable noGui to prevent the gtk x11 hack from executing
-	noGui = 1;
-	// this is only called at the begininng of execution; make sure the video subsystem is initialized
-	InitVideo (GameInfo);
-#endif
-
-	if (noGui)
+	if (text.find ("gamepad") != std::string::npos)
 	{
-		if (text.find ("gamepad") != std::string::npos)
+		int device = (text[strlen ("gamepad")] - '1');
+		if (device < 0 || device > 3)
 		{
-			int device = (text[strlen ("gamepad")] - '1');
-			if (device < 0 || device > 3)
-			{
-				FCEUD_PrintError
-					("Invalid gamepad device specified; must be one of gamepad1 through gamepad4");
-				exit (-1);
-			}
-			ConfigDevice (FCFGD_GAMEPAD, device);
+			FCEUD_PrintError
+				("Invalid gamepad device specified; must be one of gamepad1 through gamepad4");
+			exit (-1);
 		}
-		else if (text.find ("powerpad") != std::string::npos)
-		{
-			int device = (text[strlen ("powerpad")] - '1');
-			if (device < 0 || device > 1)
-			{
-				FCEUD_PrintError
-					("Invalid powerpad device specified; must be powerpad1 or powerpad2");
-				exit (-1);
-			}
-			ConfigDevice (FCFGD_POWERPAD, device);
-		}
-		else if (text.find ("hypershot") != std::string::npos)
-		{
-			ConfigDevice (FCFGD_HYPERSHOT, 0);
-		}
-		else if (text.find ("quizking") != std::string::npos)
-		{
-			ConfigDevice (FCFGD_QUIZKING, 0);
-		}
+		ConfigDevice (FCFGD_GAMEPAD, device);
 	}
-	else
-		printf ("Please run \"fceux --nogui\" before using --inputcfg\n");
-
-#endif
+	else if (text.find ("powerpad") != std::string::npos)
+	{
+		int device = (text[strlen ("powerpad")] - '1');
+		if (device < 0 || device > 1)
+		{
+			FCEUD_PrintError
+				("Invalid powerpad device specified; must be powerpad1 or powerpad2");
+			exit (-1);
+		}
+		ConfigDevice (FCFGD_POWERPAD, device);
+	}
+	else if (text.find ("hypershot") != std::string::npos)
+	{
+		ConfigDevice (FCFGD_HYPERSHOT, 0);
+	}
+	else if (text.find ("quizking") != std::string::npos)
+	{
+		ConfigDevice (FCFGD_QUIZKING, 0);
+	}
 }
-
+#endif // EMSCRIPTEN
 
 /**
  * Hack to map the new configuration onto the existing button

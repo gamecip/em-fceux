@@ -58,7 +58,5 @@ void FCEUD_UpdateInput(void);
 void UpdateInput(Config *config);
 void InputCfg(const std::string &);
 
-std::string GetUserText(const char* title);
-const char* ButtonName(const ButtConfig* bc, int which);
 #endif
 
