@@ -750,19 +750,19 @@ static void RDoSQLQ(void)
 
     if(sqacc[0]<=0)
     {
-     rea:
-     sqacc[0]+=freq[0];
-     RectDutyCount[0]=(RectDutyCount[0]+1)&7;
-     if(sqacc[0]<=0) goto rea;
+     do {
+      sqacc[0]+=freq[0];
+      RectDutyCount[0]=(RectDutyCount[0]+1)&7;
+     } while (sqacc[0]<=0);
      totalout = wlookup1[ ttable[0][RectDutyCount[0]] + ttable[1][RectDutyCount[1]] ];
     }
 
     if(sqacc[1]<=0)
     {
-     rea2:
-     sqacc[1]+=freq[1];
-     RectDutyCount[1]=(RectDutyCount[1]+1)&7;
-     if(sqacc[1]<=0) goto rea2;
+     do {
+      sqacc[1]+=freq[1];
+      RectDutyCount[1]=(RectDutyCount[1]+1)&7;
+     } while (sqacc[1]<=0);
      totalout = wlookup1[ ttable[0][RectDutyCount[0]] + ttable[1][RectDutyCount[1]] ];
     }
    }
@@ -875,30 +875,30 @@ static void RDoTriangleNoisePCMLQ(void)
 
     if(triacc<=0)
     {
-     rea:
-     triacc+=freq[0]; //t;
-     tristep=(tristep+1)&0x1F;
-     if(triacc<=0) goto rea;
+     do {
+      triacc+=freq[0]; //t;
+      tristep=(tristep+1)&0x1F;
+     } while (triacc<=0);
      tcout=(tristep&0xF);
      if(!(tristep&0x10)) tcout^=0xF;
      tcout=tcout*3;
-      totalout = wlookup2[tcout+noiseout+RawDALatch];
+     totalout = wlookup2[tcout+noiseout+RawDALatch];
     }
 
     if(noiseacc<=0)
     {
-     rea2:
+     do {
         //used to added <<(16+2) when the noise table
         //values were half.
-     if(PAL)
-       noiseacc+=NoiseFreqTablePAL[PSG[0xE]&0xF]<<(16+1);
- 	 else
-       noiseacc+=NoiseFreqTableNTSC[PSG[0xE]&0xF]<<(16+1);
-     nreg=(nreg<<1)+(((nreg>>nshift)^(nreg>>14))&1);
-     nreg&=0x7fff;
-     noiseout=amptab[(nreg>>0xe)&1];
-     if(noiseacc<=0) goto rea2;
-      totalout = wlookup2[tcout+noiseout+RawDALatch];
+      if(PAL)
+        noiseacc+=NoiseFreqTablePAL[PSG[0xE]&0xF]<<(16+1);
+      else
+        noiseacc+=NoiseFreqTableNTSC[PSG[0xE]&0xF]<<(16+1);
+      nreg=(nreg<<1)+(((nreg>>nshift)^(nreg>>14))&1);
+      nreg&=0x7fff;
+      noiseout=amptab[(nreg>>0xe)&1];
+     } while (noiseacc<=0);
+     totalout = wlookup2[tcout+noiseout+RawDALatch];
     } /* noiseacc<=0 */
   } /* for(V=... */
 }
@@ -912,10 +912,10 @@ static void RDoTriangleNoisePCMLQ(void)
 
      if(triacc<=0)
      {
-      area:
-      triacc+=freq[0]; //t;
-      tristep=(tristep+1)&0x1F;
-      if(triacc<=0) goto area;
+      do {
+       triacc+=freq[0]; //t;
+       tristep=(tristep+1)&0x1F;
+      } while (triacc<=0);
       tcout=(tristep&0xF);
       if(!(tristep&0x10)) tcout^=0xF;
       tcout=tcout*3;
@@ -931,17 +931,17 @@ static void RDoTriangleNoisePCMLQ(void)
      noiseacc-=inie[1];
      if(noiseacc<=0)
      {
-      area2:
-         //used to be added <<(16+2) when the noise table
-         //values were half.
-      if(PAL)
+      do {
+       //used to be added <<(16+2) when the noise table
+       //values were half.
+       if(PAL)
         noiseacc+=NoiseFreqTablePAL[PSG[0xE]&0xF]<<(16+1);
-	  else
+       else
         noiseacc+=NoiseFreqTableNTSC[PSG[0xE]&0xF]<<(16+1);
-      nreg=(nreg<<1)+(((nreg>>nshift)^(nreg>>14))&1);
-      nreg&=0x7fff;
-      noiseout=amptab[(nreg>>0xe)&1];
-      if(noiseacc<=0) goto area2;
+       nreg=(nreg<<1)+(((nreg>>nshift)^(nreg>>14))&1);
+       nreg&=0x7fff;
+       noiseout=amptab[(nreg>>0xe)&1];
+      } while (noiseacc<=0);
       totalout = wlookup2[tcout+noiseout+RawDALatch];
      } /* noiseacc<=0 */
     }

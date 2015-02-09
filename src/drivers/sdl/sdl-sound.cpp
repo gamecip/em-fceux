@@ -2,6 +2,7 @@
  *
  * Copyright notice for this file:
  *  Copyright (C) 2002 Xodnizel
+ *  Copyright (C) 2015 Valtteri "tsone" Heikkila
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,32 +19,17 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-/// \file
-/// \brief Handles sound emulation using the SDL.
 #include "sdl.h"
-
-#include "../common/configSys.h"
 #include "../../utils/memory.h"
-
 #include <cstdio>
-#include <cstring>
-#include <cstdlib>
 
-// TODO: tsone: define to output test sine tone
+// NOTE: tsone: define to output test sine tone
 #define TEST_SINE_AT_FILL	0
 #define TEST_SINE_AT_WRITE	0
-
-// Note: Emulated sound is mono.
-#define SOUND_RATE 	22050	// Sampling rate of both FCEUX and audio interface (in Hz).
-#define BUFFER_SIZE	(6*256)	// Internal sound buffer size (in samples).
-#define HW_BUFFER_SIZE	256	// HW sound buffer size (in samples).
-// TODO: tsone: Will it work with higher quality?
-#define SOUND_QUALITY	0	// FCEUX sound quality setting, 0: lowest.
 
 extern Config *g_config;
 
 static int *s_Buffer = 0;
-static int s_BufferMax = 0;
 static int s_BufferRead = 0;
 static int s_BufferWrite = 0;
 static int s_BufferCount = 0;
@@ -61,10 +47,7 @@ static double testSinePhase = 0.0;
 /**
  * Callback from the SDL to get and play audio data.
  */
-static void
-fillaudio(void *udata,
-			uint8 *stream,
-			int len)
+static void fillaudio(void *udata, uint8 *stream, int len)
 {
 #if TEST_SINE_AT_FILL
 
@@ -79,84 +62,59 @@ fillaudio(void *udata,
 
 #else
 
-#ifndef EMSCRIPTEN
-	int16 *tmps = (int16*)stream;
-	len >>= 1;
-	while(len) {
-		int16 sample = 0;
-		if(s_BufferCount) {
-			sample = s_Buffer[s_BufferRead];
-			s_BufferRead = (s_BufferRead + 1) % s_BufferMax;
-			s_BufferCount--;
-		} else {
-			sample = 0;
-		}
-
-		*tmps = sample;
-		tmps++;
-		len--;
-	}
-#elif 0
-	len >>= 1;
-	for (int i = 0; i < len; i++) {
-		int16 sample = 0;
-		if(s_BufferCount) {
-			sample = s_Buffer[s_BufferRead];
-			s_BufferRead = (s_BufferRead + 1) % s_BufferMax;
-			s_BufferCount--;
-		} else {
-			sample = 0;
-		}
-
-		((int16*)stream)[i] = sample;
-	}
-#elif 0
+#if 1
+// NOTE: tsone: optimized version of the below
 	int16* str = (int16*) stream;
-    len >>= 1;
-//    if (s_BufferCount < len) {
-//        printf("Sound buffer exhausted (has %d samples, needs %d).\n", s_BufferCount, len);
-//    }
-    int i = -1;
-    int j = (s_BufferCount > len) ? len : s_BufferCount;
-	int k = len - j;
-    s_BufferCount -= j;
-	++j;
-	++k;
-	while (--j) {
-		str[++i] = s_Buffer[s_BufferRead];
-		s_BufferRead = (s_BufferRead + 1) % s_BufferMax;
+	len >>= 1;
+	int i = -1;
+	int j = s_BufferRead - 1;
+	int d = (s_BufferCount > len) ? len : s_BufferCount;
+	int m = SOUND_BUF_MAX - s_BufferRead;
+	if (m > d) {
+		m = d;
 	}
-	while (--k) {
+
+	s_BufferRead = (s_BufferRead + d) & SOUND_BUF_MASK;
+	s_BufferCount -= d;
+
+	len = len - d + 1;
+	d = d - m + 1;
+	++m;
+
+	while (--m) {
+		str[++i] = s_Buffer[++j];
+	}
+	j = -1;
+	while (--d) {
+		str[++i] = s_Buffer[++j];
+	}
+	while (--len) {
 		str[++i] = 0;
 	}
+
 #else
 	int16* str = (int16*) stream;
-    len >>= 1;
-//    if (s_BufferCount < len) {
-//        printf("Sound buffer exhausted (has %d samples, needs %d).\n", s_BufferCount, len);
-//    }
-    int i = 0;
-    int d = (s_BufferCount > len) ? len : s_BufferCount;
+	len >>= 1;
+	int d = (s_BufferCount > len) ? len : s_BufferCount;
+	int i = 0;
+	if (s_BufferCount < len) {
+		printf("Sound buffer exhausted (has %d samples, needs %d).\n", s_BufferCount, len);
+	}
 	for (; i < d; ++i) {
 		str[i] = s_Buffer[s_BufferRead];
-		s_BufferRead = (s_BufferRead + 1) % s_BufferMax;
+		s_BufferRead = (s_BufferRead + 1) & SOUND_BUF_MASK;
 	}
 	for (; i < len; ++i) {
 		str[i] = 0;
 	}
-    s_BufferCount -= d;
+	s_BufferCount -= d;
 #endif
 
 #endif // TEST_SINE_AT_FILL
 }
 
-/**
- * Initialize the audio subsystem.
- */
-int
-InitSound()
+int InitSound()
 {
-	int soundvolume, soundtrianglevolume, soundsquare1volume, soundsquare2volume, soundnoisevolume, soundpcmvolume;
 	SDL_AudioSpec spec;
 
 	memset(&spec, 0, sizeof(spec));
@@ -166,100 +124,60 @@ InitSound()
 		return 0;
 	}
 	char driverName[8];
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	// TODO - SDL 2
-#else
 	SDL_AudioDriverName(driverName, 8);
-	fprintf(stderr, "Loading SDL sound with %s driver...\n", driverName);
-#endif
-
-	soundvolume = 150;
-	soundtrianglevolume = 256;
-	soundsquare1volume = 256;
-	soundsquare2volume = 256;
-	soundnoisevolume = 256;
-	soundpcmvolume = 256;
+	printf("Loading SDL sound with %s driver...\n", driverName);
 
 	spec.format = AUDIO_S16SYS;
 	spec.channels = 1;
 	spec.freq = SOUND_RATE;
-	spec.samples = HW_BUFFER_SIZE;
-
+	spec.samples = SOUND_HW_BUF_MAX;
 	spec.callback = fillaudio;
 	spec.userdata = 0;
 
-	s_BufferMax = BUFFER_SIZE;
+//	printf("Sound buffersize: %d, HW: %d)\n", SOUND_BUF_MAX, spec.samples);
 
-	// For safety, set a bare minimum:
-	if (s_BufferMax < HW_BUFFER_SIZE * 2) {
-		s_BufferMax = HW_BUFFER_SIZE * 2;
-	}
-
-	printf("Sound buffersize: %d (requested: %d, HW: %d)\n", s_BufferMax, BUFFER_SIZE, spec.samples);
-
-	s_Buffer = (int *)FCEU_dmalloc(sizeof(int) * s_BufferMax);
-	if (!s_Buffer)
+	s_Buffer = (int *)FCEU_dmalloc(sizeof(int) * SOUND_BUF_MAX);
+	if (!s_Buffer) {
 		return 0;
+	}
 	s_BufferRead = s_BufferWrite = s_BufferCount = 0;
 
-	if(SDL_OpenAudio(&spec, 0))
-	{
+	if(SDL_OpenAudio(&spec, 0)) {
 		puts(SDL_GetError());
 		KillSound();
 		return 0;
-    }
+	}
 	SDL_PauseAudio(0);
 
-	FCEUI_SetSoundVolume(soundvolume);
+	FCEUI_SetSoundVolume(150);
 	FCEUI_SetSoundQuality(SOUND_QUALITY);
 	FCEUI_Sound(SOUND_RATE);
-	FCEUI_SetTriangleVolume(soundtrianglevolume);
-	FCEUI_SetSquare1Volume(soundsquare1volume);
-	FCEUI_SetSquare2Volume(soundsquare2volume);
-	FCEUI_SetNoiseVolume(soundnoisevolume);
-	FCEUI_SetPCMVolume(soundpcmvolume);
+	FCEUI_SetTriangleVolume(256);
+	FCEUI_SetSquare1Volume(256);
+	FCEUI_SetSquare2Volume(256);
+	FCEUI_SetNoiseVolume(256);
+	FCEUI_SetPCMVolume(256);
 	return 1;
 }
 
-
-/**
- * Returns the size of the audio buffer.
- */
-int GetMaxSound(void)
+int GetSoundBufferCount(void)
 {
-	return(s_BufferMax);
+	return s_BufferCount;
 }
 
-/**
- * Returns the amount of free space in the audio buffer.
- */
-int GetWriteSound(void)
-{
-    if (s_BufferMax < s_BufferCount)
-    {
-        printf("!!!! GetWriteSound: %4d < %4d\n", s_BufferMax, s_BufferCount);
-    }
-	return(s_BufferMax - s_BufferCount);
-}
-
-/**
- * Send a sound clip to the audio subsystem.
- */
-void
-WriteSound(int32 *buf,
-           int Count)
+void WriteSound(int32 *buf, int Count)
 {
 	extern int EmulationPaused;
 	if (EmulationPaused != 0) {
 		return;
 	}
 	if (Count <= 0) {
-		printf("!!!! WriteSound: Unable to write %d samples.\n", Count);
+//		printf("!!!! WriteSound: Unable to write %d samples.\n", Count);
 		return;
 	}
-	int freeCount = GetWriteSound();
+	int freeCount = SOUND_BUF_MAX - s_BufferCount;
 	if (Count > freeCount) {
-		printf("!!!! WriteSound: Tried to write %d samples while buffer has %d free.\n", Count, freeCount);
+//		printf("!!!! WriteSound: Tried to write %d samples while buffer has %d free.\n", Count, freeCount);
 		Count = freeCount;
 	}
 
@@ -270,41 +188,51 @@ WriteSound(int32 *buf,
 	++Count;
 	while (--Count) {
 		s_Buffer[s_BufferWrite] = 0xFFF * sin(testSinePhase * (2.0*M_PI * 440.0/SOUND_RATE));
-		s_BufferWrite = (s_BufferWrite + 1) % s_BufferMax;
+		s_BufferWrite = (s_BufferWrite + 1) & SOUND_BUF_MASK;
 		++testSinePhase;
 	}
 
+#elif 1
+// NOTE: tsone: optimized version of below
+	int i = s_BufferWrite - 1;
+	int j = -1;
+	int m = SOUND_BUF_MAX - s_BufferWrite;
+	if (m > Count) {
+		m = Count;
+	}
+
+	s_BufferCount += Count;
+	s_BufferWrite = (s_BufferWrite + Count) & SOUND_BUF_MASK;
+
+	Count = Count - m + 1;
+	++m;
+
+	while (--m) {
+		s_Buffer[++i] = buf[++j];
+	}
+	i = -1;
+	while (--Count) {
+		s_Buffer[++i] = buf[++j];
+	}
+
 #else
-        if (Count > s_BufferMax - s_BufferCount)
-        {
-            printf("Had to limit sound: %d (got: %d)\n", s_BufferMax - s_BufferCount, Count);
-            Count = s_BufferMax - s_BufferCount;
-        }
-//        printf("Bufsize: %5d, Count: %5d\n", s_BufferMax - s_BufferCount, Count);
+
 	for (int i = 0; i < Count; ++i) {
 		s_Buffer[s_BufferWrite] = buf[i];
-		s_BufferWrite = (s_BufferWrite + 1) % s_BufferMax;
+		s_BufferWrite = (s_BufferWrite + 1) & SOUND_BUF_MASK;
 	}
-//		SDL_LockAudio();
+
 	s_BufferCount += Count;
-//		SDL_UnlockAudio();
+
 #endif // TEST_SINE_AT_WRITE
 }
 
-/**
- * Pause (1) or unpause (0) the audio output.
- */
-void
-SilenceSound(int n)
+void SilenceSound(int n)
 { 
 	SDL_PauseAudio(n);   
 }
 
-/**
- * Shut down the audio subsystem.
- */
-int
-KillSound(void)
+int KillSound(void)
 {
 	FCEUI_Sound(0);
 	SDL_CloseAudio();
@@ -316,13 +244,7 @@ KillSound(void)
 	return 0;
 }
 
-
-/**
- * Adjust the volume either down (-1), up (1), or to the default (0).
- * Unmutes if mute was active before.
- */
-void
-FCEUD_SoundVolumeAdjust(int n)
+void FCEUD_SoundVolumeAdjust(int n)
 {
 // TODO: tsone: set way to adjust volume?
 #ifndef EMSCRIPTEN
@@ -355,11 +277,7 @@ FCEUD_SoundVolumeAdjust(int n)
 #endif
 }
 
-/**
- * Toggles the sound on or off.
- */
-void
-FCEUD_SoundToggle(void)
+void FCEUD_SoundToggle(void)
 {
 // TODO: tsone: set way to toggle sound?
 #ifndef EMSCRIPTEN
@@ -377,3 +295,4 @@ FCEUD_SoundToggle(void)
 	}
 #endif
 }
+

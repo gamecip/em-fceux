@@ -32,9 +32,7 @@
 #include "../../driver.h"
 #include "../../utils/xstring.h"
 
-#ifdef EMSCRIPTEN
 #include <html5.h>
-#endif
 
 #include <cstring>
 #include <cstdio>
@@ -111,23 +109,6 @@ static void UpdateFTrainer (void);
 static void UpdateTopRider (void);
 
 static uint32 JSreturn = 0;
-
-#ifndef NOCHEAT
-/**
- * Configure cheat devices (game genie, etc.).  Restarts the keyboard
- * and video subsystems.
- */
-static void
-DoCheatSeq ()
-{
-	SilenceSound (1);
-	KillVideo ();
-
-	DoConsoleCheatConfig ();
-	InitVideo (GameInfo);
-	SilenceSound (0);
-}
-#endif
 
 #include "keyscan.h"
 static uint8 *g_keyState = 0;
@@ -349,13 +330,6 @@ static void KeyboardCommands ()
 	// if not NES Sound Format
 	if (gametype != GIT_NSF)
 	{
-#ifndef NOCHEAT
-		if (_keyonly (Hotkeys[HK_CHEAT_MENU]))
-		{
-			DoCheatSeq ();
-		}
-#endif
-
 		// f5 (default) save key
 		if (_keyonly (Hotkeys[HK_SAVE_STATE]))
 		{
@@ -441,17 +415,7 @@ static void KeyboardCommands ()
 	//}
 	if (_keyonly (Hotkeys[HK_QUIT]))
 	{
-		if (noGui == 1)
-		{
-			CloseGame ();
-		}
-		else
-		{
-			CloseGame();
-			FCEUI_Kill();
-			SDL_Quit();
-			exit(0);
-		}
+		CloseGame ();
 	}
 	else
 
@@ -1195,7 +1159,7 @@ UpdateFTrainer ()
 }
 
 //
-// TODO: tsone: one may with to revisit input config code later...?
+// TODO: tsone: revisit this input config code later?
 //
 #ifdef EMSCRIPTEN
 

@@ -2,6 +2,7 @@
  *
  * Copyright notice for this file:
  *  Copyright (C) 2002 Xodnizel
+ *  Copyright (C) 2015 Valtteri "tsone" Heikkila
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,11 +23,7 @@
 /// \brief Handles the graphical game display for the SDL implementation.
 
 #include "sdl.h"
-#ifndef EMSCRIPTEN
-#include "sdl-opengl.h"
-#else
 #include "sdl-es2.h"
-#endif
 #include "../common/vidblit.h"
 #include "../../fceu.h"
 #include "../../version.h"
@@ -39,10 +36,6 @@
 
 #include "../common/configSys.h"
 #include "sdl-video.h"
-
-#ifdef CREATE_AVI
-#include "../videolog/nesvideos-piece.h"
-#endif
 
 #ifdef _GTK
 #include "gui.h"
@@ -740,80 +733,6 @@ BlitScreen(uint8 *XBuf)
 #else
 	SDL_UpdateRect(s_screen, xo, yo,
 				(Uint32)(NWIDTH * s_exs), (Uint32)(s_tlines * s_eys));
-#endif
-
-#ifdef CREATE_AVI
-#if 0 /* PAL INTO NTSC HACK */
- { int fps = FCEUI_GetDesiredFPS();
- if(FCEUI_GetDesiredFPS() == 838977920) fps = 1008307711;
- NESVideoLoggingVideo(s_screen->pixels, width,height, fps, s_curbpp);
- if(FCEUI_GetDesiredFPS() == 838977920)
- {
-   static unsigned dup=0;
-   if(++dup==5) { dup=0;
-   NESVideoLoggingVideo(s_screen->pixels, width,height, fps, s_curbpp); }
- } }
-#else
- { int fps = FCEUI_GetDesiredFPS();
-   static unsigned char* result = NULL;
-   static unsigned resultsize = 0;
-   int width = NWIDTH, height = s_tlines;
-   if(!result || resultsize != width*height*3*2)
-   {
-       if(result) free(result);
-       result = (unsigned char*) FCEU_dmalloc(resultsize = width*height*3*2);
-   }
-   switch(s_curbpp)
-   {
-   #if 0
-     case 24: case 32: case 15: case 16:
-       /* Convert to I420 if possible, because our I420 conversion is optimized
-        * and it'll produce less network traffic, hence faster throughput than
-        * anything else. And H.264 eats only I420, so it'd be converted sooner
-        * or later anyway if we didn't do it. Win-win situation.
-        */
-       switch(s_curbpp)
-       {
-         case 32: Convert32To_I420Frame(s_screen->pixels, &result[0], width*height, width); break;
-         case 24: Convert24To_I420Frame(s_screen->pixels, &result[0], width*height, width); break;
-         case 15: Convert15To_I420Frame(s_screen->pixels, &result[0], width*height, width); break;
-         case 16: Convert16To_I420Frame(s_screen->pixels, &result[0], width*height, width); break;
-       }
-       NESVideoLoggingVideo(&result[0], width,height, fps, 12);
-       break;
-   #endif
-     default:
-       NESVideoLoggingVideo(s_screen->pixels, width,height, fps, s_curbpp);
-   }
- }
-#endif
-
-#if REALTIME_LOGGING
- {
-   static struct timeval last_time;
-   static int first_time=1;
-   extern long soundrate;
-   
-   struct timeval cur_time;
-   gettimeofday(&cur_time, NULL);
-   
-   double timediff =
-       (cur_time.tv_sec *1e6 + cur_time.tv_usec
-     - (last_time.tv_sec *1e6 + last_time.tv_usec)) / 1e6;
-   
-   int nframes = timediff * 60 - 1;
-   if(first_time)
-     first_time = 0;
-   else while(nframes > 0)
-   {
-     static const unsigned char Buf[800*4] = {0};
-     NESVideoLoggingVideo(screen->pixels, 256,tlines, FCEUI_GetDesiredFPS(), s_curbpp);
-     NESVideoLoggingAudio(Buf, soundrate,16,1, soundrate/60.0);
-     --nframes;
-   }
-   memcpy(&last_time, &cur_time, sizeof(last_time));
- }
-#endif
 #endif
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)

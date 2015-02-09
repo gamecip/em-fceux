@@ -11,13 +11,21 @@
 #include "dface.h"
 #include "input.h"
 
-// I'm using this as a #define so the compiler can optimize the
-// modulo operation
-#define PERIODIC_SAVE_INTERVAL 5000 // milliseconds
+#if 1
+#define SOUND_RATE		22050
+#define SOUND_BUF_MAX		4096
+#define SOUND_HW_BUF_MAX	512
+#define SOUND_QUALITY		0
+#else
+#define SOUND_RATE		44100
+#define SOUND_BUF_MAX		8192
+#define SOUND_HW_BUF_MAX	1024
+#define SOUND_QUALITY		1
+#endif
+#define SOUND_BUF_MASK		(SOUND_BUF_MAX-1)
 
 const int INVALID_STATE = 99;
 
-extern int noGui;
 extern int isloaded;
 
 int LoadGame(const char *path);

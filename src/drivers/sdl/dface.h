@@ -11,8 +11,7 @@ void DoDriverArgs(void);
 int InitSound();
 void WriteSound(int32 *Buffer, int Count);
 int KillSound(void);
-int GetMaxSound(void);
-int GetWriteSound(void);
+int GetSoundBufferCount(void);
 
 void SilenceSound(int s); /* DOS and SDL */
 
@@ -33,7 +32,6 @@ void UnlockConsole(void);
 void ToggleFS();		/* SDL */
 
 int LoadGame(const char *path);
-//int CloseGame(void);
 
 void Giggles(int);
 void DoFun(void);

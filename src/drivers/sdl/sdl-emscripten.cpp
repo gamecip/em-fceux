@@ -46,7 +46,6 @@ int isloaded;
 bool turbo = false;
 
 int eoptions=0;
-int noGui = 1;
 
 static int inited = 0;
 
@@ -110,8 +109,7 @@ void FCEM_onSaveGameInterval()
 /**
  * Closes a game.  Frees memory, and deinitializes the drivers.
  */
-int
-CloseGame()
+int CloseGame()
 {
 	if(!isloaded) {
 		return(0);
@@ -129,73 +127,27 @@ CloseGame()
 
 void FCEUD_Update(uint8 *XBuf, int32 *Buffer, int Count);
 
-static void DoFun(int frameskip, int periodic_saves)
+static void DoFrame()
 {
-	uint8 *gfx;
+	uint8 *gfx = 0;
 	int32 *sound;
 	int32 ssize;
 	static int opause = 0;
 
-#if 1
-
-	int numSkipFrames = (GetWriteSound() / (22050/60)) - 1;
-
-	if (numSkipFrames < 0) return;
-
-//	if (numSkipFrames > 1) {
-//		printf("!!!! DoFun: Skipping %d frames.\n", numSkipFrames);
-//	}
-
-	while (numSkipFrames) {
-		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
-		FCEUD_Update(gfx, sound, ssize);
-		--numSkipFrames;
-	};
-
-	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
-	FCEUD_Update(gfx, sound, ssize);
-
-	FCEUD_UpdateInput();
-
-	if (gfx && (inited&4)) {
-		BlitScreen(gfx);
-	}
-
-	if(opause!=FCEUI_EmulationPaused()) {
-		opause=FCEUI_EmulationPaused();
-		SilenceSound(opause);
-	}
-
-#else
-	if (GetWriteSound() <= 22050/60) {
-//		printf("!!!! DoFun: Sound full, waiting.. (%d free samples).\n", GetWriteSound());
+	if (GetSoundBufferCount() > SOUND_BUF_MAX - (SOUND_RATE/60)) {
+// NOTE: tsone: audio buffer has no capacity. we don't need to do this update
 		return;
 	}
 
-#ifdef FRAMESKIP
-	static int fskipc = 0;
-	fskipc = (fskipc + 1) % (frameskip + 1);
-#endif
-
-	if(NoWaiting) {
-		gfx = 0;
+	while (GetSoundBufferCount() < 2*SOUND_HW_BUF_MAX - (SOUND_RATE/60)) {
+// NOTE: tsone: too few audio samples. try to compensate skipping frames and hope it gets unnoticed...
+		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
+		FCEUD_Update(gfx, sound, ssize);
 	}
 
-//	FCEUI_Emulate(&gfx, &sound, &ssize, fskipc);
 	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
 	FCEUD_Update(gfx, sound, ssize);
-
-// TODO: tsone: something wrong is here...?
-// tsone: need some extra sound samples in the buffering
-    while (GetWriteSound() > 22050/60) {
-//    while (GetWriteSound() > GetMaxSound()/2) {
-
-//	while (GetWriteSound() > 2 * ssize) {
-		uint8 *dummygfx = 0;
-		FCEUI_Emulate(&dummygfx, &sound, &ssize, 1); //<= skip=1 to skip video emulation; sound is only emulated.
-		FCEUD_Update(dummygfx, sound, ssize);
-	}
-
+	
 	FCEUD_UpdateInput();
 
 	if (gfx && (inited&4)) {
@@ -206,20 +158,18 @@ static void DoFun(int frameskip, int periodic_saves)
 		opause=FCEUI_EmulationPaused();
 		SilenceSound(opause);
 	}
-#endif
 }
 
-static void ReloadROM(void* arg)
+static void ReloadROM(void*)
 {
-    (void) arg;
     char *filename = emscripten_run_script_string("Module.romName");
     CloseGame();
     LoadGame(filename);
 }
 
-static void FCEM_DoFun()
+static void MainLoop()
 {
-// tsone: simple way to communicate with mainloop without "exporting" functions
+// NOTE: tsone: simple way to communicate with mainloop without "exporting" functions
     int reload = EM_ASM_INT_V({ return Module.romReload||0; });
     if (reload)
     {
@@ -228,15 +178,14 @@ static void FCEM_DoFun()
     }
     else if (GameInfo)
     {
-	    DoFun(0, 0);
+	DoFrame();
     }
 }
 
 /**
  * Initialize all of the subsystem drivers: video, audio, and joystick.
  */
-static int
-DriverInitialize(FCEUGI *gi)
+static int DriverInitialize(FCEUGI *gi)
 {
 	if(InitVideo(gi) < 0) return 0;
 	inited|=4;
@@ -260,8 +209,7 @@ DriverInitialize(FCEUGI *gi)
 /**
  * Shut down all of the subsystem drivers: video, audio, and joystick.
  */
-static void
-DriverKill()
+static void DriverKill()
 {
 	if (!noconfig)
 		g_config->save();
@@ -323,25 +271,11 @@ const char *FCEUD_GetCompilerString() {
 }
 
 /**
- * Unimplemented.
- */
-void FCEUD_DebugBreakpoint() {
-	return;
-}
-
-/**
- * Unimplemented.
- */
-void FCEUD_TraceInstruction() {
-	return;
-}
-
-/**
  * The main loop for the SDL.
  */
 int main(int argc, char *argv[])
 {
-	int error, frameskip;
+	int error;
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
@@ -439,27 +373,18 @@ int main(int argc, char *argv[])
 			newppu = 1;
 	}
 
-	g_config->getOption("SDL.Frameskip", &frameskip);
+// NOTE: tsone: set higher frame rate to ensure emulation stays ahead
+	emscripten_set_main_loop(MainLoop, 100, true);
 
-	// loop playing the game
-    emscripten_set_main_loop(FCEM_DoFun, 0, true);
 	return 0;
 }
 
-/**
- * Get the time in ticks.
- */
-uint64
-FCEUD_GetTime()
+uint64 FCEUD_GetTime()
 {
 	return SDL_GetTicks();
 }
 
-/**
- * Get the tick frequency in Hz.
- */
-uint64
-FCEUD_GetTimeFreq(void)
+uint64 FCEUD_GetTimeFreq(void)
 {
 	// SDL_GetTicks() is in milliseconds
 	return 1000;
@@ -491,13 +416,14 @@ void FCEUD_PrintError(const char *errormsg)
 }
 
 
-// dummy functions
-
+// NOTE: tsone: dummy functions, not implemented
 #define DUMMY(__f) \
     void __f(void) {\
         printf("%s\n", #__f);\
         FCEU_DispMessage("Not implemented.",0);\
     }
+DUMMY(FCEUD_DebugBreakpoint)
+DUMMY(FCEUD_TraceInstruction)
 DUMMY(FCEUD_HideMenuToggle)
 DUMMY(FCEUD_MovieReplayFrom)
 DUMMY(FCEUD_ToggleStatusIcon)

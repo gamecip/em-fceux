@@ -16,7 +16,7 @@ opts = Variables(None, ARGUMENTS)
 opts.AddVariables( 
   BoolVariable('DEBUG',     'Build with debugging symbols', 1),
   BoolVariable('RELEASE',   'Set to 1 to build for release', 0),
-  BoolVariable('FRAMESKIP', 'Enable frameskipping', 0),
+  BoolVariable('FRAMESKIP', 'Enable frameskipping', 1),
   BoolVariable('OPENGL',    'Enable OpenGL support', 1),
   BoolVariable('LUA',       'Enable Lua support', 1),
   BoolVariable('GTK', 'Enable GTK2 GUI (SDL only)', 1),
@@ -215,8 +215,9 @@ if env['DEBUG']:
   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
 else:
   if env['EMSCRIPTEN']:
-    #common = '--llvm-lto 1'
-    common = ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
+    common = ' --llvm-opts 3'
+    common += ' --llvm-lto 3'
+    common += ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
     common += ' -s DISABLE_EXCEPTION_CATCHING=1'
     common += ' -s ASSERTIONS=0'
     env.Append(CCFLAGS = '-O3' + common)
