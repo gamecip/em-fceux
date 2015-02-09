@@ -11,6 +11,7 @@
 #include "dface.h"
 #include "input.h"
 
+// NOTE: tsone: both SOUND_BUF_MAX and SOUND_HW_BUF_MAX must be power of two!
 #if 1
 #define SOUND_RATE		22050
 #define SOUND_BUF_MAX		4096

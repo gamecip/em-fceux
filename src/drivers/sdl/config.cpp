@@ -100,24 +100,14 @@ InitConfig()
 	config = new Config(dir);
 
 	// sound options
-	config->addOption('g', "gamegenie", "SDL.GameGenie", 0);
 	config->addOption("pal", "SDL.PAL", 0);
 	config->addOption("frameskip", "SDL.Frameskip", 0);
 	config->addOption("clipsides", "SDL.ClipSides", 0);
 	config->addOption("nospritelim", "SDL.DisableSpriteLimit", 1);
 
-	// color control
-	config->addOption('p', "palette", "SDL.Palette", "");
-	config->addOption("tint", "SDL.Tint", 56);
-	config->addOption("hue", "SDL.Hue", 72);
-	config->addOption("ntsccolor", "SDL.NTSCpalette", 0);
-
 	// scanline settings
 	config->addOption("slstart", "SDL.ScanLineStart", 0);
 	config->addOption("slend", "SDL.ScanLineEnd", 239);
-
-	// video controls
-	config->addOption('f', "fullscreen", "SDL.Fullscreen", 0);
 
 	// set x/y res to 0 for automatic fullscreen resolution detection (no change)
 	config->addOption('x', "xres", "SDL.XResolution", 0);
@@ -136,19 +126,9 @@ InitConfig()
 	config->addOption("xstretch", "SDL.XStretch", 0);
 	config->addOption("ystretch", "SDL.YStretch", 0);
 	config->addOption("noframe", "SDL.NoFrame", 0);
-	config->addOption("special", "SDL.SpecialFilter", 0);
 	config->addOption("showfps", "SDL.ShowFPS", 0);
 
 	// OpenGL options
-#if defined(OPENGL) && defined(EMSCRIPTEN)
-// tsone: need to automatically set opengl in this case
-	config->addOption("opengl", "SDL.OpenGL", 1);
-#else
-	config->addOption("opengl", "SDL.OpenGL", 0);
-#endif
-	config->addOption("openglip", "SDL.OpenGLip", 0); // disable OpenGL interpolation
-	config->addOption("SDL.SpecialFilter", 0);
-	config->addOption("SDL.SpecialFX", 0);
 	config->addOption("SDL.Vsync", 1);
 
 	// network play options - netplay is broken
@@ -358,29 +338,19 @@ InitConfig()
 void
 UpdateEMUCore(Config *config)
 {
-	int ntsccol, ntsctint, ntschue, flag, start, end;
-	std::string cpalette;
+	int start, end;
 
-	config->getOption("SDL.NTSCpalette", &ntsccol);
-	config->getOption("SDL.Tint", &ntsctint);
-	config->getOption("SDL.Hue", &ntschue);
-	FCEUI_SetNTSCTH(ntsccol, ntsctint, ntschue);
+// TODO: tsone: no neet to call this, color handling is by the driver
+//	FCEUI_SetNTSCTH(ntsccol, ntsctint, ntschue);
 
-	config->getOption("SDL.Palette", &cpalette);
-	if(cpalette.size()) {
-		LoadCPalette(cpalette);
-	}
+// TODO: tsone: Handle PAL? This changes it.
+	FCEUI_SetVidSystem(0);
 
-	config->getOption("SDL.PAL", &flag);
-	FCEUI_SetVidSystem(flag ? 1 : 0);
-
-	config->getOption("SDL.GameGenie", &flag);
-	FCEUI_SetGameGenie(flag ? 1 : 0);
+	FCEUI_SetGameGenie(0);
 
 	FCEUI_SetLowPass(0);
 
-	config->getOption("SDL.DisableSpriteLimit", &flag);
-	FCEUI_DisableSpriteLimitation(flag ? 1 : 0);
+	FCEUI_DisableSpriteLimitation(0);
 
 	config->getOption("SDL.ScanLineStart", &start);
 	config->getOption("SDL.ScanLineEnd", &end);

@@ -307,12 +307,6 @@ static void KeyboardCommands ()
 
 // TODO: tsone: not yet implemented
 #ifndef EMSCRIPTEN
-	// Alt-Enter to toggle full-screen
-	if (keyonly (ENTER) && is_alt)
-	{
-		ToggleFS ();
-	}
-
 		// Famicom disk-system games
 	if (gametype == GIT_FDS)
 	{

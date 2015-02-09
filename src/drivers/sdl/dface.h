@@ -27,14 +27,8 @@ uint32 *GetJSOr(void);
 int InitVideo(FCEUGI *gi);
 int KillVideo(void);
 void BlitScreen(uint8 *XBuf);
-void LockConsole(void);
-void UnlockConsole(void);
-void ToggleFS();		/* SDL */
 
 int LoadGame(const char *path);
-
-void Giggles(int);
-void DoFun(void);
 
 int FCEUD_NetworkConnect(void);
 

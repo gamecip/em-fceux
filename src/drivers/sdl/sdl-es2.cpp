@@ -1,6 +1,5 @@
 #include "sdl.h"
 #include "sdl-es2.h"
-#include "../common/vidblit.h"
 #include "../../utils/memory.h"
 #include "es2n.h"
 #include "emscripten.h"
@@ -48,8 +47,6 @@ int InitOpenGL(int left,
 		int bottom,
 		double xscale,
 		double yscale,
-		int efx,
-		int ipolate,
 		int stretchx,
 		int stretchy,
 		SDL_Surface *screen)
