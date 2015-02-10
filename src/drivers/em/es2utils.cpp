@@ -144,12 +144,29 @@ void deleteFBTex(GLuint *tex, GLuint *fb)
     }
 }
 
+// DEBUG: tsone: code to find mesh AABB
+#include <stdio.h>
+
 void createMesh(es2_mesh *p, GLuint prog, int num_verts, int num_elems, const GLfloat *verts, const GLfloat *norms, const GLfloat *uvs, const GLushort *elems)
 {
     memset(p, 0, sizeof(es2_mesh));
     p->num_elems = num_elems;
 
     createBuffer(&p->vert_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, verts);
+// DEBUG: tsone: code to find mesh AABB
+    GLfloat mins[3] = { .0f, .0f, .0f }, maxs[3] = { .0f, .0f, .0f };
+    for (int i = 0; i < 3*num_verts; i += 3) {
+        for (int j = 0; j < 3; ++j) {
+            if (verts[i+j] > maxs[j]) {
+                maxs[j] = verts[i+j];
+            } else if (verts[i+j] < mins[j]) {
+                mins[j] = verts[i+j];
+            }
+        }
+    }
+    printf("verts:%d aabb: min:%.5f,%.5f,%.5f max:%.5f,%.5f,%.5f\n", num_verts,
+        mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2]);
+
     if (norms) {
         createBuffer(&p->norm_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, norms);
     }

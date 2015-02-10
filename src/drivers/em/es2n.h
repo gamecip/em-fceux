@@ -20,11 +20,13 @@ typedef struct t_es2n_controls
     GLint _brightness_loc;
     GLint _contrast_loc;
     GLint _color_loc;
-    GLint _gamma_loc;
+    GLint _disp_gamma_loc;
     GLint _rgbppu_loc;
     GLint _convergence_loc;
     GLint _sharpen_kernel_loc;
     GLint _scanline_loc;
+
+    GLint _tv_gamma_loc;
 } es2n_controls;
 
 typedef struct t_es2n
@@ -46,21 +48,16 @@ typedef struct t_es2n
     GLint viewport[4];  // Original viewport.
 
     GLfloat mvp_mat[4*4]; // MVP matrix for the meshes.
-    es2_mesh screen_mesh;
    
     GLuint tv_prog;   // Shader for TV.
-    es2_mesh tv_mesh;
 
-// TODO: remove, blur not done 
-#if 0
-    GLuint blur_fb[2];  // Framebuffers for blurring.
-    GLuint blur_tex[2]; // Blur textures.
-    GLuint blur_prog;   // Shader for blur.
-#else
-    GLuint emit_fb;     // Framebuffer for screen emitter.
-    GLuint emit_tex;    // Screen emitter texture.
-#endif
+    GLuint downscale_fb[3];  // Framebuffers for downscaling.
+    GLuint downscale_tex[3]; // Downscale textures.
+    GLuint downscale_prog;   // Shader for downscaling.
+
     es2_mesh quad_mesh;
+    es2_mesh screen_mesh;
+    es2_mesh tv_mesh;
 
     GLubyte overscan_color;   // Current overscan color (background/zero color).
     GLubyte *overscan_pixels; // Temporary overscan pixels (1x240).
@@ -70,12 +67,9 @@ typedef struct t_es2n
 
     es2n_controls controls;
 
-// TODO: remove, blur not done 
-#if 0
     // Uniform locations.
-    GLint _blur_shift_loc;
-    GLint _blur_tex_loc;
-#endif
+    GLint _downscale_invResolution_loc;
+    GLint _downscale_downscaleTex_loc;
 } es2n;
 
 void es2nInit(es2n *p, int left, int right, int top, int bottom);
