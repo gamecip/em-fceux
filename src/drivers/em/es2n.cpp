@@ -260,14 +260,14 @@ static void updateControlUniformsRGB(const es2n_controls *c)
 static void updateControlUniformsStretch(const es2n_controls *c)
 {
     GLfloat v;
-    v = c->scanlines * c->crt_enabled * (4.0f/255.0f);
+    v = c->crt_enabled * c->scanlines;
     glUniform1f(c->_scanlines_loc, v);
 }
 
 static void updateControlUniformsDisp(const es2n_controls *c, int use_gamma)
 {
     GLfloat v;
-    v = c->crt_enabled * -2.0f * (c->convergence+0.3f);
+    v = c->crt_enabled * -2.0f * c->convergence;
     glUniform1f(c->_convergence_loc, v);
 
     if (use_gamma) {

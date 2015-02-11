@@ -90,10 +90,11 @@ static const char* stretch_frag_src =
     "uniform sampler2D u_rgbTex;\n"
     "varying vec2 v_uv[2];\n"
     "void main(void) {\n"
-// TODO: _Blend_ adjacent scanlines together and then _subtract_ scanlines mask.
+    // Averate adjacent scanlines together to create smoother image.
     "vec3 color = 0.5 * (texture2D(u_rgbTex, v_uv[0]).rgb + texture2D(u_rgbTex, v_uv[1]).rgb);\n"
-    "float scanlines = u_scanlines - u_scanlines * abs(sin(M_PI*256.0 * v_uv[0].y - M_PI*0.125));\n"
-    "gl_FragColor = vec4((color - scanlines) * (1.0+scanlines), 1.0);\n"
+    // Use oscillator to mix color with its square. This keeps more of the brighter colors.
+    "float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*256.0 * v_uv[0].y - M_PI*0.125)));\n"
+    "gl_FragColor = vec4(mix(color, color*color, scanlines), 1.0);\n"
     "}\n";
 
 static const char* disp_vert_src =
