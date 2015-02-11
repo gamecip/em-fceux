@@ -68,8 +68,8 @@ static const char* rgb_frag_src =
     "yiq = mix(yiq, rgbppu, u_rgbppu);\n"
     "yiq.gb *= u_color;\n"
     "vec3 result = c_convMat * yiq;\n"
-// TODO: Decode gamma by squaring. Can't use gamma > 2.0 because it loses too much precision.
-    "result *= result;\n"
+// TODO: Decode with assumed NTSC gamma of 2.22.
+    "result = pow(result, vec3(2.22));\n"
     "gl_FragColor = vec4(u_contrast * result + u_brightness, 1.0);\n"
     "}\n";
 

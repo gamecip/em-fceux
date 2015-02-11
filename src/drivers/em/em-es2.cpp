@@ -30,6 +30,7 @@ void BlitOpenGL(uint8 *buf)
 
     // Update CRT emulation controls (from js).
     s_es2n.controls.crt_enabled = EM_ASM_INT_V({ return Module.crtControl||0; });
+    s_es2n.controls.scanline = EM_ASM_DOUBLE_V({ return Module.scanlineControl||0; });
     s_es2n.controls.convergence = EM_ASM_DOUBLE_V({ return Module.convergenceControl||0; });
 
     es2nRender(&s_es2n, buf, deempScan, PALRAM[0]);

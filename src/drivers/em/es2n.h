@@ -13,6 +13,7 @@ typedef struct t_es2n_controls
 
     // Controls for CRT emulation. If CRT emulation is disabled, these do nothing.
     int crt_enabled;    // Set to zero to disable CRT emulation.
+    GLfloat scanline;   // CRT scanline strength.
     GLfloat convergence; // CRT red-blue convergence.
     GLfloat sharpness;  // CRT sharpness control.
 

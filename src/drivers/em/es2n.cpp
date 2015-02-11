@@ -260,7 +260,7 @@ static void updateControlUniformsRGB(const es2n_controls *c)
 static void updateControlUniformsStretch(const es2n_controls *c)
 {
     GLfloat v;
-    v = c->crt_enabled * (4.0f/255.0f);
+    v = c->scanline * c->crt_enabled * (4.0f/255.0f);
     glUniform1f(c->_scanline_loc, v);
 }
 
@@ -269,8 +269,9 @@ static void updateControlUniformsDisp(const es2n_controls *c, int use_gamma)
     GLfloat v;
     v = c->crt_enabled * -2.0f * (c->convergence+0.3f);
     glUniform1f(c->_convergence_loc, v);
+
     if (use_gamma) {
-      v = 0.55f + 0.1f*c->gamma;
+      v = 0.45f + 0.1f*c->gamma;
       glUniform1f(c->_disp_gamma_loc, v);
     } else {
       glUniform1f(c->_disp_gamma_loc, 1.0f);
@@ -287,7 +288,7 @@ static void updateControlUniformsDisp(const es2n_controls *c, int use_gamma)
 static void updateControlUniformsTV(const es2n_controls *c)
 {
     GLfloat v;
-    v = 0.55f + 0.1f*c->gamma;
+    v = 0.45f + 0.1f*c->gamma;
     glUniform1f(c->_tv_gamma_loc, v);
 }
 
