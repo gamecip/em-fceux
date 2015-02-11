@@ -9,11 +9,12 @@ typedef struct t_es2n_controls
     GLfloat contrast;   // Contrast control.
     GLfloat color;      // Color control.
     GLfloat gamma;      // Gamma control.
+    GLfloat glow;       // Glow control.
     GLfloat rgbppu;     // RGB PPU control.
 
     // Controls for CRT emulation. If CRT emulation is disabled, these do nothing.
     int crt_enabled;    // Set to zero to disable CRT emulation.
-    GLfloat scanline;   // CRT scanline strength.
+    GLfloat scanlines;  // CRT scanlines strength.
     GLfloat convergence; // CRT red-blue convergence.
     GLfloat sharpness;  // CRT sharpness control.
 
@@ -22,12 +23,14 @@ typedef struct t_es2n_controls
     GLint _contrast_loc;
     GLint _color_loc;
     GLint _disp_gamma_loc;
+    GLint _disp_glow_loc;
     GLint _rgbppu_loc;
     GLint _convergence_loc;
     GLint _sharpen_kernel_loc;
-    GLint _scanline_loc;
+    GLint _scanlines_loc;
 
     GLint _tv_gamma_loc;
+    GLint _tv_glow_loc;
 } es2n_controls;
 
 typedef struct t_es2n

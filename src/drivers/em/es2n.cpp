@@ -260,8 +260,8 @@ static void updateControlUniformsRGB(const es2n_controls *c)
 static void updateControlUniformsStretch(const es2n_controls *c)
 {
     GLfloat v;
-    v = c->scanline * c->crt_enabled * (4.0f/255.0f);
-    glUniform1f(c->_scanline_loc, v);
+    v = c->scanlines * c->crt_enabled * (4.0f/255.0f);
+    glUniform1f(c->_scanlines_loc, v);
 }
 
 static void updateControlUniformsDisp(const es2n_controls *c, int use_gamma)
@@ -271,11 +271,13 @@ static void updateControlUniformsDisp(const es2n_controls *c, int use_gamma)
     glUniform1f(c->_convergence_loc, v);
 
     if (use_gamma) {
-      v = 0.45f + 0.1f*c->gamma;
-      glUniform1f(c->_disp_gamma_loc, v);
+        v = 0.45f + 0.1f*c->gamma;
+        glUniform1f(c->_disp_gamma_loc, v);
     } else {
-      glUniform1f(c->_disp_gamma_loc, 1.0f);
+        glUniform1f(c->_disp_gamma_loc, 1.0f);
     }
+    v = 0.03f + 0.03f*c->glow;
+    glUniform1f(c->_disp_glow_loc, v);
     v = (0.9f-c->rgbppu) * 0.4f * (c->sharpness+0.5f);
     GLfloat sharpen_kernel[3 * 3] = {
         0.0f, -v, 0.0f, 
@@ -290,6 +292,8 @@ static void updateControlUniformsTV(const es2n_controls *c)
     GLfloat v;
     v = 0.45f + 0.1f*c->gamma;
     glUniform1f(c->_tv_gamma_loc, v);
+    v = 0.03f + 0.03f*c->glow;
+    glUniform1f(c->_tv_glow_loc, v);
 }
 
 static void updateUniformsDownscale(const es2n *p, int size, int texIdx)
@@ -332,7 +336,7 @@ static void initUniformsStretch(es2n *p)
     glUniform1i(k, RGB_I);
 
     es2n_controls *c = &p->controls;
-    c->_scanline_loc = glGetUniformLocation(prog, "u_scanline");
+    c->_scanlines_loc = glGetUniformLocation(prog, "u_scanlines");
     updateControlUniformsStretch(&p->controls);
 }
 
@@ -352,6 +356,7 @@ static void initUniformsDisp(es2n *p)
     c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
     c->_sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
     c->_disp_gamma_loc = glGetUniformLocation(prog, "u_gamma");
+    c->_disp_glow_loc = glGetUniformLocation(prog, "u_glow");
     updateControlUniformsDisp(&p->controls, 1);
 }
 
@@ -371,6 +376,7 @@ static void initUniformsTV(es2n *p)
 
     es2n_controls *c = &p->controls;
     c->_tv_gamma_loc = glGetUniformLocation(prog, "u_gamma");
+    c->_tv_glow_loc = glGetUniformLocation(prog, "u_glow");
     updateControlUniformsTV(&p->controls);
 }
 

@@ -416,9 +416,10 @@
         Module.contrastControl = 0;
         Module.colorControl = 0;
         Module.gammaControl = 0;
+        Module.glowControl = 0;
         Module.rgbppuControl = 0;
         Module.crtControl = 1;
-        Module.scanlineControl = 0;
+        Module.scanlinesControl = 1;
         Module.convergenceControl = 0;
         Module.sharpnessControl = 0;
       }
@@ -429,10 +430,11 @@
     Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('contrast', this.value)" onchange="changeControl('contrast', this.value)"/><br/>
     Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('color', this.value)" onchange="changeControl('color', this.value)"/><br/>
     Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
+    Glow <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('glow', this.value)" onchange="changeControl('glow', this.value)"/><br/>
     Sharpness <input type="range" min="-0.5" max="0.5" value="0" step="0.1" oninput="changeControl('sharpness', this.value)" onchange="changeControl('sharpness', this.value)"/><br/>
     RGB PPU <input type="range" min="-0.1" max="0.9" value="0" step="0.1" oninput="changeControl('rgbppu', this.value)" onchange="changeControl('rgbppu', this.value)"/><br/>
     CRT Emulation <input type="checkbox" checked="1" oninput="changeControl('crt', this.checked)" onchange="changeControl('crt', this.checked)"/><br/>
-    CRT Scanline <input type="range" min="0" max="2" value="1" step="0.2" oninput="changeControl('scanline', this.value)" onchange="changeControl('scanline', this.value)"/><br/>
+    CRT Scanlines <input type="range" min="0" max="2" value="1" step="0.2" oninput="changeControl('scanlines', this.value)" onchange="changeControl('scanlines', this.value)"/><br/>
     CRT Convergence <input type="range" min="-0.3" max="0.7" value="0" step="0.1" oninput="changeControl('convergence', this.value)" onchange="changeControl('convergence', this.value)"/><br/>
     <input type="button" value="Reset" onclick="resetControls()"/><br/>
 

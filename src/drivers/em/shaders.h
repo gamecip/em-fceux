@@ -86,14 +86,14 @@ static const char* stretch_vert_src =
 static const char* stretch_frag_src =
     "precision highp float;\n"
     DEFINE(M_PI)
-    "uniform float u_scanline;\n"
+    "uniform float u_scanlines;\n"
     "uniform sampler2D u_rgbTex;\n"
     "varying vec2 v_uv[2];\n"
     "void main(void) {\n"
-// TODO: _Blend_ adjacent scanlines together and then _subtract_ scanline mask.
+// TODO: _Blend_ adjacent scanlines together and then _subtract_ scanlines mask.
     "vec3 color = 0.5 * (texture2D(u_rgbTex, v_uv[0]).rgb + texture2D(u_rgbTex, v_uv[1]).rgb);\n"
-    "float scanline = u_scanline - u_scanline * abs(sin(M_PI*256.0 * v_uv[0].y - M_PI*0.125));\n"
-    "gl_FragColor = vec4((color - scanline) * (1.0+scanline), 1.0);\n"
+    "float scanlines = u_scanlines - u_scanlines * abs(sin(M_PI*256.0 * v_uv[0].y - M_PI*0.125));\n"
+    "gl_FragColor = vec4((color - scanlines) * (1.0+scanlines), 1.0);\n"
     "}\n";
 
 static const char* disp_vert_src =
@@ -107,7 +107,7 @@ static const char* disp_vert_src =
     "uniform mat4 u_mvp;\n"
     "varying vec2 v_uv[5];\n"
     "varying vec3 v_color;\n"
-    "varying vec2 v_bloomUV;\n"
+    "varying vec2 v_glowUV;\n"
     "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
     "void main() {\n"
     "vec2 uv = vec2(1.0/280.0, 22.0/256.0) + vec2(278.0/280.0, 228.0/256.0)*a_uv;\n"
@@ -132,7 +132,7 @@ static const char* disp_vert_src =
 #endif
     "gl_Position = u_mvp * a_vert;\n"
 // TODO: tsone: duplicate code (disp & tv)
-    "v_bloomUV = 0.5 + 0.499 * gl_Position.xy / gl_Position.w;\n"
+    "v_glowUV = 0.5 + 0.499 * gl_Position.xy / gl_Position.w;\n"
     "}\n";
 static const char* disp_frag_src =
 "precision highp float;\n"
@@ -140,9 +140,10 @@ static const char* disp_frag_src =
 "uniform sampler2D u_downscale1Tex;\n"
 "uniform mat3 u_sharpenKernel;\n"
 "uniform float u_gamma;\n"
+"uniform float u_glow;\n"
 "varying vec2 v_uv[5];\n"
 "varying vec3 v_color;\n"
-"varying vec2 v_bloomUV;\n"
+"varying vec2 v_glowUV;\n"
 
 //
 // From 'Improved texture interpolation' by Inigo Quilez (2009):
@@ -216,8 +217,8 @@ static const char* disp_frag_src =
     "SMP(4, u_sharpenKernel[2]);\n"
     "color = clamp(color, 0.0, 1.0);\n"
 // TODO: tsone: duplicate code (disp & tv)
-// TODO: tsone: quick hack to disable bloom in downscale pass
-    "if (u_gamma != 1.0) color += 0.04 * texture2DCubic(u_downscale1Tex, v_bloomUV, vec2(64.0));\n"
+// TODO: tsone: quick hack to disable glow in downscale pass
+    "if (u_gamma != 1.0) color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(64.0));\n"
 //    "gl_FragColor = vec4(v_color + color, 1.0);\n"
     "gl_FragColor = vec4(pow(v_color + color, vec3(u_gamma)), 1.0);\n"
 "}\n";
@@ -231,7 +232,7 @@ static const char* tv_vert_src =
     "varying vec3 v_p;\n"
     "varying vec3 v_n;\n"
     "varying vec3 v_v;\n"
-    "varying vec2 v_bloomUV;\n"
+    "varying vec2 v_glowUV;\n"
 
     "void main() {\n"
     "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
@@ -249,7 +250,7 @@ static const char* tv_vert_src =
     "v_p = a_vert.xyz;\n"
     "gl_Position = u_mvp * a_vert;\n"
 // TODO: tsone: duplicate code (disp & tv)
-    "v_bloomUV = 0.5 + 0.499 * gl_Position.xy / gl_Position.w;\n"
+    "v_glowUV = 0.5 + 0.499 * gl_Position.xy / gl_Position.w;\n"
     "}\n";
 static const char* tv_frag_src =
     "precision highp float;\n"
@@ -257,11 +258,12 @@ static const char* tv_frag_src =
     "uniform sampler2D u_downscale1Tex;\n"
     "uniform sampler2D u_downscale2Tex;\n"
     "uniform float u_gamma;\n"
+    "uniform float u_glow;\n"
     "varying vec3 v_color;\n"
     "varying vec3 v_p;\n"
     "varying vec3 v_n;\n"
     "varying vec3 v_v;\n"
-    "varying vec2 v_bloomUV;\n"
+    "varying vec2 v_glowUV;\n"
 
 // TODO: tsone: duplicate code (disp & tv)
 //
@@ -377,7 +379,7 @@ static const char* tv_frag_src =
 #endif
 //    "color = 0.5 * texture2D(u_downscale1Tex, v_uv).rgb;\n"
 // TODO: tsone: duplicate code (disp & tv)
-    "color += 0.04 * texture2DCubic(u_downscale1Tex, v_bloomUV, vec2(64.0));\n"
+    "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(64.0));\n"
     "gl_FragColor = vec4(pow(color, vec3(u_gamma)), 1.0);\n"
     "}\n";
 
