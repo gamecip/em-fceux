@@ -15,6 +15,11 @@ typedef struct t_es2_mesh
     GLint num_elems;
 } es2_mesh;
 
+GLfloat vec3Dot(const GLfloat *a, const GLfloat *b);
+void vec3Set(GLfloat *c, const GLfloat *a);
+void vec3Sub(GLfloat *c, const GLfloat *a, const GLfloat *b);
+void vec3Add(GLfloat *c, const GLfloat *a, const GLfloat *b);
+void vec3Scale(GLfloat *c, const GLfloat *a, GLfloat scale);
 void mat4Proj(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar);
 void mat4Trans(GLfloat *p, GLfloat *trans);
 void mat4Mul(GLfloat *p, const GLfloat *a, const GLfloat *b);

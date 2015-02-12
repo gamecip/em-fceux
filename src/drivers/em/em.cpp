@@ -143,6 +143,9 @@ static void DoFrame()
 // NOTE: tsone: too few audio samples. try to compensate skipping frames and hope it gets unnoticed...
 		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
 		FCEUD_Update(gfx, sound, ssize);
+
+// TODO: tsone: should update input again?
+//		FCEUD_UpdateInput();
 	}
 
 	FCEUI_Emulate(&gfx, &sound, &ssize, 0);

@@ -1,10 +1,45 @@
 #include "es2utils.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
 #define VERT_LOC 0
 #define NORM_LOC 1
 #define UV_LOC   2
+
+GLfloat vec3Dot(const GLfloat *a, const GLfloat *b)
+{
+    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+
+void vec3Set(GLfloat *c, const GLfloat *a)
+{
+    c[0] = a[0];
+    c[1] = a[1];
+    c[2] = a[2];
+}
+
+void vec3Sub(GLfloat *c, const GLfloat *a, const GLfloat *b)
+{
+    c[0] = a[0] - b[0];
+    c[1] = a[1] - b[1];
+    c[2] = a[2] - b[2];
+}
+
+void vec3Add(GLfloat *c, const GLfloat *a, const GLfloat *b)
+{
+    c[0] = a[0] + b[0];
+    c[1] = a[1] + b[1];
+    c[2] = a[2] + b[2];
+}
+
+void vec3Scale(GLfloat *c, const GLfloat *a, GLfloat scale)
+{
+    c[0] = a[0] * scale;
+    c[1] = a[1] * scale;
+    c[2] = a[2] * scale;
+}
 
 void mat4Proj(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar)
 {
@@ -47,6 +82,24 @@ GLuint compileShader(GLenum type, const char *src)
     GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &src, 0);
     glCompileShader(shader);
+
+    GLint value;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &value);
+    if (value == GL_FALSE) {
+        printf("ERROR: Shader compilation failed:\n");
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &value);
+        if (value > 0) {
+          char *buf = (char*) malloc(value);
+          glGetShaderInfoLog(shader, value, 0, buf);
+          printf("%s\n", buf);
+          free(buf);
+        } else {
+            printf("ERROR: No shader info log!\n");
+        }
+        printf("Shader source:\n%s\n", src);
+    }
+
+
     return shader;
 }
 

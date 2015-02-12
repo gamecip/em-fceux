@@ -110,10 +110,10 @@ static double NTSCsignal(int pixel, int phase)
 
 // 1D comb filter which relies on the inverse phase of the adjacent even and odd fields.
 // Ideally this allows extracting accurate luma and chroma. With NES PPU however, phase of
-// the fields is slightly off. More specifically, we'd need 6 samples phase difference
+// the fields is slightly off. More specifically, we'd need phase difference of 6 samples
 // (=half chroma wavelength), but we get 8 which comes from the discarded 1st pixel of
 // the odd field. The error is 2 samples or 60 degrees. The error is fixed by adjusting
-// the phase of the cos-sin (demodulator).
+// the phase of the cos-sin (demodulator, not done in this function...).
 static void comb1D(double *result, double level0, double level1, double x)
 {
     // Apply the 1D comb to separate luma and chroma.
@@ -122,9 +122,12 @@ static void comb1D(double *result, double level0, double level1, double x)
     double a = (2.0*M_PI/12.0) * x;
     // Demodulate and store YIQ result.
     result[0] = y;
-// TODO: have constants for these color scalers?
-    result[1] = 1.414*c * cos(a);
-    result[2] = 1.480*c * sin(a);
+    // This scaler (8/6) was found with experimentation. Something with inadequate sampling?
+    result[1] = 1.333*c * cos(a);
+    result[2] = 1.333*c * sin(a);
+// TODO: tsone: old scalers? seem to over-saturate. no idea where these from
+//    result[1] = 1.414*c * cos(a);
+//    result[2] = 1.480*c * sin(a);
 }
 
 static void adjustYIQLimits(es2n *p, double *yiq)
@@ -247,14 +250,16 @@ static void genLookupTex(es2n *p)
 static void updateControlUniformsRGB(const es2n_controls *c)
 {
     GLfloat v;
-    v = 0.333f * c->brightness;
+    v = 0.15f * c->brightness;
     glUniform1f(c->_brightness_loc, v);
-    v = 1.0f + 0.5f*c->contrast;
+    v = 1.0f + 0.4f*c->contrast;
     glUniform1f(c->_contrast_loc, v);
     v = 1.0f + c->color;
     glUniform1f(c->_color_loc, v);
     v = c->rgbppu + 0.1f;
     glUniform1f(c->_rgbppu_loc, v);
+    v = 1.0f + 0.3f*c->gamma;
+    glUniform1f(c->_gamma_loc, v);
 }
 
 static void updateControlUniformsStretch(const es2n_controls *c)
@@ -271,13 +276,11 @@ static void updateControlUniformsDisp(const es2n_controls *c, int use_gamma)
     glUniform1f(c->_convergence_loc, v);
 
     if (use_gamma) {
-        v = 0.45f + 0.1f*c->gamma;
-        glUniform1f(c->_disp_gamma_loc, v);
+        v = 0.08f + 0.08f*c->glow;
+        glUniform1f(c->_disp_glow_loc, v);
     } else {
-        glUniform1f(c->_disp_gamma_loc, 1.0f);
+        glUniform1f(c->_disp_glow_loc, -1.0f); // Disables gamma and glow.
     }
-    v = 0.03f + 0.03f*c->glow;
-    glUniform1f(c->_disp_glow_loc, v);
     v = (0.9f-c->rgbppu) * 0.4f * (c->sharpness+0.5f);
     GLfloat sharpen_kernel[3 * 3] = {
         0.0f, -v, 0.0f, 
@@ -290,9 +293,7 @@ static void updateControlUniformsDisp(const es2n_controls *c, int use_gamma)
 static void updateControlUniformsTV(const es2n_controls *c)
 {
     GLfloat v;
-    v = 0.45f + 0.1f*c->gamma;
-    glUniform1f(c->_tv_gamma_loc, v);
-    v = 0.03f + 0.03f*c->glow;
+    v = 0.08f + 0.08f*c->glow;
     glUniform1f(c->_tv_glow_loc, v);
 }
 
@@ -324,6 +325,7 @@ static void initUniformsRGB(es2n *p)
     c->_contrast_loc = glGetUniformLocation(prog, "u_contrast");
     c->_color_loc = glGetUniformLocation(prog, "u_color");
     c->_rgbppu_loc = glGetUniformLocation(prog, "u_rgbppu");
+    c->_gamma_loc = glGetUniformLocation(prog, "u_gamma");
     updateControlUniformsRGB(&p->controls);
 }
 
@@ -355,7 +357,6 @@ static void initUniformsDisp(es2n *p)
     es2n_controls *c = &p->controls;
     c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
     c->_sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
-    c->_disp_gamma_loc = glGetUniformLocation(prog, "u_gamma");
     c->_disp_glow_loc = glGetUniformLocation(prog, "u_glow");
     updateControlUniformsDisp(&p->controls, 1);
 }
@@ -375,7 +376,6 @@ static void initUniformsTV(es2n *p)
     glUniformMatrix4fv(k, 1, GL_FALSE, p->mvp_mat);
 
     es2n_controls *c = &p->controls;
-    c->_tv_gamma_loc = glGetUniformLocation(prog, "u_gamma");
     c->_tv_glow_loc = glGetUniformLocation(prog, "u_glow");
     updateControlUniformsTV(&p->controls);
 }
@@ -517,7 +517,46 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Setup TV shader.
     p->tv_prog = buildShader(tv_vert_src, tv_frag_src);
-    createMesh(&p->tv_mesh, p->tv_prog, mesh_rim_vert_num, 3*mesh_rim_face_num, mesh_rim_verts, mesh_rim_norms, 0, mesh_rim_faces);
+// TODO: tsone: generate uvs as distances to crt screen edges
+    GLfloat *rim_uvs = (GLfloat*) malloc(2*sizeof(GLfloat) * mesh_rim_vert_num);
+    for (int i = 0; i < mesh_rim_vert_num; ++i) {
+        GLfloat p[3];
+        vec3Set(p, &mesh_rim_verts[3*i]);
+        GLfloat shortest[3] = { 0, 0, 0 };
+        GLfloat shortestDist = 1000000.0f;
+        for (int j = 0; j < mesh_screen_face_num; ++j) {
+            for (int m = 0; m < 3; ++m) {
+                int ai = mesh_screen_faces[3*j+m];
+                int bi = mesh_screen_faces[3*j+((m+1)%3)];
+                GLfloat a[3], b[3], pa[3], ba[3];
+                vec3Set(a, &mesh_screen_verts[3*ai]);
+                vec3Set(b, &mesh_screen_verts[3*bi]);
+                vec3Sub(pa, p, a);
+                vec3Sub(ba, b, a);
+                GLfloat dotbaba = vec3Dot(ba, ba);
+                GLfloat t = 0;
+                if (dotbaba != 0) {
+                    t = vec3Dot(pa, ba) / dotbaba;
+                    if (t < 0) t = 0;
+                    else if (t > 1) t = 1;
+                }
+                vec3Scale(ba, ba, t);
+                vec3Add(a, a, ba);
+                vec3Sub(a, a, p);
+                GLfloat dist = vec3Dot(a, a);
+                if (dist < shortestDist) {
+                    shortestDist = dist;
+                    vec3Set(shortest, a);
+                }
+            }
+        }
+// TODO: tsone: could interpolate uv with vert normal here, and not in vertex shader
+        rim_uvs[2*i  ] = shortest[0];
+        rim_uvs[2*i+1] = shortest[1];
+    }
+    createMesh(&p->tv_mesh, p->tv_prog, mesh_rim_vert_num, 3*mesh_rim_face_num, mesh_rim_verts, mesh_rim_norms, rim_uvs, mesh_rim_faces);
+    free(rim_uvs);
+//    createMesh(&p->tv_mesh, p->tv_prog, mesh_rim_vert_num, 3*mesh_rim_face_num, mesh_rim_verts, mesh_rim_norms, 0, mesh_rim_faces);
     initUniformsTV(p);
 }
 

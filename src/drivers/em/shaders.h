@@ -34,6 +34,7 @@ static const char* rgb_frag_src =
     "uniform float u_contrast;\n"
     "uniform float u_color;\n"
     "uniform float u_rgbppu;\n"
+    "uniform float u_gamma;\n"
     "varying vec2 v_uv[int(NUM_TAPS)];\n"
     "varying vec2 v_deemp_uv;\n"
     "const mat3 c_convMat = mat3(\n"
@@ -47,7 +48,7 @@ static const char* rgb_frag_src =
     "#define UV(i_) uv = vec2(U(i_), V(i_))\n"
     "#define RESCALE(v_) ((v_) * (u_maxs-u_mins) + u_mins)\n"
     "#define SMP(i_) P(i_); UV(i_); yiq += RESCALE(texture2D(u_lookupTex, uv).rgb)\n"
-    "\n"
+
     "void main(void) {\n"
     "float deemp = 64.0 * (255.0/511.0) * texture2D(u_deempTex, v_deemp_uv).r;\n"
     "float subp = mod(floor(NUM_SUBPS*IDX_W * v_uv[int(NUM_TAPS)/2].x), NUM_SUBPS);\n"
@@ -67,9 +68,9 @@ static const char* rgb_frag_src =
     "yiq *= (8.0/2.0) / vec3(YW2, CW2-2.0, CW2-2.0);\n"
     "yiq = mix(yiq, rgbppu, u_rgbppu);\n"
     "yiq.gb *= u_color;\n"
-    "vec3 result = c_convMat * yiq;\n"
-// TODO: Decode with assumed NTSC gamma of 2.22.
-    "result = pow(result, vec3(2.22));\n"
+    "vec3 result = clamp(c_convMat * yiq, 0.0, 1.0);\n"
+    // Use low NTSC/CRT gamma 2.31 to compensate for lit room. 2.5 is way too high.
+    "result = pow(result, vec3(2.31*u_gamma));\n"
     "gl_FragColor = vec4(u_contrast * result + u_brightness, 1.0);\n"
     "}\n";
 
@@ -133,14 +134,13 @@ static const char* disp_vert_src =
 #endif
     "gl_Position = u_mvp * a_vert;\n"
 // TODO: tsone: duplicate code (disp & tv)
-    "v_glowUV = 0.5 + 0.499 * gl_Position.xy / gl_Position.w;\n"
+    "v_glowUV = 0.5 + 0.5 * gl_Position.xy / gl_Position.w;\n"
     "}\n";
 static const char* disp_frag_src =
 "precision highp float;\n"
 "uniform sampler2D u_stretchTex;\n"
 "uniform sampler2D u_downscale1Tex;\n"
 "uniform mat3 u_sharpenKernel;\n"
-"uniform float u_gamma;\n"
 "uniform float u_glow;\n"
 "varying vec2 v_uv[5];\n"
 "varying vec3 v_color;\n"
@@ -206,6 +206,15 @@ static const char* disp_frag_src =
     "return mix( mix( s3, s2, sx ), mix( s1, s0, sx ), sy );\n"
 "}\n"
 
+    "vec3 encodeGamma(const vec3 color)\n"
+    "{\n"
+        "return vec3(\n"
+            "(color.r <= 0.018) ? 4.5*color.r : 1.099*pow(color.r, 0.45) - 0.099,\n"
+            "(color.g <= 0.018) ? 4.5*color.g : 1.099*pow(color.g, 0.45) - 0.099,\n"
+            "(color.b <= 0.018) ? 4.5*color.b : 1.099*pow(color.b, 0.45) - 0.099\n"
+        ");\n"
+    "}\n"
+
 "#define SMP(i_, m_) color += (m_) * texture2D(u_stretchTex, v_uv[i_]).rgb\n"
 "void main(void) {\n"
     "vec3 color = vec3(0.0);\n"
@@ -217,11 +226,14 @@ static const char* disp_frag_src =
     "SMP(3, vec3(0.0, 0.0, 1.0));\n"
     "SMP(4, u_sharpenKernel[2]);\n"
     "color = clamp(color, 0.0, 1.0);\n"
+    "color += v_color;\n"
 // TODO: tsone: duplicate code (disp & tv)
 // TODO: tsone: quick hack to disable glow in downscale pass
-    "if (u_gamma != 1.0) color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(64.0));\n"
-//    "gl_FragColor = vec4(v_color + color, 1.0);\n"
-    "gl_FragColor = vec4(pow(v_color + color, vec3(u_gamma)), 1.0);\n"
+    "if (u_glow >= 0.0) {\n"
+        "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(64.0));\n"
+        "color = encodeGamma(color);\n"
+    "}\n"
+    "gl_FragColor = vec4(color, 1.0);\n"
 "}\n";
 
 static const char* tv_vert_src =
@@ -235,36 +247,65 @@ static const char* tv_vert_src =
     "varying vec3 v_v;\n"
     "varying vec2 v_glowUV;\n"
 
+// TODO: tsone: testing distances in uvs
+    "attribute vec2 a_uv;\n"
+    "varying vec2 v_uv;\n"
+    "varying vec2 v_blends;\n"
+
     "void main() {\n"
-    "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
-    "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
-    "vec4 p = u_mvp * a_vert;\n"
-    "vec3 n = normalize(a_norm);\n"
-    "vec3 v = normalize(view_pos - a_vert.xyz);\n"
-    "vec3 l = normalize(light_pos - a_vert.xyz);\n"
-    "vec3 h = normalize(l + v);\n"
-    "float ndotl = max(dot(n, l), 0.0);\n"
-    "float ndoth = max(dot(n, h), 0.0);\n"
-    "v_color = vec3(0.007 + 0.05*ndotl + 0.00*pow(ndoth, 19.0));\n"
-    "v_n = n;\n"
-    "v_v = v;\n"
-    "v_p = a_vert.xyz;\n"
-    "gl_Position = u_mvp * a_vert;\n"
+        "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
+        "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
+        "vec4 p = u_mvp * a_vert;\n"
+        "vec3 n = normalize(a_norm);\n"
+        "vec3 v = normalize(view_pos - a_vert.xyz);\n"
+        "vec3 l = normalize(light_pos - a_vert.xyz);\n"
+        "vec3 h = normalize(l + v);\n"
+        "float ndotl = max(dot(n, l), 0.0);\n"
+        "float ndoth = max(dot(n, h), 0.0);\n"
+        "v_color = vec3(0.000 + 0.004*ndotl + 0.00*pow(ndoth, 19.0));\n"
+// TODO: tsone: disable light for now
+        "v_color = vec3(0.0);\n"
+        "v_n = n;\n"
+        "v_v = v;\n"
+        "v_p = a_vert.xyz;\n"
+        "gl_Position = u_mvp * a_vert;\n"
 // TODO: tsone: duplicate code (disp & tv)
-    "v_glowUV = 0.5 + 0.499 * gl_Position.xy / gl_Position.w;\n"
+        "v_glowUV = 0.5 + 0.5 * gl_Position.xy / gl_Position.w;\n"
+    
+        "float les = length(a_uv);\n"
+        "vec2 clay = (les > 0.0) ? a_uv / les : vec2(0.0);\n"
+        "vec2 nxy = normalize(v_n.xy);\n"
+        "float mixer = max(1.0 - 30.0*les, 0.0);\n"
+        "vec2 pool = normalize(mix(clay, nxy, mixer));\n"
+        "vec4 tmp = u_mvp * vec4(a_vert.xy + 5.5*vec2(1.0, 7.0/8.0)*(vec2(les) + vec2(0.0014, 0.0019))*pool, a_vert.zw);\n"
+        "v_uv = 0.5 + 0.5 * tmp.xy / tmp.w;\n"
+        "v_blends.y = 50.0*les;\n"
     "}\n";
 static const char* tv_frag_src =
     "precision highp float;\n"
     DEFINE(M_PI)
+    "uniform sampler2D u_downscale0Tex;\n"
     "uniform sampler2D u_downscale1Tex;\n"
     "uniform sampler2D u_downscale2Tex;\n"
-    "uniform float u_gamma;\n"
     "uniform float u_glow;\n"
     "varying vec3 v_color;\n"
     "varying vec3 v_p;\n"
     "varying vec3 v_n;\n"
     "varying vec3 v_v;\n"
     "varying vec2 v_glowUV;\n"
+
+    "varying vec2 v_uv;\n"
+    "varying vec2 v_blends;\n"
+
+// TODO: tsone: this function is also shared
+    "vec3 encodeGamma(const vec3 color)\n"
+    "{\n"
+        "return vec3(\n"
+            "(color.r <= 0.018) ? 4.5*color.r : 1.099*pow(color.r, 0.45) - 0.099,\n"
+            "(color.g <= 0.018) ? 4.5*color.g : 1.099*pow(color.g, 0.45) - 0.099,\n"
+            "(color.b <= 0.018) ? 4.5*color.b : 1.099*pow(color.b, 0.45) - 0.099\n"
+        ");\n"
+    "}\n"
 
 // TODO: tsone: duplicate code (disp & tv)
 //
@@ -301,87 +342,55 @@ static const char* tv_frag_src =
     "return mix( mix( s3, s2, sx ), mix( s1, s0, sx ), sy );\n"
 "}\n"
 
-//    "const vec3 c_center = vec3(0.0, 0.00056, -0.0932);\n"
-//    "const vec3 c_size = vec3(0.97*0.956, 0.94*0.704, 0.0);\n"
-//    "const vec3 c_size = vec3(0.956, 0.704, 0.0) + vec3(0.002, -0.001, 0.0);\n"
-//    "const vec3 c_size = vec3(0.94531-0.00, 0.69515-0.05, 0.0);\n"
     "const vec2 c_uvMult = vec2(0.892, 0.827);\n"
+    "const vec3 c_center = vec3(0.0, 0.000135, -0.04427);\n"
+    "const vec3 c_size = vec3(0.95584, 0.703985, 0.04986);\n"
+//    "const vec3 c_size = vec3(0.95584-0.011, 0.703985-0.011, 0.04986);\n"
+
     "void main(void) {\n"
-    "vec3 color;\n"
-#if 0
-    "const vec3 c_center = vec3(0.0, 0.000135, -0.04427);\n"
-    "const vec3 c_size = vec3(0.95584-0.011, 0.703985-0.011, 0.04986);\n"
-// TODO: tsone: testing reflected
-//    "vec3 d = c_center + vec3(0.0, 0.0, c_size.z) - v_p;\n"
-    "vec3 d = c_center - vec3(0.0, 0.0, c_size.z) - v_p;\n"
-//    "vec3 d = c_center - v_p;\n"
-//    "vec3 r = reflect(-normalize(v_v), normalize(v_n));\n"
-    "vec3 r = reflect(-normalize(v_v), normalize(vec3(1.0,1.0,0.8)*v_n));\n"
-//    "r = normalize(mix(r, l, 0.3));\n"
-    "float t = (c_center.z - c_size.z - v_p.z) / r.z;\n"
-    "if (t <= 0.0) color = vec3(0.0, 0.0, 0.0);\n"
-    "else {\n"
-    "vec2 uv = c_uvMult * (v_p.xy + t*r.xy - c_center.xy) / c_size.xy;\n"
-    "float spec = dot(uv, uv);\n"
-    "spec = max(1.0 - spec*spec, 0.0) / (1.0 + dot(d, d));\n"
-//    "vec2 uv = clamp((v_p.xy + t*r.xy - c_center.xy) / c_size.xy, -1.0, 1.0);\n"
-    "color = spec * texture2D(u_downscale2Tex, 0.5 + 0.5*uv).rgb;\n"
-    "}\n"
-    "d.xy = abs(d.xy);\n"
-    "if (d.x <= c_size.x && d.y <= c_size.y) color = vec3(0.0, 1.0, 0.0);\n"
-#elif 1
-// TODO: tsone: faked reflections
-// TODO: tsone: quick hack
-    "const vec3 c_center = vec3(0.0, 0.000135, -0.04427);\n"
-//    "const vec3 c_size = vec3(0.95584, 0.703985, 0.04986);\n"
-    "const vec3 c_size = vec3(0.95584-0.011, 0.703985-0.011, 0.04986);\n"
+        "vec3 color;\n"
+
+#if 1
+    "vec3 d = vec3(-v_uv, 0.0);\n"
+    "vec3 c = vec3(v_p.xy + v_uv, v_p.z);\n"
+#else
     // calculate closest point 'c' on screen plane
     "vec3 d = v_p - c_center;\n"
     "vec3 q = min(abs(d) - c_size, 0.0) + c_size;\n"
     "vec3 c = c_center + sign(d) * q;\n"
     // point-light shading respective to 'c'
     "d = v_p - c;\n"
-    "vec3 l = -normalize(d);\n" // light at "closest", z=0.01 is screen AABB maxz
-    "vec3 n = normalize(v_n);\n"
-    "float ndotl = max(dot(n, l), 0.0);\n"
-    "float ndoth = max(dot(n, normalize(normalize(v_v) + l)), 0.0);\n"
+#endif
+//    "float ndoth = max(dot(n, normalize(normalize(v_v) + l)), 0.0);\n"
 //    "vec3 l = normalize(vec3(0.0, 0.0, 0.02) - v_p);\n" // light at "center"
 //    "float h = 1.0 + 96.0 * dot(d, d);\n"
-    "float h = 10.0 * length(d);\n"
-    "float diff = (0.9/M_PI) * (ndotl/(1.0 + h*h));\n"
-    "float spec = (0.1 * (2.0+6.0)/(2.0*M_PI)) * pow(ndoth, 6.0);\n"
-    // offset uv 
-    "vec2 uv = 0.5 + 0.5 * c_uvMult * (c.xy - (2.0 + h*vec2(23.0,7.0))*d.xy - c_center.xy) / c_size.xy;\n"
+//    "float spec = (0.1 * (2.0+6.0)/(2.0*M_PI)) * pow(ndoth, 6.0);\n"
+//    "float diff = (0.9/M_PI) * (ndotl/(1.0 + h*h));\n"
+    "float diff = 0.2;\n"
     // sample and mix
-//    "color = texture2D(u_downscale2Tex, uv).rgb;\n"
-//    "float ndotl = max(dot(n, d) / h, 0.0);\n"
-//    "float ndotl = max(dot(n, normalize(c_center - v_p)), 0.0);\n"
-//    "vec3 l = normalize(vec3(c.xy, 0.01) - v_p);\n" // light at "closest", z=0.01 is screen AABB maxz
-//    "color = vec3(ndotl / h);\n"
-//    "color = vec3(1.0*ndotl/h);\n"
-//    "color = vec3(diff);\n"
-//    "color = vec3(ndotl);\n"
-    "color = diff * texture2DCubic(u_downscale2Tex, uv, vec2(16.0)).rgb;\n"
-//    "color += spec * texture2DCubic(u_downscale1Tex, uv, vec2(64.0)).rgb;\n"
-#else
-    "vec3 n = normalize(v_n);\n"
-    "vec3 d = c_center - v_p;\n"
-    "float h = length(d);\n"
-    "float nDotL = max(dot(n, d) / h, 0.0);\n"
-    "float nDotV = max(dot(n, normalize(v_v)), 0.0);\n"
-    "h = 1.0 + max(h - c_size.y, 0.0);\n"
-    "h *= h;\n"
-    "h *= h;\n"
-//    "h *= h;\n"
-    "float atten = 1.0 / h;\n"
-//    "color = vec3(nDotV * nDotD, atten, nDotD * atten);\n"
-//    "color = vec3(nDotV * nDotL * atten, nDotV * nDotL, atten);\n"
-    "color = vec3(nDotV * nDotL * atten);\n"
-#endif
-//    "color = 0.5 * texture2D(u_downscale1Tex, v_uv).rgb;\n"
+    "color = v_color;\n"
+    "vec2 nuv = 2.0*v_uv - 1.0;\n"
+    "float vignette = max(1.0 - length(nuv), 0.0);\n"
+
+//        "vec3 ds0 = texture2D(u_downscale0Tex, v_uv).rgb;\n"
+        "vec3 ds0 = texture2DCubic(u_downscale0Tex, v_uv, vec2(256.0));\n"
+//        "vec3 ds1 = texture2D(u_downscale1Tex, v_uv).rgb;\n"
+        "vec3 ds1 = texture2DCubic(u_downscale1Tex, v_uv, vec2(64.0));\n"
+//        "vec3 ds2 = texture2D(u_downscale2Tex, v_uv).rgb;\n"
+        "vec3 ds2 = texture2DCubic(u_downscale2Tex, v_uv, vec2(16.0));\n"
+
+        "if (v_blends.y < 1.0) {\n"
+            "color = mix(ds0, ds1, v_blends.y);\n"
+        "} else if (v_blends.y < 3.0) {\n"
+            "color = mix(ds1, ds2, 0.5*v_blends.y - 0.5);\n"
+        "} else {\n"
+            "color = ds2;\n"
+        "}\n"
+        "color *= diff;\n"
+
 // TODO: tsone: duplicate code (disp & tv)
-    "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(64.0));\n"
-    "gl_FragColor = vec4(pow(color, vec3(u_gamma)), 1.0);\n"
+        "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(64.0));\n"
+        "gl_FragColor = vec4(encodeGamma(color), 1.0);\n"
     "}\n";
 
 // 4x4 box downscale.
