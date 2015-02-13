@@ -19,25 +19,22 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#include <cstdio>
 #include "em.h"
 #include "../../utils/memory.h"
-#include <cstdio>
+#include "../../fceu.h"
 
 // NOTE: tsone: define to output test sine tone
 #define TEST_SINE_AT_FILL	0
 #define TEST_SINE_AT_WRITE	0
-
-extern Config *g_config;
 
 static int *s_Buffer = 0;
 static int s_BufferRead = 0;
 static int s_BufferWrite = 0;
 static int s_BufferCount = 0;
 
-// TODO: tsone: required for sound muting
-#ifndef EMSCRIPTEN
-static int s_mute = 0;
-#endif
+// Sound is NOT muted if this is 0, otherwise it is muted.
+static int s_soundvolumestore = 0;
 
 #if TEST_SINE_AT_FILL || TEST_SINE_AT_WRITE
 #include <math.h>
@@ -246,53 +243,38 @@ int KillSound(void)
 
 void FCEUD_SoundVolumeAdjust(int n)
 {
-// TODO: tsone: set way to adjust volume?
-#ifndef EMSCRIPTEN
-	int soundvolume;
-	g_config->getOption("SDL.SoundVolume", &soundvolume);
+        int soundvolume = s_soundvolumestore ? s_soundvolumestore : FSettings.SoundVolume;
+	s_soundvolumestore = 0;
 
-	switch(n) {
-	case -1:
+	if (n < 0) {
 		soundvolume -= 10;
-		if(soundvolume < 0) {
-			soundvolume = 0;
-		}
-		break;
-	case 0:
-		soundvolume = 100;
-		break;
-	case 1:
+	} else if (n > 0) {
 		soundvolume += 10;
-		if(soundvolume > 150) {
-			soundvolume = 150;
-		}
-		break;
+	} else {
+		soundvolume = 100;
 	}
 
-	s_mute = 0;
-	FCEUI_SetSoundVolume(soundvolume);
-	g_config->setOption("SDL.SoundVolume", soundvolume);
+	if (soundvolume < 0) {
+		soundvolume = 0;
+        } else if (soundvolume > 150) {
+		soundvolume = 150;
+        }
 
-	FCEU_DispMessage("Sound volume %d.",0, soundvolume);
-#endif
+	FCEUI_SetSoundVolume(soundvolume);
+
+//	FCEU_DispMessage("Sound volume %d.",0, soundvolume);
 }
 
 void FCEUD_SoundToggle(void)
 {
-// TODO: tsone: set way to toggle sound?
-#ifndef EMSCRIPTEN
-	if(s_mute) {
-		int soundvolume;
-		g_config->getOption("SDL.SoundVolume", &soundvolume);
-
-		s_mute = 0;
-		FCEUI_SetSoundVolume(soundvolume);
-		FCEU_DispMessage("Sound mute off.",0);
+	if(s_soundvolumestore) {
+		FCEUI_SetSoundVolume(s_soundvolumestore);
+		s_soundvolumestore = 0;
+//		FCEU_DispMessage("Sound mute off.",0);
 	} else {
-		s_mute = 1;
+		s_soundvolumestore = FSettings.SoundVolume;
 		FCEUI_SetSoundVolume(0);
-		FCEU_DispMessage("Sound mute on.",0);
+//		FCEU_DispMessage("Sound mute on.",0);
 	}
-#endif
 }
 

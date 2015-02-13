@@ -16,9 +16,7 @@ typedef struct {
 extern int NoWaiting;
 extern CFGSTRUCT InputConfig[];
 extern ARGPSTRUCT InputArgs[];
-extern int Hotkeys[];
 void ParseGIInput(FCEUGI *GI);
-void setHotKeys();
 int ButtonConfigBegin();
 void ButtonConfigEnd();
 void ConfigButton(char *text, ButtConfig *bc);
@@ -32,8 +30,6 @@ int DWaitButton(const uint8 *text, ButtConfig *bc, int wb);
 #define FCFGD_POWERPAD  2
 #define FCFGD_HYPERSHOT 3
 #define FCFGD_QUIZKING  4
-
-#define SDL_FCEU_HOTKEY_EVENT	SDL_USEREVENT
 
 void InitInputInterface(void);
 void InputUserActiveFix(void);

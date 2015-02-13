@@ -56,7 +56,6 @@ static int s_inited;
 
 static double s_exs, s_eys;
 static int s_clipSides;
-static int noframe;
 static int s_nativeWidth = -1;
 static int s_nativeHeight = -1;
 
@@ -111,11 +110,10 @@ inline double GetYScale(int yres)
 {
 	return ((double)yres) / s_tlines;
 }
+
 void FCEUD_VideoChanged()
 {
-	int buf;
-	g_config->getOption("SDL.PAL", &buf);
-	if(buf)
+	if(FSettings.PAL)
 		PAL = 1;
 	else
 		PAL = 0;
@@ -131,25 +129,14 @@ InitVideo(FCEUGI *gi)
 	// XXX soules - const?  is this necessary?
 	const SDL_VideoInfo *vinf;
 	int error, flags = 0;
-	int doublebuf, xstretch, ystretch, xres, yres, show_fps;
 
 	FCEUI_printf("Initializing video...");
 
-	// load the relevant configuration variables
-	g_config->getOption("SDL.DoubleBuffering", &doublebuf);
-	g_config->getOption("SDL.XStretch", &xstretch);
-	g_config->getOption("SDL.YStretch", &ystretch);
-	g_config->getOption("SDL.LastXRes", &xres);
-	g_config->getOption("SDL.LastYRes", &yres);
-	g_config->getOption("SDL.ClipSides", &s_clipSides);
-	g_config->getOption("SDL.NoFrame", &noframe);
-	g_config->getOption("SDL.ShowFPS", &show_fps);
+	s_clipSides = 0; // Don't clip left side.
 
 	// check the starting, ending, and total scan lines
 	FCEUI_GetCurrentVidSystem(&s_srendline, &s_erendline);
 	s_tlines = s_erendline - s_srendline + 1;
-
-	// check if we should auto-set x/y resolution
 
     // check for OpenGL and set the global flags
 	flags = SDL_OPENGL;
@@ -178,41 +165,21 @@ InitVideo(FCEUGI *gi)
 		s_nativeHeight = vinf->current_h;
 	}
 
-	// check to see if we are showing FPS
-	FCEUI_SetShowFPS(show_fps);
+	FCEUI_SetShowFPS(0);
     
-	if(noframe) {
-		flags |= SDL_NOFRAME;
-	}
+// TODO: tsone: not sure if we need this with emscripten?
+	flags |= SDL_NOFRAME;
 
-	// enable double buffering if requested and we have hardware support
 	FCEU_printf("Initializing with OpenGL.\n");
-	if(doublebuf) {
-		 SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	}
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-	int desbpp;
-	g_config->getOption("SDL.BitsPerPixel", &desbpp);
-
-	g_config->getOption("SDL.XScale", &s_exs);
-	g_config->getOption("SDL.YScale", &s_eys);
+	// Scale x to compensate the 24px overscan.
+	s_exs = 4.0 * (280.0/256.0) + 0.5/256.0;
+	s_eys = 4.0;
 
 	// -Video Modes Tag-
 
-	if(s_exs <= 0.01) {
-		FCEUD_PrintError("xscale out of bounds.");
-		KillVideo();
-		return -1;
-	}
-	if(s_eys <= 0.01) {
-		FCEUD_PrintError("yscale out of bounds.");
-		KillVideo();
-		return -1;
-	}
-
-	s_screen = SDL_SetVideoMode((int)(NWIDTH * s_exs),
-							(int)(s_tlines * s_eys),
-							desbpp, flags);
+	s_screen = SDL_SetVideoMode((int)(NWIDTH * s_exs), (int)(s_tlines * s_eys), 32, flags);
 	if(!s_screen) {
 		FCEUD_PrintError(SDL_GetError());
 		return -1;
@@ -262,7 +229,7 @@ InitVideo(FCEUGI *gi)
 		if(!InitOpenGL(NOFFSET, 256 - (s_clipSides ? 8 : 0),
 					s_srendline, s_erendline + 1,
 					s_exs, s_eys,
-					xstretch, ystretch, s_screen)) 
+					0, 0, s_screen)) 
 		{
 			FCEUD_PrintError("Error initializing OpenGL.");
 			KillVideo();

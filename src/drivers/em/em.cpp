@@ -37,13 +37,15 @@
     #error "SDL 2.0 not supported"
 #endif
 
+#define TURBO_FRAMESKIPS 3
+
+void FCEUD_Update(uint8 *XBuf, int32 *Buffer, int Count);
+
 extern double g_fpsScale;
 
 extern bool MaxSpeed;
 
 int isloaded;
-
-bool turbo = false;
 
 int eoptions=0;
 
@@ -80,13 +82,9 @@ int LoadGame(const char *path)
 		return(0);
 	}
 	
-	// set pal/ntsc
-	int id;
-	g_config->getOption("SDL.PAL", &id);
-	if(id)
-		FCEUI_SetVidSystem(1);
-	else
-		FCEUI_SetVidSystem(0);
+// TODO: tsone: support for PAL?
+        // NTSC=0, PAL=1
+	FCEUI_SetVidSystem(0);
 	
 	isloaded = 1;
 
@@ -125,8 +123,6 @@ int CloseGame()
 	return(1);
 }
 
-void FCEUD_Update(uint8 *XBuf, int32 *Buffer, int Count);
-
 static void DoFrame()
 {
 	uint8 *gfx = 0;
@@ -134,18 +130,26 @@ static void DoFrame()
 	int32 ssize;
 	static int opause = 0;
 
+	if (NoWaiting) {
+		for (int i = 0; i < TURBO_FRAMESKIPS; ++i) {
+			FCEUI_Emulate(&gfx, &sound, &ssize, 2);
+			FCEUD_Update(gfx, sound, ssize);
+		}
+	}
+
+// TODO: tsone: assumes NTSC 60Hz
 	if (GetSoundBufferCount() > SOUND_BUF_MAX - (SOUND_RATE/60)) {
-// NOTE: tsone: audio buffer has no capacity. we don't need to do this update
+		// Audio buffer has no capacity, i.e. update cycle is ahead of time -> skip the cycle.
 		return;
 	}
 
-	while (GetSoundBufferCount() < 2*SOUND_HW_BUF_MAX - (SOUND_RATE/60)) {
-// NOTE: tsone: too few audio samples. try to compensate skipping frames and hope it gets unnoticed...
+	// In case of lag, try to fill audio buffer to critical minimum by skipping frames.
+// TODO: tsone: assumes NTSC 60Hz
+	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / (SOUND_RATE/60);
+	while (frameskips > 0) {
 		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
 		FCEUD_Update(gfx, sound, ssize);
-
-// TODO: tsone: should update input again?
-//		FCEUD_UpdateInput();
+		--frameskips;
 	}
 
 	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
@@ -153,7 +157,7 @@ static void DoFrame()
 	
 	FCEUD_UpdateInput();
 
-	if (gfx && (inited&4)) {
+	if (gfx && (inited & 4)) {
 		BlitScreen(gfx);
 	}
 
@@ -314,60 +318,8 @@ int main(int argc, char *argv[])
     // update the input devices
 	UpdateInput(g_config);
 
-	// If x/y res set to 0, store current display res in SDL.LastX/YRes
-	int yres, xres;
-	g_config->getOption("SDL.XResolution", &xres);
-	g_config->getOption("SDL.YResolution", &yres);
-	const SDL_VideoInfo* vid_info = SDL_GetVideoInfo();
-	if(xres == 0) 
-    {
-        if(vid_info != NULL)
-        {
-			g_config->setOption("SDL.LastXRes", vid_info->current_w);
-        }
-        else
-        {
-			g_config->setOption("SDL.LastXRes", 512);
-        }
-    }
-	else
-	{
-		g_config->setOption("SDL.LastXRes", xres);
-	}	
-    if(yres == 0)
-    {
-        if(vid_info != NULL)
-        {
-			g_config->setOption("SDL.LastYRes", vid_info->current_h);
-        }
-        else
-        {
-			g_config->setOption("SDL.LastYRes", 448);
-        }
-    } 
-	else
-	{
-		g_config->setOption("SDL.LastYRes", yres);
-	}
-	
 	// update the emu core
 	UpdateEMUCore(g_config);
-
-#ifndef EMSCRIPTEN
-	{
-		int id;
-		g_config->getOption("SDL.InputDisplay", &id);
-		extern int input_display;
-		input_display = id;
-		// not exactly an id as an true/false switch; still better than creating another int for that
-		g_config->getOption("SDL.SubtitleDisplay", &id); 
-		extern int movieSubtitles;
-		movieSubtitles = id;
-	}
-#endif
-	
-	// load the hotkeys from the config life
-	setHotKeys();
 
 	{
 		int id;
@@ -438,8 +390,6 @@ bool FCEUI_AviIsRecording(void) {return false;}
 void FCEUI_UseInputPreset(int preset) { }
 bool FCEUD_PauseAfterPlayback() { return false; }
 // These are actually fine, but will be unused and overriden by the current UI code.
-void FCEUD_TurboOn	(void) { NoWaiting|= 1; }
-void FCEUD_TurboOff   (void) { NoWaiting&=~1; }
 void FCEUD_TurboToggle(void) { NoWaiting^= 1; }
 FCEUFILE* FCEUD_OpenArchiveIndex(ArchiveScanRecord& asr, std::string &fname, int innerIndex) { return 0; }
 FCEUFILE* FCEUD_OpenArchive(ArchiveScanRecord& asr, std::string& fname, std::string* innerFilename) { return 0; }

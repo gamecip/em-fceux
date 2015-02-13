@@ -36,12 +36,6 @@ extern int eoptions;
 #define EO_LOWPASS	512
 #define EO_AUTOHIDE	1024
 
-extern int _sound;
-extern long soundrate;
-extern long soundbufsize;
-
-int CLImain(int argc, char *argv[]);
-
 // Device management defaults
 #define NUM_INPUT_DEVICES 3
 

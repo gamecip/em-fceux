@@ -145,58 +145,6 @@ _keyonly (int a)
 
 static int g_fkbEnabled = 0;
 
-// this function loads the sdl hotkeys from the config file into the
-// global scope.  this elimates the need for accessing the config file
-
-int Hotkeys[HK_MAX] = { 0 };
-
-// on every cycle of keyboardinput()
-void
-setHotKeys ()
-{
-	std::string prefix = "SDL.Hotkeys.";
-	for (int i = 0; i < HK_MAX; i++)
-	{
-		g_config->getOption (prefix + HotkeyStrings[i], &Hotkeys[i]);
-	}
-	return;
-}
-
-/***
-  * This function is a wrapper for FCEUI_ToggleEmulationPause that handles
-  * releasing/capturing mouse pointer during pause toggles
-  * */
-void
-TogglePause ()
-{
-	FCEUI_ToggleEmulationPause ();
-
-	int no_cursor;
-	g_config->getOption("SDL.NoFullscreenCursor", &no_cursor);
-	int fullscreen;
-	g_config->getOption ("SDL.Fullscreen", &fullscreen);
-
-	// Don't touch grab when in windowed mode
-	if(fullscreen == 0)
-		return;
-
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	// TODO - SDL2
-#else
-	if (FCEUI_EmulationPaused () == 0)
-	{
-		SDL_WM_GrabInput (SDL_GRAB_ON);
-		if(no_cursor)
-			SDL_ShowCursor (0);
-	}
-	else {
-		SDL_WM_GrabInput (SDL_GRAB_OFF);
-		SDL_ShowCursor (1);
-	}
-#endif
-	return;
-}
-
 // TODO: tsone: dummy functions
 void FCEUD_MovieRecordTo() {}
 
@@ -223,76 +171,46 @@ unsigned int *GetKeyboard(void)
  */
 static void KeyboardCommands ()
 {
-	int is_shift, is_alt;
-
 	// get the keyboard input
-#if SDL_VERSION_ATLEAST(1, 3, 0)
 	g_keyState = (Uint8*)SDL_GetKeyboardState (NULL);
-#else
-	g_keyState = SDL_GetKeyState (NULL);
-#endif
 
+// TODO: tsone: family keyboard toggle not working
+#ifndef EMSCRIPTEN
 	// check if the family keyboard is enabled
 	if (CurInputType[2] == SIFC_FKB)
 	{
-#if SDL_VERSION_ATLEAST(1, 3, 0)
-		// TODO - SDL2
-		if (0)
-#else
 		if (keyonly (SCROLLLOCK))
-#endif
 			{
 				g_fkbEnabled ^= 1;
 				FCEUI_DispMessage ("Family Keyboard %sabled.", 0,
 				g_fkbEnabled ? "en" : "dis");
 			}
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-		// TODO - SDL2
-#else
 		SDL_WM_GrabInput (g_fkbEnabled ? SDL_GRAB_ON : SDL_GRAB_OFF);
-#endif
 		if (g_fkbEnabled)
 		{
 			return;
 		}
 	}
-
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	if (g_keyState[SDL_GetScancodeFromKey (SDLK_LSHIFT)]
-		|| g_keyState[SDL_GetScancodeFromKey (SDLK_RSHIFT)])
-#else
-	if (g_keyState[SDLK_LSHIFT] || g_keyState[SDLK_RSHIFT])
 #endif
+
+// TODO: tsone: shift and alt are not working
+#ifndef EMSCRIPTEN
+	int is_shift, is_alt;
+
+	if (g_keyState[SDLK_LSHIFT] || g_keyState[SDLK_RSHIFT])
 	is_shift = 1;
   else
 	is_shift = 0;
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	if (g_keyState[SDL_GetScancodeFromKey (SDLK_LALT)]
-	|| g_keyState[SDL_GetScancodeFromKey (SDLK_RALT)])
-#else
 	if (g_keyState[SDLK_LALT] || g_keyState[SDLK_RALT])
-#endif
 	{
 		is_alt = 1;
-#if !SDL_VERSION_ATLEAST(2, 0, 0)
-		// workaround for GDK->SDL in GTK problems where ALT release is never 
-        // getting sent
-        // I know this is sort of an ugly hack to fix this, but the bug is 
-        // rather annoying
-		// prg318 10/23/11
-		int fullscreen;
-		g_config->getOption ("SDL.Fullscreen", &fullscreen);
-		if (!fullscreen)
-		{
-			g_keyState[SDLK_LALT] = 0;
-			g_keyState[SDLK_RALT] = 0;
-		}
-#endif
 	}
 	else
 		is_alt = 0;
+#endif
 
-
+// TODO: tsone: not yet implemented
+#ifndef EMSCRIPTEN
 	if (_keyonly (Hotkeys[HK_TOGGLE_BG]))
 	{
 		if (is_shift)
@@ -304,6 +222,7 @@ static void KeyboardCommands ()
 			FCEUI_SetRenderPlanes (true, true);
 		}
 	}
+#endif
 
 // TODO: tsone: not yet implemented
 #ifndef EMSCRIPTEN
@@ -324,66 +243,52 @@ static void KeyboardCommands ()
 	// if not NES Sound Format
 	if (gametype != GIT_NSF)
 	{
-		// f5 (default) save key
-		if (_keyonly (Hotkeys[HK_SAVE_STATE]))
+		if (_keyonly (SDLK_F5))
 		{
 			FCEUI_SaveState(NULL);
 		}
-
-		// f7 to load state
-		if (_keyonly (Hotkeys[HK_LOAD_STATE]))
+		if (_keyonly (SDLK_F7))
 		{
 			FCEUI_LoadState(NULL);
 		}
 	}
 
 
-	if (_keyonly (Hotkeys[HK_DECREASE_SPEED]))
+	if (_keyonly (SDLK_EQUALS))
 	{
 		DecreaseEmulationSpeed ();
 	}
 
-	if (_keyonly (Hotkeys[HK_INCREASE_SPEED]))
+	if (_keyonly (SDLK_MINUS))
 	{
 		IncreaseEmulationSpeed ();
 	}
 
+// TODO: tsone: allow input displaying?
 #ifndef EMSCRIPTEN
-	if (_keyonly (Hotkeys[HK_TOGGLE_FRAME_DISPLAY]))
-	{
-		FCEUI_MovieToggleFrameDisplay ();
-	}
-
-	if (_keyonly (Hotkeys[HK_TOGGLE_INPUT_DISPLAY]))
+	if (_keyonly (SDLK_COMMA))
 	{
 		FCEUI_ToggleInputDisplay ();
-		extern int input_display;
-		g_config->setOption ("SDL.InputDisplay", input_display);
-	}
-
-	if (_keyonly (Hotkeys[HK_MOVIE_TOGGLE_RW]))
-	{
-		FCEUI_SetMovieToggleReadOnly (!FCEUI_GetMovieToggleReadOnly ());
 	}
 #endif
 
-	if (_keyonly (Hotkeys[HK_PAUSE]))
+	if (_keyonly (SDLK_p))
 	{
 		//FCEUI_ToggleEmulationPause(); 
 		// use the wrapper function instead of the fceui function directly
 		// so we can handle cursor grabbage
-		TogglePause ();
+	FCEUI_ToggleEmulationPause ();
 	}
 
 	// Toggle throttling
 	NoWaiting &= ~1;
-	if (g_keyState[Hotkeys[HK_TURBO]])
+	if (g_keyState[SDLK_TAB])
 	{
 		NoWaiting |= 1;
 	}
 
 	static bool frameAdvancing = false;
-	if (g_keyState[Hotkeys[HK_FRAME_ADVANCE]])
+	if (g_keyState[SDLK_BACKSLASH])
 	{
 		if (frameAdvancing == false)
 		{
@@ -400,10 +305,13 @@ static void KeyboardCommands ()
 		}
 	}
 
-	if (_keyonly (Hotkeys[HK_RESET]))
+	if (_keyonly (SDLK_r))
 	{
 		FCEUI_ResetNES ();
 	}
+
+// TODO: tsone: power off by some key or UI?
+#ifndef EMSCRIPTEN
 	//if(_keyonly(Hotkeys[HK_POWER])) {
 	//    FCEUI_PowerNES();
 	//}
@@ -412,31 +320,36 @@ static void KeyboardCommands ()
 		CloseGame ();
 	}
 	else
+#endif
 
+	const int statekeys[] = {
+		SDLK_0, SDLK_1, SDLK_2, SDLK_3, SDLK_4, SDLK_5,
+		SDLK_6, SDLK_7, SDLK_8, SDLK_9
+        };
 	for (int i = 0; i < 10; i++)
-		if (_keyonly (Hotkeys[HK_SELECT_STATE_0 + i]))
+		if (_keyonly (statekeys[i]))
 		{
 			FCEUI_SelectState (i, 1);
 		}
 
-	if (_keyonly (Hotkeys[HK_SELECT_STATE_NEXT]))
+	if (_keyonly (SDLK_PAGEUP))
 	{
 		FCEUI_SelectStateNext (1);
 	}
 
-	if (_keyonly (Hotkeys[HK_SELECT_STATE_PREV]))
+	if (_keyonly (SDLK_PAGEDOWN))
 	{
 		FCEUI_SelectStateNext (-1);
 	}
 
-	if (_keyonly (Hotkeys[HK_FA_LAG_SKIP]))
+	if (_keyonly (SDLK_DELETE))
 	{
 		frameAdvanceLagSkip ^= 1;
 		FCEUI_DispMessage ("Skipping lag in Frame Advance %sabled.", 0,
 		frameAdvanceLagSkip ? "en" : "dis");
 	}
 
-	if (_keyonly (Hotkeys[HK_LAG_COUNTER_DISPLAY]))
+	if (_keyonly (SDLK_SLASH))
 	{
 		lagCounterDisplay ^= 1;
 	}
@@ -445,11 +358,11 @@ static void KeyboardCommands ()
 	if (gametype == GIT_VSUNI)
 	{
 		// insert coin
-		if (_keyonly (Hotkeys[HK_VS_INSERT_COIN]))
+		if (_keyonly (SDLK_F6))
 			FCEUI_VSUniCoin ();
 
 		// toggle dipswitch display
-		if (_keyonly (Hotkeys[HK_VS_TOGGLE_DIPSWITCH]))
+		if (_keyonly (SDLK_F8))
 		{
 			DIPS ^= 1;
 			FCEUI_VSUniToggleDIPView ();
@@ -466,9 +379,9 @@ static void KeyboardCommands ()
 	}
 	else
 	{
-		if (_keyonly (Hotkeys[HK_DECREASE_SPEED]))
+		if (_keyonly (SDLK_EQUALS))
 			FCEUI_NTSCDEC ();
-		if (_keyonly (Hotkeys[HK_INCREASE_SPEED]))
+		if (_keyonly (SDLK_MINUS))
 			FCEUI_NTSCINC ();
 
 // TODO: tsone: disabled barcode
@@ -579,16 +492,6 @@ UpdatePhysicalInput ()
 			  CloseGame ();
 			  puts ("Quit");
 			  break;
-			case SDL_FCEU_HOTKEY_EVENT:
-				switch (event.user.code)
-				{
-					case HK_PAUSE:
-						TogglePause ();
-						break;
-					default:
-						FCEU_printf ("Warning: unknown hotkey event %d\n",
-									event.user.code);
-				}
 			default:
 				break;
 		}
