@@ -24,6 +24,8 @@ typedef struct t_es2n_controls
     GLint _color_loc;
     GLint _gamma_loc;
     GLint _disp_glow_loc;
+    GLint _disp_uvScale_loc;
+    GLint _disp_mvp_loc;
     GLint _rgbppu_loc;
     GLint _convergence_loc;
     GLint _sharpen_kernel_loc;
@@ -50,7 +52,7 @@ typedef struct t_es2n
 
     GLint viewport[4];  // Original viewport.
 
-    GLfloat mvp_mat[4*4]; // MVP matrix for the meshes.
+    GLfloat mvp_mat[4*4]; // Perspective MVP matrix for the meshes.
    
     GLuint tv_prog;   // Shader for TV.
 

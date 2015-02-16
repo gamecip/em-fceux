@@ -3,19 +3,20 @@ static const char* rgb_vert_src =
     "precision highp float;\n"
     DEFINE(NUM_TAPS)
     DEFINE(IDX_W)
-    "attribute vec2 a_vert;\n"
+    "attribute vec4 a_vert;\n"
+    "attribute vec2 a_uv;\n"
     "varying vec2 v_uv[int(NUM_TAPS)];\n"
     "varying vec2 v_deemp_uv;\n"
     "#define UV_OUT(i_, o_) v_uv[i_] = vec2(uv.x + (o_)/IDX_W, uv.y)\n"
     "void main() {\n"
-    "vec2 uv = 0.5 + vec2(0.5, 0.5*240.0/256.0) * sign(a_vert);\n"
+    "vec2 uv = a_uv;\n"
     "UV_OUT(0,-2.0);\n"
     "UV_OUT(1,-1.0);\n"
     "UV_OUT(2, 0.0);\n"
     "UV_OUT(3, 1.0);\n"
     "UV_OUT(4, 2.0);\n"
     "v_deemp_uv = vec2(uv.y, 0.0);\n"
-    "gl_Position = vec4(a_vert, 0.0, 1.0);\n"
+    "gl_Position = a_vert;\n"
     "}\n";
 static const char* rgb_frag_src =
     "precision highp float;\n"
@@ -75,17 +76,20 @@ static const char* rgb_frag_src =
     "}\n";
 
 static const char* stretch_vert_src =
+    DEFINE(IDX_H)
     "precision highp float;\n"
-    "attribute vec2 a_vert;\n"
+    "attribute vec4 a_vert;\n"
+    "attribute vec2 a_uv;\n"
     "varying vec2 v_uv[2];\n"
     "void main() {\n"
-    "vec2 uv = 0.5 + vec2(0.5, 0.5*240.0/256.0) * sign(a_vert);\n"
+    "vec2 uv = a_uv;\n"
     "v_uv[0] = vec2(uv.x, 1.0 - uv.y);\n"
-    "v_uv[1] = vec2(v_uv[0].x, v_uv[0].y - 0.25/256.0);\n"
-    "gl_Position = vec4(a_vert, 0.0, 1.0);\n"
+    "v_uv[1] = vec2(v_uv[0].x, v_uv[0].y - 0.25/IDX_H);\n"
+    "gl_Position = a_vert;\n"
     "}\n";
 static const char* stretch_frag_src =
     "precision highp float;\n"
+    DEFINE(IDX_H)
     DEFINE(M_PI)
     "uniform float u_scanlines;\n"
     "uniform sampler2D u_rgbTex;\n"
@@ -94,7 +98,7 @@ static const char* stretch_frag_src =
     // Averate adjacent scanlines together to create smoother image.
     "vec3 color = 0.5 * (texture2D(u_rgbTex, v_uv[0]).rgb + texture2D(u_rgbTex, v_uv[1]).rgb);\n"
     // Use oscillator to mix color with its square. This keeps more of the brighter colors.
-    "float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*256.0 * v_uv[0].y - M_PI*0.125)));\n"
+    "float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*IDX_H * v_uv[0].y - M_PI*0.125)));\n"
     "gl_FragColor = vec4(mix(color, color*color, scanlines), 1.0);\n"
     "}\n";
 
@@ -107,12 +111,13 @@ static const char* disp_vert_src =
     "attribute vec2 a_uv;\n"
     "uniform float u_convergence;\n"
     "uniform mat4 u_mvp;\n"
+    "uniform vec2 u_uvScale;\n"
     "varying vec2 v_uv[5];\n"
     "varying vec3 v_color;\n"
     "varying vec2 v_glowUV;\n"
     "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
     "void main() {\n"
-    "vec2 uv = vec2(1.0/280.0, 22.0/256.0) + vec2(278.0/280.0, 228.0/256.0)*a_uv;\n"
+    "vec2 uv = 0.5 + u_uvScale.xy * (a_uv - 0.5);\n"
     "TAP(0,-4.0);\n"
     "TAP(1,-u_convergence);\n"
     "TAP(2, 0.0);\n"
@@ -138,6 +143,8 @@ static const char* disp_vert_src =
     "}\n";
 static const char* disp_frag_src =
 "precision highp float;\n"
+DEFINE(DOWNSCALE1_W)
+DEFINE(DOWNSCALE1_H)
 "uniform sampler2D u_stretchTex;\n"
 "uniform sampler2D u_downscale1Tex;\n"
 "uniform mat3 u_sharpenKernel;\n"
@@ -230,7 +237,7 @@ static const char* disp_frag_src =
 // TODO: tsone: duplicate code (disp & tv)
 // TODO: tsone: quick hack to disable glow in downscale pass
     "if (u_glow >= 0.0) {\n"
-        "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(64.0));\n"
+        "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(DOWNSCALE1_W, DOWNSCALE1_H));\n"
         "color = encodeGamma(color);\n"
     "}\n"
     "gl_FragColor = vec4(color, 1.0);\n"
@@ -284,6 +291,12 @@ static const char* tv_vert_src =
 static const char* tv_frag_src =
     "precision highp float;\n"
     DEFINE(M_PI)
+    DEFINE(DOWNSCALE0_W)
+    DEFINE(DOWNSCALE0_H)
+    DEFINE(DOWNSCALE1_W)
+    DEFINE(DOWNSCALE1_H)
+    DEFINE(DOWNSCALE2_W)
+    DEFINE(DOWNSCALE2_H)
     "uniform sampler2D u_downscale0Tex;\n"
     "uniform sampler2D u_downscale1Tex;\n"
     "uniform sampler2D u_downscale2Tex;\n"
@@ -373,11 +386,11 @@ static const char* tv_frag_src =
     "float vignette = max(1.0 - length(nuv), 0.0);\n"
 
 //        "vec3 ds0 = texture2D(u_downscale0Tex, v_uv).rgb;\n"
-        "vec3 ds0 = texture2DCubic(u_downscale0Tex, v_uv, vec2(256.0));\n"
+        "vec3 ds0 = texture2DCubic(u_downscale0Tex, v_uv, vec2(DOWNSCALE0_W, DOWNSCALE0_H));\n"
 //        "vec3 ds1 = texture2D(u_downscale1Tex, v_uv).rgb;\n"
-        "vec3 ds1 = texture2DCubic(u_downscale1Tex, v_uv, vec2(64.0));\n"
+        "vec3 ds1 = texture2DCubic(u_downscale1Tex, v_uv, vec2(DOWNSCALE1_W, DOWNSCALE1_H));\n"
 //        "vec3 ds2 = texture2D(u_downscale2Tex, v_uv).rgb;\n"
-        "vec3 ds2 = texture2DCubic(u_downscale2Tex, v_uv, vec2(16.0));\n"
+        "vec3 ds2 = texture2DCubic(u_downscale2Tex, v_uv, vec2(DOWNSCALE2_W, DOWNSCALE2_H));\n"
 
         "if (v_blends.y < 1.0) {\n"
             "color = mix(ds0, ds1, v_blends.y);\n"
@@ -389,7 +402,7 @@ static const char* tv_frag_src =
         "color *= diff;\n"
 
 // TODO: tsone: duplicate code (disp & tv)
-        "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(64.0));\n"
+        "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(DOWNSCALE1_W, DOWNSCALE1_H));\n"
         "gl_FragColor = vec4(encodeGamma(color), 1.0);\n"
     "}\n";
 
@@ -397,12 +410,13 @@ static const char* tv_frag_src =
 static const char* downscale_vert_src =
     "precision highp float;\n"
     "uniform vec2 u_invResolution;\n"
-    "attribute vec2 a_vert;\n"
+    "attribute vec4 a_vert;\n"
+    "attribute vec2 a_uv;\n"
     "varying vec2 v_uv[4];\n"
     "#define UV(i_, shift_) v_uv[(i_)] = uv + (shift_);\n"
     "void main() {\n"
-    "gl_Position = vec4(sign(a_vert), 0.0, 1.0);\n"
-    "vec2 uv = 0.5 + 0.5*gl_Position.xy;\n"
+    "gl_Position = a_vert;\n"
+    "vec2 uv = a_uv;\n"
    	"UV(0, vec2(-u_invResolution.x, -u_invResolution.y))\n"
 	"UV(1, vec2( u_invResolution.x, -u_invResolution.y))\n"
 	"UV(2, vec2(-u_invResolution.x,  u_invResolution.y))\n"

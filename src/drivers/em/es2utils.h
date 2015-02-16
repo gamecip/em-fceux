@@ -20,7 +20,7 @@ void vec3Set(GLfloat *c, const GLfloat *a);
 void vec3Sub(GLfloat *c, const GLfloat *a, const GLfloat *b);
 void vec3Add(GLfloat *c, const GLfloat *a, const GLfloat *b);
 void vec3Scale(GLfloat *c, const GLfloat *a, GLfloat scale);
-void mat4Proj(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar);
+void mat4Persp(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar);
 void mat4Trans(GLfloat *p, GLfloat *trans);
 void mat4Mul(GLfloat *p, const GLfloat *a, const GLfloat *b);
 GLuint compileShader(GLenum type, const char *src);
@@ -33,7 +33,7 @@ void createTex(GLuint *tex, int w, int h, GLenum format, GLenum min_filter, GLen
 void deleteTex(GLuint *tex);
 void createFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum min_filter, GLenum mag_filter);
 void deleteFBTex(GLuint *tex, GLuint *fb);
-void createMesh(es2_mesh *p, GLuint prog, int num_verts, int num_elems, const GLfloat *verts, const GLfloat *norms, const GLfloat *uvs, const GLushort *elems);
+void createMesh(es2_mesh *p, int num_verts, int num_elems, const GLfloat *verts, const GLfloat *norms, const GLfloat *uvs, const GLushort *elems);
 void deleteMesh(es2_mesh *p);
 void meshRender(es2_mesh *p);
 

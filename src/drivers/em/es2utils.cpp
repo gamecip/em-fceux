@@ -41,7 +41,7 @@ void vec3Scale(GLfloat *c, const GLfloat *a, GLfloat scale)
     c[2] = a[2] * scale;
 }
 
-void mat4Proj(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar)
+void mat4Persp(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar)
 {
     const GLfloat f = 1.0 / tan(fovy / 2.0);
     memset(p, 0, 4*4*sizeof(GLfloat));
@@ -200,7 +200,7 @@ void deleteFBTex(GLuint *tex, GLuint *fb)
 // DEBUG: tsone: code to find mesh AABB
 #include <stdio.h>
 
-void createMesh(es2_mesh *p, GLuint prog, int num_verts, int num_elems, const GLfloat *verts, const GLfloat *norms, const GLfloat *uvs, const GLushort *elems)
+void createMesh(es2_mesh *p, int num_verts, int num_elems, const GLfloat *verts, const GLfloat *norms, const GLfloat *uvs, const GLushort *elems)
 {
     memset(p, 0, sizeof(es2_mesh));
     p->num_elems = num_elems;
