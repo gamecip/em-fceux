@@ -15,9 +15,14 @@
 #define LOOKUP_I    2
 #define RGB_I       3
 #define STRETCH_I   4
-#define DOWNSCALE0_I 5
-#define DOWNSCALE1_I 6
-#define DOWNSCALE2_I 7
+// NOTE: tsone: these must be in incremental order
+#define TV_I        5
+#define DOWNSAMPLE0_I 6
+#define DOWNSAMPLE1_I 7
+#define DOWNSAMPLE2_I 8
+#define DOWNSAMPLE3_I 9
+#define DOWNSAMPLE4_I 10
+#define DOWNSAMPLE5_I 11
 #define TEX(i_)     (GL_TEXTURE0+(i_))
 
 #define PERSISTENCE_R 0.165 // Red phosphor persistence.
@@ -46,12 +51,6 @@
 #define IDX_H 240
 #define RGB_W (NUM_SUBPS * IDX_W)
 #define STRETCH_H (4 * 240)
-#define DOWNSCALE0_W 280
-#define DOWNSCALE0_H 240
-#define DOWNSCALE1_W 70
-#define DOWNSCALE1_H 60
-#define DOWNSCALE2_W 17
-#define DOWNSCALE2_H 15
 // Half-width of Y and C box filter kernels.
 #define YW2 6.0
 #define CW2 12.0
@@ -83,6 +82,14 @@ static const GLfloat mesh_quad_norms[] = {
 };
 
 static const GLfloat mat4_identity[] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
+
+// Texture sample offsets and weights for gaussian w/ radius=8, sigma=4.
+// Eliminates aliasing and blurs for "faked" glossy reflections and AO.
+static const float s_downsample_offs[] = { -6.892337f, -4.922505f, -2.953262f, -0.98438f, 0.98438f, 2.953262f, 4.922505f, 6.892337f };
+static const float s_downsample_ws[] = { 0.045894f, 0.096038f, 0.157115f, 0.200954f, 0.200954f, 0.157115f, 0.096038f, 0.045894f };
+
+static const int s_downsample_widths[]  = { 1120, 280, 280,  70, 70, 18, 18 };
+static const int s_downsample_heights[] = {  960, 960, 240, 240, 60, 60, 15 };
 
 // This source code is modified from original at:
 // http://wiki.nesdev.com/w/index.php/NTSC_video
@@ -140,11 +147,13 @@ static void comb1D(double *result, double level0, double level1, double x)
     double a = (2.0*M_PI/12.0) * x;
     // Demodulate and store YIQ result.
     result[0] = y;
+// TODO: tsone: battling with scalers... weird
     // This scaler (8/6) was found with experimentation. Something with inadequate sampling?
-    result[1] = 1.333*c * cos(a);
-    result[2] = 1.333*c * sin(a);
+//    result[1] = 1.333*c * cos(a);
+//    result[2] = 1.333*c * sin(a);
 // TODO: tsone: old scalers? seem to over-saturate. no idea where these from
-//    result[1] = 1.414*c * cos(a);
+    result[1] = 1.414*c * cos(a);
+    result[2] = 1.414*c * sin(a);
 //    result[2] = 1.480*c * sin(a);
 }
 
@@ -276,18 +285,18 @@ static void updateUniformsRGB(const es2n_controls *c)
     glUniform1f(c->_color_loc, v);
     v = c->rgbppu + 0.1f;
     glUniform1f(c->_rgbppu_loc, v);
-    v = 1.0f + 0.3f*c->gamma;
+    v = 2.4f/2.2f + 0.3f*c->gamma;
     glUniform1f(c->_gamma_loc, v);
 }
 
 static void updateUniformsStretch(const es2n_controls *c)
 {
     GLfloat v;
-    v = c->crt_enabled * c->scanlines;
+    v = c->crt_enabled * 0.5f * c->scanlines;
     glUniform1f(c->_scanlines_loc, v);
 }
 
-static void updateUniformsDisp(const es2n *p, int final_pass)
+static void updateUniformsScreen(const es2n *p, int final_pass)
 {
     const es2n_controls *c = &p->controls;
     GLfloat v;
@@ -295,18 +304,11 @@ static void updateUniformsDisp(const es2n *p, int final_pass)
     glUniform1f(c->_convergence_loc, v);
 
     if (c->crt_enabled) {
-        glUniform2f(c->_disp_uvScale_loc, 278.0/IDX_W, 228.0/IDX_H);
-        glUniformMatrix4fv(c->_disp_mvp_loc, 1, GL_FALSE, p->mvp_mat);
+        glUniform2f(c->_screen_uvScale_loc, 278.0/IDX_W, 228.0/IDX_H);
+        glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, p->mvp_mat);
     } else {
-        glUniform2f(c->_disp_uvScale_loc, 260.0/IDX_W, 224.0/IDX_H);
-        glUniformMatrix4fv(c->_disp_mvp_loc, 1, GL_FALSE, mat4_identity);
-    }
-
-    if (final_pass) {
-        v = 0.08f + 0.08f*c->glow;
-        glUniform1f(c->_disp_glow_loc, v);
-    } else {
-        glUniform1f(c->_disp_glow_loc, -1.0f); // Disables gamma and glow.
+        glUniform2f(c->_screen_uvScale_loc, 260.0/IDX_W, 224.0/IDX_H);
+        glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, mat4_identity);
     }
 
     v = (0.9f-c->rgbppu) * 0.4f * (c->sharpness+0.5f);
@@ -318,17 +320,35 @@ static void updateUniformsDisp(const es2n *p, int final_pass)
     glUniformMatrix3fv(c->_sharpen_kernel_loc, 1, GL_FALSE, sharpen_kernel);
 }
 
-static void updateUniformsTV(const es2n_controls *c)
+static void updateUniformsDownsample(const es2n *p, int w, int h, int texIdx, int isHorzPass)
 {
-    GLfloat v;
-    v = 0.08f + 0.08f*c->glow;
-    glUniform1f(c->_tv_glow_loc, v);
+    float offsets[2*8];
+    if (isHorzPass) {
+        for (int i = 0; i < 8; ++i) {
+            offsets[2*i  ] = s_downsample_offs[i] / w;
+            offsets[2*i+1] = 0;
+        }
+    } else {
+        for (int i = 0; i < 8; ++i) {
+            offsets[2*i  ] = 0;
+            offsets[2*i+1] = s_downsample_offs[i] / h;
+        }
+    }
+    glUniform2fv(p->_downsample_offsets_loc, 8, offsets);
+    glUniform1fv(p->_downsample_weights_loc, 8, s_downsample_ws);
+    glUniform1i(p->_downsample_downsampleTex_loc, texIdx);
 }
 
-static void updateUniformsDownscale(const es2n *p, int w, int h, int texIdx)
+// TODO: tsone: not necessary?
+static void updateUniformsTV(const es2n *p)
 {
-    glUniform2f(p->_downscale_invResolution_loc, 1.0/w, 1.0/h);
-    glUniform1i(p->_downscale_downscaleTex_loc, texIdx);
+}
+
+static void updateUniformsCombine(const es2n *p)
+{
+    const es2n_controls *c = &p->controls;
+    GLfloat v = 0.08f + 0.08f*c->glow;
+    glUniform1f(c->_combine_glow_loc, v);
 }
 
 static void initUniformsRGB(es2n *p)
@@ -369,23 +389,22 @@ static void initUniformsStretch(es2n *p)
     updateUniformsStretch(&p->controls);
 }
 
-static void initUniformsDisp(es2n *p)
+static void initUniformsScreen(es2n *p)
 {
     GLint k;
-    GLuint prog = p->disp_prog;
+    GLuint prog = p->screen_prog;
 
     k = glGetUniformLocation(prog, "u_stretchTex");
     glUniform1i(k, STRETCH_I);
-    k = glGetUniformLocation(prog, "u_downscale1Tex");
-    glUniform1i(k, DOWNSCALE1_I);
+    k = glGetUniformLocation(prog, "u_downsample3Tex");
+    glUniform1i(k, DOWNSAMPLE3_I);
 
     es2n_controls *c = &p->controls;
     c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
     c->_sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
-    c->_disp_glow_loc = glGetUniformLocation(prog, "u_glow");
-    c->_disp_uvScale_loc = glGetUniformLocation(prog, "u_uvScale");
-    c->_disp_mvp_loc = glGetUniformLocation(prog, "u_mvp");
-    updateUniformsDisp(p, 1);
+    c->_screen_uvScale_loc = glGetUniformLocation(prog, "u_uvScale");
+    c->_screen_mvp_loc = glGetUniformLocation(prog, "u_mvp");
+    updateUniformsScreen(p, 1);
 }
 
 static void initUniformsTV(es2n *p)
@@ -393,27 +412,42 @@ static void initUniformsTV(es2n *p)
     GLint k;
     GLuint prog = p->tv_prog;
 
-    k = glGetUniformLocation(prog, "u_downscale0Tex");
-    glUniform1i(k, DOWNSCALE0_I);
-    k = glGetUniformLocation(prog, "u_downscale1Tex");
-    glUniform1i(k, DOWNSCALE1_I);
-    k = glGetUniformLocation(prog, "u_downscale2Tex");
-    glUniform1i(k, DOWNSCALE2_I);
+    k = glGetUniformLocation(prog, "u_downsample1Tex");
+    glUniform1i(k, DOWNSAMPLE1_I);
+    k = glGetUniformLocation(prog, "u_downsample3Tex");
+    glUniform1i(k, DOWNSAMPLE3_I);
+    k = glGetUniformLocation(prog, "u_downsample5Tex");
+    glUniform1i(k, DOWNSAMPLE5_I);
     k = glGetUniformLocation(prog, "u_mvp");
     glUniformMatrix4fv(k, 1, GL_FALSE, p->mvp_mat);
 
-    es2n_controls *c = &p->controls;
-    c->_tv_glow_loc = glGetUniformLocation(prog, "u_glow");
-    updateUniformsTV(&p->controls);
+    updateUniformsTV(p);
 }
 
-static void initUniformsDownscale(es2n *p)
+static void initUniformsDownsample(es2n *p)
 {
-    GLuint prog = p->downscale_prog;
+    GLuint prog = p->downsample_prog;
 
-    p->_downscale_invResolution_loc = glGetUniformLocation(prog, "u_invResolution");
-    p->_downscale_downscaleTex_loc = glGetUniformLocation(prog, "u_downscaleTex");
-    updateUniformsDownscale(p, DOWNSCALE0_W, DOWNSCALE0_H, DOWNSCALE0_I);
+    p->_downsample_offsets_loc = glGetUniformLocation(prog, "u_offsets");
+    p->_downsample_weights_loc = glGetUniformLocation(prog, "u_weights");
+    p->_downsample_downsampleTex_loc = glGetUniformLocation(prog, "u_downsampleTex");
+    updateUniformsDownsample(p, 280, 240, DOWNSAMPLE0_I, 1);
+}
+
+static void initUniformsCombine(es2n *p)
+{
+    GLint k;
+    GLuint prog = p->combine_prog;
+
+    k = glGetUniformLocation(prog, "u_tvTex");
+    glUniform1i(k, TV_I);
+    k = glGetUniformLocation(prog, "u_downsample3Tex");
+    glUniform1i(k, DOWNSAMPLE3_I);
+    k = glGetUniformLocation(prog, "u_downsample5Tex");
+    glUniform1i(k, DOWNSAMPLE5_I);
+
+    es2n_controls *c = &p->controls;
+    c->_combine_glow_loc = glGetUniformLocation(prog, "u_glow");
 }
 
 static void passRGB(es2n *p)
@@ -439,49 +473,51 @@ static void passStretch(es2n *p)
     meshRender(&p->quad_mesh);
 }
 
-static void passDownscale(es2n *p)
+static void passDownsample(es2n *p)
 {
-    glUseProgram(p->disp_prog);
-    glBindFramebuffer(GL_FRAMEBUFFER, p->downscale_fb[0]);
-    glViewport(0, 0, DOWNSCALE0_W, DOWNSCALE0_H);
-    updateUniformsDisp(p, 0);
-// TODO: tsone: maybe have this in disp pass, separate tv pass from disp..?
-    if (p->controls.crt_enabled) {
-        meshRender(&p->screen_mesh);
-    } else {
+    glUseProgram(p->downsample_prog);
+
+    for (int i = 0; i < 6; ++i) {
+        glBindFramebuffer(GL_FRAMEBUFFER, p->downsample_fb[i]);
+        glViewport(0, 0, s_downsample_widths[i+1], s_downsample_heights[i+1]);
+        updateUniformsDownsample(p, s_downsample_widths[i], s_downsample_heights[i], TV_I + i, !(i & 1));
         meshRender(&p->quad_mesh);
     }
-
-// TODO: tsone: further downscaling is only needed when crt_enabled=1, should be skipped?
-    glUseProgram(p->downscale_prog);
-    glBindFramebuffer(GL_FRAMEBUFFER, p->downscale_fb[1]);
-    glViewport(0, 0, DOWNSCALE1_W, DOWNSCALE1_H);
-    updateUniformsDownscale(p, DOWNSCALE0_W, DOWNSCALE0_H, DOWNSCALE0_I);
-    meshRender(&p->quad_mesh);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, p->downscale_fb[2]);
-    glViewport(0, 0, DOWNSCALE2_W, DOWNSCALE2_H);
-    updateUniformsDownscale(p, DOWNSCALE1_W, DOWNSCALE1_H, DOWNSCALE1_I);
-    meshRender(&p->quad_mesh);
 }
 
-static void passDisp(es2n *p)
+static void passScreen(es2n *p)
 {
-    // crt screen
-    glUseProgram(p->disp_prog);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
-    updateUniformsDisp(p, 1);
+    glBindFramebuffer(GL_FRAMEBUFFER, p->tv_fb);
+    glViewport(0, 0, RGB_W, STRETCH_H);
+    glUseProgram(p->screen_prog);
+    updateUniformsScreen(p, 1);
 
     if (p->controls.crt_enabled) {
         meshRender(&p->screen_mesh);
-
-        // tv plastic rim
-        glUseProgram(p->tv_prog);
-        meshRender(&p->tv_mesh);
     } else {
         meshRender(&p->quad_mesh);
     }
+}
+
+static void passTV(es2n *p)
+{
+    if (!p->controls.crt_enabled) {
+        return;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, p->tv_fb);
+    glViewport(0, 0, RGB_W, STRETCH_H);
+    glUseProgram(p->tv_prog);
+    updateUniformsTV(p);
+    meshRender(&p->tv_mesh);
+}
+
+static void passCombine(es2n *p)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
+    glUseProgram(p->combine_prog);
+    updateUniformsCombine(p);
+    meshRender(&p->quad_mesh);
 }
 
 // TODO: reformat inputs to something more meaningful
@@ -535,22 +571,24 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     p->stretch_prog = buildShader(stretch_vert_src, stretch_frag_src);
     initUniformsStretch(p);
 
-    // Setup downscale framebuffers.
-    glActiveTexture(TEX(DOWNSCALE0_I));
-    createFBTex(&p->downscale_tex[0], &p->downscale_fb[0], DOWNSCALE0_W, DOWNSCALE0_H, GL_RGB, GL_LINEAR, GL_LINEAR);
-    glActiveTexture(TEX(DOWNSCALE1_I));
-    createFBTex(&p->downscale_tex[1], &p->downscale_fb[1], DOWNSCALE1_W, DOWNSCALE1_H, GL_RGB, GL_LINEAR, GL_LINEAR);
-    glActiveTexture(TEX(DOWNSCALE2_I));
-    createFBTex(&p->downscale_tex[2], &p->downscale_fb[2], DOWNSCALE2_W, DOWNSCALE2_H, GL_RGB, GL_LINEAR, GL_LINEAR);
+    // Setup screen/TV framebuffer.
+    glActiveTexture(TEX(TV_I));
+    createFBTex(&p->tv_tex, &p->tv_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_LINEAR);
 
-    // Setup downscale shader.
-    p->downscale_prog = buildShader(downscale_vert_src, downscale_frag_src);
-    initUniformsDownscale(p);
+    // Setup downsample framebuffers.
+    for (int i = 0; i < 6; ++i) {
+      glActiveTexture(TEX(DOWNSAMPLE0_I + i));
+      createFBTex(&p->downsample_tex[i], &p->downsample_fb[i], s_downsample_widths[i+1], s_downsample_heights[i+1], GL_RGB, GL_LINEAR, GL_LINEAR);
+    }
 
-    // Setup display (output) shader.
-    p->disp_prog = buildShader(disp_vert_src, disp_frag_src);
+    // Setup downsample shader.
+    p->downsample_prog = buildShader(downsample_vert_src, downsample_frag_src);
+    initUniformsDownsample(p);
+
+    // Setup screen shader.
+    p->screen_prog = buildShader(screen_vert_src, screen_frag_src);
     createMesh(&p->screen_mesh, mesh_screen_vert_num, 3*mesh_screen_face_num, mesh_screen_verts, mesh_screen_norms, mesh_screen_uvs, mesh_screen_faces);
-    initUniformsDisp(p);
+    initUniformsScreen(p);
 
     // Setup TV shader.
     p->tv_prog = buildShader(tv_vert_src, tv_frag_src);
@@ -594,23 +632,29 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     createMesh(&p->tv_mesh, mesh_rim_vert_num, 3*mesh_rim_face_num, mesh_rim_verts, mesh_rim_norms, rim_uvs, mesh_rim_faces);
     free(rim_uvs);
     initUniformsTV(p);
+
+    // Setup combine shader.
+    p->combine_prog = buildShader(combine_vert_src, combine_frag_src);
+    initUniformsCombine(p);
 }
 
 void es2nDeinit(es2n *p)
 {
     deleteFBTex(&p->rgb_tex, &p->rgb_fb);
     deleteFBTex(&p->stretch_tex, &p->stretch_fb);
-    deleteFBTex(&p->downscale_tex[0], &p->downscale_fb[0]);
-    deleteFBTex(&p->downscale_tex[1], &p->downscale_fb[1]);
-    deleteFBTex(&p->downscale_tex[2], &p->downscale_fb[2]);
+    deleteFBTex(&p->tv_tex, &p->tv_fb);
+    for (int i = 0; i < 6; ++i) {
+        deleteFBTex(&p->downsample_tex[i], &p->downsample_fb[i]);
+    }
     deleteTex(&p->idx_tex);
     deleteTex(&p->deemp_tex);
     deleteTex(&p->lookup_tex);
     deleteShader(&p->rgb_prog);
     deleteShader(&p->stretch_prog);
-    deleteShader(&p->downscale_prog);
-    deleteShader(&p->disp_prog);
+    deleteShader(&p->screen_prog);
+    deleteShader(&p->downsample_prog);
     deleteShader(&p->tv_prog);
+    deleteShader(&p->combine_prog);
     deleteMesh(&p->screen_mesh);
     deleteMesh(&p->quad_mesh);
     deleteMesh(&p->tv_mesh);
@@ -640,7 +684,9 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_c
 
     passRGB(p);
     passStretch(p);
-    passDownscale(p);
-    passDisp(p);
+    passScreen(p);
+    passDownsample(p);
+    passTV(p);
+    passCombine(p);
 }
 

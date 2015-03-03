@@ -23,15 +23,15 @@ typedef struct t_es2n_controls
     GLint _contrast_loc;
     GLint _color_loc;
     GLint _gamma_loc;
-    GLint _disp_glow_loc;
-    GLint _disp_uvScale_loc;
-    GLint _disp_mvp_loc;
+    GLint _screen_uvScale_loc;
+    GLint _screen_mvp_loc;
     GLint _rgbppu_loc;
     GLint _convergence_loc;
     GLint _sharpen_kernel_loc;
     GLint _scanlines_loc;
 
-    GLint _tv_glow_loc;
+    GLint _combine_glow_loc;
+
 } es2n_controls;
 
 typedef struct t_es2n
@@ -41,24 +41,28 @@ typedef struct t_es2n
     GLuint lookup_tex;  // Palette to voltage levels lookup texture.
 
     GLuint rgb_fb;      // Framebuffer for output RGB texture generation.
-    GLuint rgb_tex;     // Output RGB texture (1024x256x3).
+    GLuint rgb_tex;     // Output RGB texture.
     GLuint rgb_prog;    // Shader for RGB.
 
     GLuint stretch_fb;   // Framebuffer for stretched RGB texture.
-    GLuint stretch_tex;  // Output stretched RGB texture (1024x1024x3).
+    GLuint stretch_tex;  // Output stretched RGB texture.
     GLuint stretch_prog; // Shader for stretched RGB.
 
-    GLuint disp_prog;   // Shader for final display.
+    GLuint screen_prog;  // Shader for screen.
 
-    GLint viewport[4];  // Original viewport.
+    GLuint tv_fb;        // Framebuffer to render screen and TV.
+    GLuint tv_tex;       // Texture for screen/TV framebuffer.
+    GLuint tv_prog;      // Shader for tv.
+
+    GLuint combine_prog; // Shader for combine.
+
+    GLint viewport[4];  // Screen viewport.
 
     GLfloat mvp_mat[4*4]; // Perspective MVP matrix for the meshes.
    
-    GLuint tv_prog;   // Shader for TV.
-
-    GLuint downscale_fb[3];  // Framebuffers for downscaling.
-    GLuint downscale_tex[3]; // Downscale textures.
-    GLuint downscale_prog;   // Shader for downscaling.
+    GLuint downsample_fb[6];  // Framebuffers for downscaling.
+    GLuint downsample_tex[6]; // Downsample textures.
+    GLuint downsample_prog;   // Shader for downscaling.
 
     es2_mesh quad_mesh;
     es2_mesh screen_mesh;
@@ -73,8 +77,9 @@ typedef struct t_es2n
     es2n_controls controls;
 
     // Uniform locations.
-    GLint _downscale_invResolution_loc;
-    GLint _downscale_downscaleTex_loc;
+    GLint _downsample_weights_loc;
+    GLint _downsample_offsets_loc;
+    GLint _downsample_downsampleTex_loc;
 } es2n;
 
 void es2nInit(es2n *p, int left, int right, int top, int bottom);

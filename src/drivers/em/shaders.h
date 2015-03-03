@@ -64,14 +64,15 @@ static const char* rgb_frag_src =
     "vec3 rgbppu = RESCALE(texture2D(u_lookupTex, vec2(1.0, uv.y)).rgb);\n"
     "SMP(3);\n"
     "SMP(4);\n"
-// TODO: Working multiplier for filtered chroma to match PPU is 2/5 (for CW2=12).
-// TODO: Is this because colors are blended together with composite?
+    // Working multiplier for filtered chroma to match PPU is 2/5 (for CW2=12).
+    // Is this because color fringing with composite?
     "yiq *= (8.0/2.0) / vec3(YW2, CW2-2.0, CW2-2.0);\n"
     "yiq = mix(yiq, rgbppu, u_rgbppu);\n"
     "yiq.gb *= u_color;\n"
     "vec3 result = clamp(c_convMat * yiq, 0.0, 1.0);\n"
-    // Use low NTSC/CRT gamma 2.31 to compensate for lit room. 2.5 is way too high.
-    "result = pow(result, vec3(2.31*u_gamma));\n"
+    // Gamma convert RGB from NTSC space to space similar to SRGB.
+    "result = pow(result, vec3(u_gamma));\n"
+    // NOTE: While this seems to be wrong (after gamma), it works well in practice...?
     "gl_FragColor = vec4(u_contrast * result + u_brightness, 1.0);\n"
     "}\n";
 
@@ -95,14 +96,18 @@ static const char* stretch_frag_src =
     "uniform sampler2D u_rgbTex;\n"
     "varying vec2 v_uv[2];\n"
     "void main(void) {\n"
-    // Averate adjacent scanlines together to create smoother image.
-    "vec3 color = 0.5 * (texture2D(u_rgbTex, v_uv[0]).rgb + texture2D(u_rgbTex, v_uv[1]).rgb);\n"
-    // Use oscillator to mix color with its square. This keeps more of the brighter colors.
+    // Sample adjacent scanlines, linearize color and average to smoothen slightly vertically.
+    "vec3 c0 = texture2D(u_rgbTex, v_uv[0]).rgb;\n"
+    "vec3 c1 = texture2D(u_rgbTex, v_uv[1]).rgb;\n"
+    "vec3 color = 0.5 * (c0*c0 + c1*c1);\n"
+    // Use oscillator to mix color with its square to achieve scanlines effect.
+    // This formula dims midtones, keeping bright and very dark colors.
     "float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*IDX_H * v_uv[0].y - M_PI*0.125)));\n"
-    "gl_FragColor = vec4(mix(color, color*color, scanlines), 1.0);\n"
+    // Gamma encode color w/ sqrt().
+    "gl_FragColor = vec4(sqrt(mix(color, max(2.0*color - 1.0, 0.0), scanlines)), 1.0);\n"
     "}\n";
 
-static const char* disp_vert_src =
+static const char* screen_vert_src =
     "precision highp float;\n"
     DEFINE(RGB_W)
     DEFINE(M_PI)
@@ -114,7 +119,6 @@ static const char* disp_vert_src =
     "uniform vec2 u_uvScale;\n"
     "varying vec2 v_uv[5];\n"
     "varying vec3 v_color;\n"
-    "varying vec2 v_glowUV;\n"
     "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
     "void main() {\n"
     "vec2 uv = 0.5 + u_uvScale.xy * (a_uv - 0.5);\n"
@@ -135,23 +139,17 @@ static const char* disp_vert_src =
     "float ndoth = max(dot(n, h), 0.0);\n"
     "v_color = vec3(0.006*ndotl + 0.04*pow(ndoth, 21.0));\n"
 #else
+// TODO: tsone: This color must be linearized
     "v_color = vec3(0.0);\n"
 #endif
     "gl_Position = u_mvp * a_vert;\n"
-// TODO: tsone: duplicate code (disp & tv)
-    "v_glowUV = 0.5 + 0.5 * gl_Position.xy / gl_Position.w;\n"
     "}\n";
-static const char* disp_frag_src =
+static const char* screen_frag_src =
 "precision highp float;\n"
-DEFINE(DOWNSCALE1_W)
-DEFINE(DOWNSCALE1_H)
 "uniform sampler2D u_stretchTex;\n"
-"uniform sampler2D u_downscale1Tex;\n"
 "uniform mat3 u_sharpenKernel;\n"
-"uniform float u_glow;\n"
 "varying vec2 v_uv[5];\n"
 "varying vec3 v_color;\n"
-"varying vec2 v_glowUV;\n"
 
 //
 // From 'Improved texture interpolation' by Inigo Quilez (2009):
@@ -178,7 +176,7 @@ DEFINE(DOWNSCALE1_H)
     "return texture2D( tex, p ).rgb;\n"
 "}\n"
 
-// TODO: tsone: duplicate code (disp & tv)
+// TODO: tsone: duplicate code (screen & tv)
 //
 // Optimized cubic texture interpolation. Uses 4 texture samples for the 4x4 texel area.
 //
@@ -213,34 +211,21 @@ DEFINE(DOWNSCALE1_H)
     "return mix( mix( s3, s2, sx ), mix( s1, s0, sx ), sy );\n"
 "}\n"
 
-    "vec3 encodeGamma(const vec3 color)\n"
-    "{\n"
-        "return vec3(\n"
-            "(color.r <= 0.018) ? 4.5*color.r : 1.099*pow(color.r, 0.45) - 0.099,\n"
-            "(color.g <= 0.018) ? 4.5*color.g : 1.099*pow(color.g, 0.45) - 0.099,\n"
-            "(color.b <= 0.018) ? 4.5*color.b : 1.099*pow(color.b, 0.45) - 0.099\n"
-        ");\n"
-    "}\n"
-
-"#define SMP(i_, m_) color += (m_) * texture2D(u_stretchTex, v_uv[i_]).rgb\n"
+// Sample, linearize and sum.
+"#define SMP(i_, m_) tmp = texture2D(u_stretchTex, v_uv[i_]).rgb; color += (m_) * tmp*tmp\n"
+//"#define SMP(i_, m_) color += (m_) * texture2DSmooth(u_stretchTex, v_uv[i_], vec2(1120.0, 960.0))\n"
 "void main(void) {\n"
+    "vec3 tmp;\n"
     "vec3 color = vec3(0.0);\n"
     "SMP(0, u_sharpenKernel[0]);\n"
     "SMP(1, vec3(1.0, 0.0, 0.0));\n"
-// TODO: tsone: actually iq's filter doesn't improve..? remove
     "SMP(2, u_sharpenKernel[1]);\n"
-//    "color += u_sharpenKernel[1] * texture2DSmooth(u_stretchTex, v_uv[2], 4.0*vec2(280.0, 256.0));\n"
     "SMP(3, vec3(0.0, 0.0, 1.0));\n"
     "SMP(4, u_sharpenKernel[2]);\n"
     "color = clamp(color, 0.0, 1.0);\n"
     "color += v_color;\n"
-// TODO: tsone: duplicate code (disp & tv)
-// TODO: tsone: quick hack to disable glow in downscale pass
-    "if (u_glow >= 0.0) {\n"
-        "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(DOWNSCALE1_W, DOWNSCALE1_H));\n"
-        "color = encodeGamma(color);\n"
-    "}\n"
-    "gl_FragColor = vec4(color, 1.0);\n"
+    // Gamma encode color w/ sqrt().
+    "gl_FragColor = vec4(sqrt(color), 1.0);\n"
 "}\n";
 
 static const char* tv_vert_src =
@@ -252,7 +237,6 @@ static const char* tv_vert_src =
     "varying vec3 v_p;\n"
     "varying vec3 v_n;\n"
     "varying vec3 v_v;\n"
-    "varying vec2 v_glowUV;\n"
 
 // TODO: tsone: testing distances in uvs
     "attribute vec2 a_uv;\n"
@@ -276,8 +260,6 @@ static const char* tv_vert_src =
         "v_v = v;\n"
         "v_p = a_vert.xyz;\n"
         "gl_Position = u_mvp * a_vert;\n"
-// TODO: tsone: duplicate code (disp & tv)
-        "v_glowUV = 0.5 + 0.5 * gl_Position.xy / gl_Position.w;\n"
     
         "float les = length(a_uv);\n"
         "vec2 clay = (les > 0.0) ? a_uv / les : vec2(0.0);\n"
@@ -286,41 +268,34 @@ static const char* tv_vert_src =
         "vec2 pool = normalize(mix(clay, nxy, mixer));\n"
         "vec4 tmp = u_mvp * vec4(a_vert.xy + 5.5*vec2(1.0, 7.0/8.0)*(vec2(les) + vec2(0.0014, 0.0019))*pool, a_vert.zw);\n"
         "v_uv = 0.5 + 0.5 * tmp.xy / tmp.w;\n"
-        "v_blends.y = 50.0*les;\n"
+
+        "float w = 51.0 * les;\n"
+        "if (w < 1.0) {\n"
+            "v_blends.x = w;\n"
+            "v_blends.y = 0.0;\n"
+        "} else if (w < 4.0) {\n"
+            "v_blends.x = 1.0;\n"
+            "v_blends.y = 0.33333*w - 0.33333;\n"
+        "} else {\n"
+            "v_blends.x = 1.0;\n"
+            "v_blends.y = 1.0;\n"
+        "}\n"
     "}\n";
 static const char* tv_frag_src =
     "precision highp float;\n"
     DEFINE(M_PI)
-    DEFINE(DOWNSCALE0_W)
-    DEFINE(DOWNSCALE0_H)
-    DEFINE(DOWNSCALE1_W)
-    DEFINE(DOWNSCALE1_H)
-    DEFINE(DOWNSCALE2_W)
-    DEFINE(DOWNSCALE2_H)
-    "uniform sampler2D u_downscale0Tex;\n"
-    "uniform sampler2D u_downscale1Tex;\n"
-    "uniform sampler2D u_downscale2Tex;\n"
-    "uniform float u_glow;\n"
+    "uniform sampler2D u_downsample1Tex;\n"
+    "uniform sampler2D u_downsample3Tex;\n"
+    "uniform sampler2D u_downsample5Tex;\n"
     "varying vec3 v_color;\n"
     "varying vec3 v_p;\n"
     "varying vec3 v_n;\n"
     "varying vec3 v_v;\n"
-    "varying vec2 v_glowUV;\n"
 
     "varying vec2 v_uv;\n"
     "varying vec2 v_blends;\n"
 
-// TODO: tsone: this function is also shared
-    "vec3 encodeGamma(const vec3 color)\n"
-    "{\n"
-        "return vec3(\n"
-            "(color.r <= 0.018) ? 4.5*color.r : 1.099*pow(color.r, 0.45) - 0.099,\n"
-            "(color.g <= 0.018) ? 4.5*color.g : 1.099*pow(color.g, 0.45) - 0.099,\n"
-            "(color.b <= 0.018) ? 4.5*color.b : 1.099*pow(color.b, 0.45) - 0.099\n"
-        ");\n"
-    "}\n"
-
-// TODO: tsone: duplicate code (disp & tv)
+// TODO: tsone: duplicate code (screen & tv)
 //
 // Optimized cubic texture interpolation. Uses 4 texture samples for the 4x4 texel area.
 //
@@ -385,54 +360,79 @@ static const char* tv_frag_src =
     "vec2 nuv = 2.0*v_uv - 1.0;\n"
     "float vignette = max(1.0 - length(nuv), 0.0);\n"
 
-//        "vec3 ds0 = texture2D(u_downscale0Tex, v_uv).rgb;\n"
-        "vec3 ds0 = texture2DCubic(u_downscale0Tex, v_uv, vec2(DOWNSCALE0_W, DOWNSCALE0_H));\n"
-//        "vec3 ds1 = texture2D(u_downscale1Tex, v_uv).rgb;\n"
-        "vec3 ds1 = texture2DCubic(u_downscale1Tex, v_uv, vec2(DOWNSCALE1_W, DOWNSCALE1_H));\n"
-//        "vec3 ds2 = texture2D(u_downscale2Tex, v_uv).rgb;\n"
-        "vec3 ds2 = texture2DCubic(u_downscale2Tex, v_uv, vec2(DOWNSCALE2_W, DOWNSCALE2_H));\n"
-
-        "if (v_blends.y < 1.0) {\n"
-            "color = mix(ds0, ds1, v_blends.y);\n"
-        "} else if (v_blends.y < 3.0) {\n"
-            "color = mix(ds1, ds2, 0.5*v_blends.y - 0.5);\n"
-        "} else {\n"
-            "color = ds2;\n"
-        "}\n"
-        "color *= diff;\n"
-
-// TODO: tsone: duplicate code (disp & tv)
-        "color += u_glow * texture2DCubic(u_downscale1Tex, v_glowUV, vec2(DOWNSCALE1_W, DOWNSCALE1_H));\n"
-        "gl_FragColor = vec4(encodeGamma(color), 1.0);\n"
+    // Sample from downsampled (blurry) textures and linearize.
+    "vec3 ds0 = texture2D(u_downsample1Tex, v_uv).rgb;\n"
+    "vec3 ds1 = texture2D(u_downsample3Tex, v_uv).rgb;\n"
+    "vec3 ds2 = texture2D(u_downsample5Tex, v_uv).rgb;\n"
+    "ds0 *= ds0;\n"
+    "ds1 *= ds1;\n"
+    "ds2 *= ds2;\n"
+    // Blend together to mimic glossy reflection and ambient diffuse.
+    "color = mix(mix(ds0, ds1, v_blends.x), ds2, v_blends.y);\n"
+    "color *= diff;\n"
+    // Gamma encode color w/ sqrt().
+    "gl_FragColor = vec4(sqrt(color), 1.0);\n"
     "}\n";
 
-// 4x4 box downscale.
-static const char* downscale_vert_src =
+// Downsample shader.
+static const char* downsample_vert_src =
     "precision highp float;\n"
-    "uniform vec2 u_invResolution;\n"
+    "uniform vec2 u_offsets[8];\n"
     "attribute vec4 a_vert;\n"
     "attribute vec2 a_uv;\n"
-    "varying vec2 v_uv[4];\n"
-    "#define UV(i_, shift_) v_uv[(i_)] = uv + (shift_);\n"
+    "varying vec2 v_uv[8];\n"
+
     "void main() {\n"
     "gl_Position = a_vert;\n"
-    "vec2 uv = a_uv;\n"
-   	"UV(0, vec2(-u_invResolution.x, -u_invResolution.y))\n"
-	"UV(1, vec2( u_invResolution.x, -u_invResolution.y))\n"
-	"UV(2, vec2(-u_invResolution.x,  u_invResolution.y))\n"
-	"UV(3, vec2( u_invResolution.x,  u_invResolution.y))\n"
+    "for (int i = 0; i < 8; i++) {\n"
+        "v_uv[i] = a_uv + u_offsets[i];\n"
+    "}\n"
     "}\n";
-static const char* downscale_frag_src =
+static const char* downsample_frag_src =
     "precision highp float;\n"
-    "uniform sampler2D u_downscaleTex;\n"
-    "varying vec2 v_uv[4];\n"
-    "#define SAMPLE(i_) result += texture2D(u_downscaleTex, v_uv[(i_)]).rgb;\n"
+    "uniform sampler2D u_downsampleTex;\n"
+    "uniform float u_weights[8];\n"
+    "varying vec2 v_uv[8];\n"
+
     "void main(void) {\n"
     "vec3 result = vec3(0.0);\n"
-   	"SAMPLE(0)\n"
-	"SAMPLE(1)\n"
-	"SAMPLE(2)\n"
-	"SAMPLE(3)\n"
-    "gl_FragColor = vec4(0.25 * result, 1.0);\n"
+    "for (int i = 0; i < 8; i++) {\n"
+        "vec3 color = texture2D(u_downsampleTex, v_uv[i]).rgb;\n"
+        "result += u_weights[i] * color*color;\n"
+    "}\n"
+    "gl_FragColor = vec4(sqrt(result), 1.0);\n"
     "}\n";
 
+// Combine shader.
+static const char* combine_vert_src =
+    "precision highp float;\n"
+    "attribute vec4 a_vert;\n"
+    "attribute vec2 a_uv;\n"
+    "varying vec2 v_uv;\n"
+    "void main() {\n"
+        "gl_Position = a_vert;\n"
+        "v_uv = a_uv;\n"
+    "}\n";
+static const char* combine_frag_src =
+    "precision highp float;\n"
+    "uniform sampler2D u_tvTex;\n"
+    "uniform sampler2D u_downsample3Tex;\n"
+    "uniform sampler2D u_downsample5Tex;\n"
+    "uniform float u_glow;\n"
+    "varying vec2 v_uv;\n"
+
+    "void main(void) {\n"
+        // Sample screen/tv and downsampled (blurry) textures for glow.
+        "vec3 color = texture2D(u_tvTex, v_uv).rgb;\n"
+        "vec3 ds3 = texture2D(u_downsample3Tex, v_uv).rgb;\n"
+        "vec3 ds5 = texture2D(u_downsample5Tex, v_uv).rgb;\n"
+        // Linearize color values.
+        "color *= color;\n"
+        "ds3 *= ds3;\n"
+        "ds5 *= ds5;\n"
+        // Blend in glow as blurry highlight allowing slight bleeding on higher u_glow values.
+        "float g2 = u_glow * u_glow;\n"
+        "color = (color + u_glow*ds3 + g2*ds5) / (1.0 + g2);\n"
+        // Gamma encode w/ sqrt() to something similar to sRGB space.
+        "gl_FragColor = vec4(sqrt(color), 1.0);\n"
+    "}\n";
