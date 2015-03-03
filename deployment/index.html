@@ -45,6 +45,7 @@
         height: 649px;
         margin-left: -384px;
         margin-top: -318px;
+        visibility: hidden;
 //        background-image: url('img/mock3.png');
       }
       #loader {
@@ -399,11 +400,10 @@
           r.readAsArrayBuffer(f);
         }
       }
-      var elem = document.getElementById('visor');
-      elem.addEventListener('dragenter', dragHandler('enter'), false);
-      elem.addEventListener('dragleave', dragHandler('leave'), false);
-      elem.addEventListener('dragover', dragHandler('over'), false);
-      elem.addEventListener('drop', dropHandler, false);
+      document.addEventListener('dragenter', dragHandler('enter'), false);
+      document.addEventListener('dragleave', dragHandler('leave'), false);
+      document.addEventListener('dragover', dragHandler('over'), false);
+      document.addEventListener('drop', dropHandler, false);
     </script>
     <script type="text/javascript">
       function changeControl(name, value) {
@@ -416,7 +416,7 @@
         Module.contrastControl = 0;
         Module.colorControl = 0;
         Module.gammaControl = 0;
-        Module.glowControl = 0;
+        Module.glowControl = -0.4;
         Module.rgbppuControl = 0;
         Module.crtControl = 1;
         Module.scanlinesControl = 0.1;
@@ -430,7 +430,7 @@
     Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('contrast', this.value)" onchange="changeControl('contrast', this.value)"/><br/>
     Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('color', this.value)" onchange="changeControl('color', this.value)"/><br/>
     Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
-    Glow <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('glow', this.value)" onchange="changeControl('glow', this.value)"/><br/>
+    Glow <input type="range" min="-1" max="1" value="-0.4" step="0.2" oninput="changeControl('glow', this.value)" onchange="changeControl('glow', this.value)"/><br/>
     Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="changeControl('sharpness', this.value)" onchange="changeControl('sharpness', this.value)"/><br/>
     RGB PPU <input type="range" min="-0.1" max="0.9" value="0" step="0.1" oninput="changeControl('rgbppu', this.value)" onchange="changeControl('rgbppu', this.value)"/><br/>
     CRT Emulation <input type="checkbox" checked="1" oninput="changeControl('crt', this.checked)" onchange="changeControl('crt', this.checked)"/><br/>

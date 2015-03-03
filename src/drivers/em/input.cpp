@@ -52,6 +52,8 @@ static int cspec = 0;
 
 extern int gametype;
 
+int MouseData[3] = { 0, 0, 0 };
+
 /**
  * Necessary for proper GUI functioning (configuring when a game isn't loaded).
  */
@@ -445,37 +447,6 @@ static void KeyboardCommands ()
 }
 
 /**
- * Return the state of the mouse buttons.  Input 'd' is an array of 3
- * integers that store <x, y, button state>.
- */
-void				// removed static for a call in lua-engine.cpp
-GetMouseData (uint32 (&d)[3])
-{
-	int x, y;
-	uint32 t;
-
-	// retrieve the state of the mouse from SDL
-	t = SDL_GetMouseState (&x, &y);
-
-	d[2] = 0;
-	if (t & SDL_BUTTON (1))
-	{
-		d[2] |= 0x1;
-	}
-	if (t & SDL_BUTTON (3))
-	{
-		d[2] |= 0x2;
-	}
-
-	// get the mouse position from the SDL video driver
-	t = PtoV (x, y);
-	d[0] = t & 0xFFFF;
-	d[1] = (t >> 16) & 0xFFFF;
-	// debug print 
-	// printf("mouse %d %d %d\n", d[0], d[1], d[2]);
-}
-
-/**
  * Handles outstanding SDL events.
  */
 static void
@@ -713,8 +684,6 @@ UpdatePPadData (int w)
 	return r;
 }
 
-static uint32 MouseData[3] = { 0, 0, 0 };
-
 static uint8 fkbkeys[0x48];
 
 /**
@@ -790,7 +759,8 @@ void FCEUD_UpdateInput ()
 
 	if (t & 2)
 	{
-		GetMouseData (MouseData);
+// TODO: tsone: not needed because mouse is updated via callback
+//		GetMouseData (MouseData);
 	}
 }
 
@@ -816,6 +786,17 @@ void FCEUD_SetInput (bool fourscore, bool microphone, ESI port0, ESI port1,
 	replaceP2StartWithMicrophone = microphone;
 
 	InitInputInterface ();
+}
+
+static EM_BOOL FCEM_MouseCallback(int type, const EmscriptenMouseEvent *event, void *)
+{
+	// Map element coords to NES screen coords.
+	uint32 t = PtoV(event->targetX, event->targetY);
+	MouseData[0] = t & 0xFFFF;
+	MouseData[1] = (t >> 16) & 0xFFFF;
+	// Bit 0 set if primary button down, bit 1 set if secondary down.
+	MouseData[2] = event->buttons & 3;
+	return 1;
 }
 
 /**
@@ -900,6 +881,12 @@ void InitInputInterface ()
 
 	FCEUI_SetInputFC ((ESIFC) CurInputType[2], InputDPtr, attrib);
 	FCEUI_SetInputFourscore ((eoptions & EO_FOURSCORE) != 0);
+
+	const char *elem = "#canvas";
+	emscripten_set_mousemove_callback(elem, 0, 0, FCEM_MouseCallback);
+	emscripten_set_mousedown_callback(elem, 0, 0, FCEM_MouseCallback);
+	emscripten_set_mouseup_callback(elem, 0, 0, FCEM_MouseCallback);
+	emscripten_set_click_callback(elem, 0, 0, FCEM_MouseCallback);
 }
 
 
