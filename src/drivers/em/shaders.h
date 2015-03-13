@@ -1,15 +1,21 @@
-
+#if DBG_MODE
+#define DBG_PROLOG() \
+    "uniform vec3 u_mouse;\n"
+#else
+#define DBG_PROLOG()
+#endif
 static const char* rgb_vert_src =
     "precision highp float;\n"
+DBG_PROLOG()
     DEFINE(NUM_TAPS)
     DEFINE(IDX_W)
     "attribute vec4 a_vert;\n"
-    "attribute vec2 a_uv;\n"
+    "attribute vec2 a_extra;\n"
     "varying vec2 v_uv[int(NUM_TAPS)];\n"
     "varying vec2 v_deemp_uv;\n"
     "#define UV_OUT(i_, o_) v_uv[i_] = vec2(uv.x + (o_)/IDX_W, uv.y)\n"
     "void main() {\n"
-    "vec2 uv = a_uv;\n"
+    "vec2 uv = a_extra;\n"
     "UV_OUT(0,-2.0);\n"
     "UV_OUT(1,-1.0);\n"
     "UV_OUT(2, 0.0);\n"
@@ -20,6 +26,7 @@ static const char* rgb_vert_src =
     "}\n";
 static const char* rgb_frag_src =
     "precision highp float;\n"
+DBG_PROLOG()
     DEFINE(NUM_SUBPS)
     DEFINE(NUM_TAPS)
     DEFINE(LOOKUP_W)
@@ -73,71 +80,100 @@ static const char* rgb_frag_src =
     // Gamma convert RGB from NTSC space to space similar to SRGB.
     "result = pow(result, vec3(u_gamma));\n"
     // NOTE: While this seems to be wrong (after gamma), it works well in practice...?
-    "gl_FragColor = vec4(u_contrast * result + u_brightness, 1.0);\n"
+    "result = clamp(u_contrast * result + u_brightness, 0.0, 1.0);\n"
+    // Write linear color (banding is not visible for pixelated graphics).
+// TODO: tsone: testing encoding everywhere
+    "gl_FragColor = vec4(result, 1.0);\n"
+//    "gl_FragColor = vec4(result * result, 1.0);\n"
     "}\n";
 
 static const char* stretch_vert_src =
     DEFINE(IDX_H)
     "precision highp float;\n"
+DBG_PROLOG()
     "attribute vec4 a_vert;\n"
-    "attribute vec2 a_uv;\n"
+    "attribute vec2 a_extra;\n"
     "varying vec2 v_uv[2];\n"
     "void main() {\n"
-    "vec2 uv = a_uv;\n"
+    "vec2 uv = a_extra;\n"
     "v_uv[0] = vec2(uv.x, 1.0 - uv.y);\n"
     "v_uv[1] = vec2(v_uv[0].x, v_uv[0].y - 0.25/IDX_H);\n"
     "gl_Position = a_vert;\n"
     "}\n";
 static const char* stretch_frag_src =
     "precision highp float;\n"
+DBG_PROLOG()
     DEFINE(IDX_H)
     DEFINE(M_PI)
     "uniform float u_scanlines;\n"
     "uniform sampler2D u_rgbTex;\n"
     "varying vec2 v_uv[2];\n"
     "void main(void) {\n"
-    // Sample adjacent scanlines, linearize color and average to smoothen slightly vertically.
+    // Sample adjacent scanlines and average to smoothen slightly vertically.
     "vec3 c0 = texture2D(u_rgbTex, v_uv[0]).rgb;\n"
     "vec3 c1 = texture2D(u_rgbTex, v_uv[1]).rgb;\n"
+// TODO: tsone: testing encoding everywhere
     "vec3 color = 0.5 * (c0*c0 + c1*c1);\n"
-    // Use oscillator to mix color with its square to achieve scanlines effect.
-    // This formula dims midtones, keeping bright and very dark colors.
+//    "vec3 color = 0.5 * (c0 + c1);\n"
+    // Use oscillator as scanline modulator.
     "float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*IDX_H * v_uv[0].y - M_PI*0.125)));\n"
-    // Gamma encode color w/ sqrt().
+    // This formula dims dark colors, but keeps brights.
+// TODO: tsone: testing encoding everywhere
     "gl_FragColor = vec4(sqrt(mix(color, max(2.0*color - 1.0, 0.0), scanlines)), 1.0);\n"
+//    "gl_FragColor = vec4(mix(color, max(2.0*color - 1.0, 0.0), scanlines), 1.0);\n"
     "}\n";
 
 static const char* screen_vert_src =
     "precision highp float;\n"
+DBG_PROLOG()
     DEFINE(RGB_W)
     DEFINE(M_PI)
     "attribute vec4 a_vert;\n"
     "attribute vec3 a_norm;\n"
-    "attribute vec2 a_uv;\n"
+    "attribute vec2 a_extra;\n"
     "uniform float u_convergence;\n"
     "uniform mat4 u_mvp;\n"
     "uniform vec2 u_uvScale;\n"
     "varying vec2 v_uv[5];\n"
     "varying vec3 v_color;\n"
+    "varying vec3 v_norm;\n"
+    "varying vec3 v_pos;\n"
+
     "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
     "void main() {\n"
-    "vec2 uv = 0.5 + u_uvScale.xy * (a_uv - 0.5);\n"
+    "vec2 uv = 0.5 + u_uvScale.xy * (a_extra - 0.5);\n"
     "TAP(0,-4.0);\n"
-    "TAP(1,-u_convergence);\n"
+    "TAP(1, u_convergence);\n"
     "TAP(2, 0.0);\n"
-    "TAP(3, u_convergence);\n"
+    "TAP(3,-u_convergence);\n"
     "TAP(4, 4.0);\n"
 // TODO: tsone: have some light on screen or not?
-#if 0
+#if 1
     "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
     "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
     "vec3 n = normalize(a_norm);\n"
+    "v_norm = a_norm;\n"
+    "v_pos = a_vert.xyz;\n"
     "vec3 v = normalize(view_pos - a_vert.xyz);\n"
-    "vec3 l = normalize(light_pos - a_vert.xyz);\n"
+    "vec3 p2l = light_pos - a_vert.xyz;\n"
+    "float p2lL = length(p2l);\n"
+    "vec3 l = p2l / p2lL;\n"
     "vec3 h = normalize(l + v);\n"
     "float ndotl = max(dot(n, l), 0.0);\n"
     "float ndoth = max(dot(n, h), 0.0);\n"
-    "v_color = vec3(0.006*ndotl + 0.04*pow(ndoth, 21.0));\n"
+    "float ndotv = max(dot(n, v), 0.0);\n"
+    "float Cd = 0.5;\n"
+    "float Cs = 0.5;\n"
+    "float m = 11.0;\n"
+    "float Cd0 = Cd / M_PI;\n"
+    "float Cs0 = (Cs * (m + 8.0) / (8.0 * M_PI)) * pow(ndoth, m);\n"
+    "float R = 10.0;\n"
+    "float El = R / (1.0 + dot(p2l, p2l));\n"
+//    "float Rf0 = 0.03;\n"
+//    "float Rf = Rf0 + (1.0-Rf0) * pow(1.0-ndotl, 5.0);\n"
+//    "float Cd2 = (21.0/(20.0*M_PI * (1.0-Rf0))) * (1.0-pow(1.0-ndotl, 5.0)) * (1.0-pow(1.0-ndotv, 5.0));\n"
+//    "v_color = vec3(0.006*ndotl + 0.04*pow(ndoth, e));\n"
+    "v_color = vec3((Cd0 + Cs0) * El*ndotl);\n"
 #else
 // TODO: tsone: This color must be linearized
     "v_color = vec3(0.0);\n"
@@ -146,10 +182,16 @@ static const char* screen_vert_src =
     "}\n";
 static const char* screen_frag_src =
 "precision highp float;\n"
+DBG_PROLOG()
+DEFINE(M_PI)
 "uniform sampler2D u_stretchTex;\n"
-"uniform mat3 u_sharpenKernel;\n"
+// TODO: tsone: for debug
+"uniform float u_convergence;\n"
+"uniform vec3 u_sharpenKernel[5];\n"
 "varying vec2 v_uv[5];\n"
 "varying vec3 v_color;\n"
+"varying vec3 v_norm;\n"
+"varying vec3 v_pos;\n"
 
 //
 // From 'Improved texture interpolation' by Inigo Quilez (2009):
@@ -211,25 +253,56 @@ static const char* screen_frag_src =
     "return mix( mix( s3, s2, sx ), mix( s1, s0, sx ), sy );\n"
 "}\n"
 
-// Sample, linearize and sum.
-"#define SMP(i_, m_) tmp = texture2D(u_stretchTex, v_uv[i_]).rgb; color += (m_) * tmp*tmp\n"
-//"#define SMP(i_, m_) color += (m_) * texture2DSmooth(u_stretchTex, v_uv[i_], vec2(1120.0, 960.0))\n"
 "void main(void) {\n"
-    "vec3 tmp;\n"
     "vec3 color = vec3(0.0);\n"
-    "SMP(0, u_sharpenKernel[0]);\n"
-    "SMP(1, vec3(1.0, 0.0, 0.0));\n"
-    "SMP(2, u_sharpenKernel[1]);\n"
-    "SMP(3, vec3(0.0, 0.0, 1.0));\n"
-    "SMP(4, u_sharpenKernel[2]);\n"
+    "for (int i = 0; i < 5; i++) {\n"
+        "vec3 tmp = texture2D(u_stretchTex, v_uv[i]).rgb;\n"
+        "color += u_sharpenKernel[i] * tmp*tmp;\n"
+    "}\n"
     "color = clamp(color, 0.0, 1.0);\n"
-    "color += v_color;\n"
-    // Gamma encode color w/ sqrt().
+// TODO: tsone: test adding dust scatter
+    "vec3 n = normalize(v_norm);\n"
+    "color += 0.018*texture2D(u_stretchTex, v_uv[2] - 0.021*n.xy).rgb;\n"
+
+#if 1
+    "const vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
+    "const vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
+    "vec3 p = v_pos;\n"
+    "vec3 v = normalize(view_pos - p);\n"
+    "vec3 p2l = light_pos - p;\n"
+    "float p2lL = length(p2l);\n"
+    "vec3 l = p2l / p2lL;\n"
+    "vec3 h = normalize(l + v);\n"
+    "float ndotl = max(dot(n, l), 0.0);\n"
+    "float ndoth = max(dot(n, h), 0.0);\n"
+    "float ndotv = max(dot(n, v), 0.0);\n"
+    "float albedo = 0.13;\n"
+    "float Cd = albedo;\n"
+    "float Cs = 0.0;\n"
+    "float m = 11.0;\n"
+    "float Cd0 = Cd / M_PI;\n"
+    "float Cs0 = (Cs * (m + 8.0) / (8.0 * M_PI)) * pow(ndoth, m);\n"
+    "float R = 10.0;\n"
+    "float El = R / (dot(p2l, p2l));\n"
+//    "float Rf0 = 0.03;\n"
+//    "float Rf = Rf0 + (1.0-Rf0) * pow(1.0-ndotl, 5.0);\n"
+//    "float Cd2 = (21.0/(20.0*M_PI * (1.0-Rf0))) * (1.0-pow(1.0-ndotl, 5.0)) * (1.0-pow(1.0-ndotv, 5.0));\n"
+//    "color += vec3((Cd0 + Cs0) * El*ndotl);\n"
+#else
+    "vec3 n = normalize(v_norm);\n"
+//    "vec3 p = v_pos;\n"
+//    "color = v_color;\n"
+//    "color = vec3(0.0, u_convergence/2.0+p.z-n.y, 0.0);\n"
+    "color = vec3(n.y, -n.y, 0.0);\n"
+#endif
+
+    // Use gamma encoding as we may output smooth color changes here.
     "gl_FragColor = vec4(sqrt(color), 1.0);\n"
 "}\n";
 
 static const char* tv_vert_src =
     "precision highp float;\n"
+DBG_PROLOG()
     "attribute vec4 a_vert;\n"
     "attribute vec3 a_norm;\n"
     "uniform mat4 u_mvp;\n"
@@ -239,9 +312,11 @@ static const char* tv_vert_src =
     "varying vec3 v_v;\n"
 
 // TODO: tsone: testing distances in uvs
-    "attribute vec2 a_uv;\n"
+    "attribute vec3 a_extra;\n"
     "varying vec2 v_uv;\n"
     "varying vec2 v_blends;\n"
+
+    "#define smoothstep01(x_) ((3.0 - 2.0*(x_)) * (x_)*(x_))\n"
 
     "void main() {\n"
         "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
@@ -261,28 +336,45 @@ static const char* tv_vert_src =
         "v_p = a_vert.xyz;\n"
         "gl_Position = u_mvp * a_vert;\n"
     
-        "float les = length(a_uv);\n"
-        "vec2 clay = (les > 0.0) ? a_uv / les : vec2(0.0);\n"
+        "float andy = length(a_extra);\n"
+        "float les = length(a_extra.xy);\n"
+        "vec2 clay = (les > 0.0) ? a_extra.xy / les : vec2(0.0);\n"
         "vec2 nxy = normalize(v_n.xy);\n"
         "float mixer = max(1.0 - 30.0*les, 0.0);\n"
+//        "float mixer = max(1.0 - 50.0*andy, 0.0);\n"
         "vec2 pool = normalize(mix(clay, nxy, mixer));\n"
         "vec4 tmp = u_mvp * vec4(a_vert.xy + 5.5*vec2(1.0, 7.0/8.0)*(vec2(les) + vec2(0.0014, 0.0019))*pool, a_vert.zw);\n"
         "v_uv = 0.5 + 0.5 * tmp.xy / tmp.w;\n"
 
-        "float w = 51.0 * les;\n"
+// TODO: tsone: testing with real 3D distance to screen
+#if 0
+        "v_blends.x = andy;\n"
+#else
+//        "float w = 3.0 * (1.0 - pow(1.0 + 3.5*andy, -4.0));\n"
+        "float w = (u_mouse.x/256.0)*50.0*andy;\n"
+//        "float w = 0.0*andy;\n"
+//        "float w = 51.0*les;\n"
         "if (w < 1.0) {\n"
             "v_blends.x = w;\n"
             "v_blends.y = 0.0;\n"
+//        "} else if (w < 2.0) {\n"
         "} else if (w < 4.0) {\n"
             "v_blends.x = 1.0;\n"
+//            "v_blends.y = 1.0*w - 1.0;\n"
             "v_blends.y = 0.33333*w - 0.33333;\n"
         "} else {\n"
             "v_blends.x = 1.0;\n"
             "v_blends.y = 1.0;\n"
         "}\n"
+// TODO: tsone: is this better?
+        "v_blends = smoothstep01(v_blends);\n"
+//        "v_blends *= v_blends;\n"
+//        "v_blends *= v_blends;\n"
+#endif
     "}\n";
 static const char* tv_frag_src =
     "precision highp float;\n"
+DBG_PROLOG()
     DEFINE(M_PI)
     "uniform sampler2D u_downsample1Tex;\n"
     "uniform sampler2D u_downsample3Tex;\n"
@@ -354,7 +446,7 @@ static const char* tv_frag_src =
 //    "float h = 1.0 + 96.0 * dot(d, d);\n"
 //    "float spec = (0.1 * (2.0+6.0)/(2.0*M_PI)) * pow(ndoth, 6.0);\n"
 //    "float diff = (0.9/M_PI) * (ndotl/(1.0 + h*h));\n"
-    "float diff = 0.2;\n"
+    "float diff = 1.0;\n"
     // sample and mix
     "color = v_color;\n"
     "vec2 nuv = 2.0*v_uv - 1.0;\n"
@@ -368,7 +460,14 @@ static const char* tv_frag_src =
     "ds1 *= ds1;\n"
     "ds2 *= ds2;\n"
     // Blend together to mimic glossy reflection and ambient diffuse.
+// TODO: tsone: testing other types of blendings
+#if 0
+    "float w = v_blends.x;\n"
+    "w = 1.0 + w*w;\n"
+    "color = (ds0/(u_mouse.x*w/4.0) + ds1/(u_mouse.y*w/4.0) + ds2/(w)) / 3.0;\n"
+#else
     "color = mix(mix(ds0, ds1, v_blends.x), ds2, v_blends.y);\n"
+#endif
     "color *= diff;\n"
     // Gamma encode color w/ sqrt().
     "gl_FragColor = vec4(sqrt(color), 1.0);\n"
@@ -377,19 +476,21 @@ static const char* tv_frag_src =
 // Downsample shader.
 static const char* downsample_vert_src =
     "precision highp float;\n"
+DBG_PROLOG()
     "uniform vec2 u_offsets[8];\n"
     "attribute vec4 a_vert;\n"
-    "attribute vec2 a_uv;\n"
+    "attribute vec2 a_extra;\n"
     "varying vec2 v_uv[8];\n"
 
     "void main() {\n"
     "gl_Position = a_vert;\n"
     "for (int i = 0; i < 8; i++) {\n"
-        "v_uv[i] = a_uv + u_offsets[i];\n"
+        "v_uv[i] = a_extra + u_offsets[i];\n"
     "}\n"
     "}\n";
 static const char* downsample_frag_src =
     "precision highp float;\n"
+DBG_PROLOG()
     "uniform sampler2D u_downsampleTex;\n"
     "uniform float u_weights[8];\n"
     "varying vec2 v_uv[8];\n"
@@ -406,15 +507,17 @@ static const char* downsample_frag_src =
 // Combine shader.
 static const char* combine_vert_src =
     "precision highp float;\n"
+DBG_PROLOG()
     "attribute vec4 a_vert;\n"
-    "attribute vec2 a_uv;\n"
+    "attribute vec2 a_extra;\n"
     "varying vec2 v_uv;\n"
     "void main() {\n"
         "gl_Position = a_vert;\n"
-        "v_uv = a_uv;\n"
+        "v_uv = a_extra;\n"
     "}\n";
 static const char* combine_frag_src =
     "precision highp float;\n"
+DBG_PROLOG()
     "uniform sampler2D u_tvTex;\n"
     "uniform sampler2D u_downsample3Tex;\n"
     "uniform sampler2D u_downsample5Tex;\n"

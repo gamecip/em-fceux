@@ -307,17 +307,14 @@ void BlitScreen(uint8 *XBuf)
  *  Converts an x-y coordinate in the window manager into an x-y
  *  coordinate on FCEU's screen.
  */
-uint32
-PtoV(uint16 x,
-	uint16 y)
+void PtoV(int *x, int *y)
 {
-	y = (uint16)((double)y / s_eys);
-	x = (uint16)((double)x / s_exs);
-	if(s_clipSides) {
-		x += 8;
+	*y /= s_eys;
+	*x /= s_exs;
+	if (s_clipSides) {
+		*x += 8;
 	}
-	y += s_srendline;
-	return (x | (y << 16));
+	*y += s_srendline;
 }
 
 // TODO: tsone: AVI recording should be removed, these are unnecessary

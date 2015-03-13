@@ -6,12 +6,7 @@
 
 #define VERT_LOC 0
 #define NORM_LOC 1
-#define UV_LOC   2
-
-GLfloat vec3Dot(const GLfloat *a, const GLfloat *b)
-{
-    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
-}
+#define EXTRA_LOC 2
 
 void vec3Set(GLfloat *c, const GLfloat *a)
 {
@@ -34,11 +29,68 @@ void vec3Add(GLfloat *c, const GLfloat *a, const GLfloat *b)
     c[2] = a[2] + b[2];
 }
 
-void vec3Scale(GLfloat *c, const GLfloat *a, GLfloat scale)
+void vec3MulScalar(GLfloat *c, const GLfloat *a, GLfloat s)
 {
-    c[0] = a[0] * scale;
-    c[1] = a[1] * scale;
-    c[2] = a[2] * scale;
+    c[0] = a[0] * s;
+    c[1] = a[1] * s;
+    c[2] = a[2] * s;
+}
+
+void vec3DivScalar(GLfloat *c, const GLfloat *a, GLfloat s)
+{
+    c[0] = a[0] / s;
+    c[1] = a[1] / s;
+    c[2] = a[2] / s;
+}
+
+GLfloat vec3Dot(const GLfloat *a, const GLfloat *b)
+{
+    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+
+void vec3Cross(GLfloat *result, const GLfloat *a, const GLfloat *b)
+{
+    result[0] = a[1]*b[2] - a[2]*b[1];
+    result[1] = a[2]*b[0] - a[0]*b[2];
+    result[2] = a[0]*b[1] - a[1]*b[0];
+}
+
+GLfloat vec3Length2(const GLfloat *a)
+{
+    return vec3Dot(a, a);
+}
+
+GLfloat vec3Length(const GLfloat *a)
+{
+    return sqrt(vec3Length2(a));
+}
+
+GLfloat vec3Normalize(GLfloat *c, const GLfloat *a)
+{
+    GLfloat d = vec3Length(a);
+    if (d > 0) {
+        vec3DivScalar(c, a, d);
+    } else {
+        c[0] = c[1] = c[2] = 0;
+    }
+    return d;
+}
+
+GLfloat vec3ClosestOnSegment(GLfloat *result, const GLfloat *p, const GLfloat *a, const GLfloat *b)
+{
+    GLfloat pa[3], ba[3];
+    vec3Sub(pa, p, a);
+    vec3Sub(ba, b, a);
+    GLfloat dotbaba = vec3Length2(ba);
+    GLfloat t = 0;
+    if (dotbaba != 0) {
+        t = vec3Dot(pa, ba) / dotbaba;
+        if (t < 0) t = 0;
+        else if (t > 1) t = 1;
+    }
+    vec3MulScalar(ba, ba, t);
+    vec3Add(result, a, ba);
+    return t;
 }
 
 void mat4Persp(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar)
@@ -110,7 +162,7 @@ GLuint linkShader(GLuint vert_shader, GLuint frag_shader)
     glAttachShader(prog, frag_shader);
     glBindAttribLocation(prog, VERT_LOC, "a_vert");
     glBindAttribLocation(prog, NORM_LOC, "a_norm");
-    glBindAttribLocation(prog, UV_LOC, "a_uv");
+    glBindAttribLocation(prog, EXTRA_LOC, "a_extra");
     glLinkProgram(prog);
     glUseProgram(prog);
     return prog;
@@ -197,13 +249,46 @@ void deleteFBTex(GLuint *tex, GLuint *fb)
     }
 }
 
-// DEBUG: tsone: code to find mesh AABB
+// Inverse edge length weighted method. As described in Real-time rendering (3rd ed.) p.546.
+// Ref: Max, N. L., (1999) 'Weights for computing vertex normals from facet normals'
+//   in Journal of grahics tools, vol.4, no.2, pp.1-6.
+static GLfloat* meshGenerateNormals(int num_verts, int num_elems, const GLfloat *verts, const GLushort *elems)
+{
+    num_verts *= 3;
+    GLfloat *norms = (GLfloat*) calloc(num_verts, sizeof(GLfloat));
+    GLfloat e1[3], e2[3], no[3];
+
+    for (int i = 0; i < num_elems; i += 3) {
+        for (int j = 0; j < 3; ++j) {
+            int a = 3*elems[i+j];
+            int b = 3*elems[i+((j+1)%3)];
+            int c = 3*elems[i+((j+2)%3)];
+
+            vec3Sub(e1, &verts[c], &verts[b]);
+            vec3Sub(e2, &verts[a], &verts[b]);
+            vec3Cross(no, e1, e2);
+
+            GLfloat d = vec3Length2(e1) * vec3Length2(e2);
+            vec3DivScalar(no, no, d);
+            vec3Add(&norms[b], &norms[b], no);
+        }
+    }
+
+    for (int i = 0; i < num_verts; i += 3) {
+        vec3Normalize(&norms[i], &norms[i]);
+    }
+
+    return norms;
+}
+
+// DEBUG: tsone: for code to find mesh AABB below
 #include <stdio.h>
 
-void createMesh(es2_mesh *p, int num_verts, int num_elems, const GLfloat *verts, const GLfloat *norms, const GLfloat *uvs, const GLushort *elems)
+void createMesh(es2_mesh *p, int num_verts, int num_elems, int extra_comps, const GLfloat *verts, const GLfloat *norms, const GLfloat *extra, const GLushort *elems)
 {
     memset(p, 0, sizeof(es2_mesh));
     p->num_elems = num_elems;
+    p->extra_comps = extra_comps;
 
     createBuffer(&p->vert_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, verts);
 // DEBUG: tsone: code to find mesh AABB
@@ -221,11 +306,21 @@ void createMesh(es2_mesh *p, int num_verts, int num_elems, const GLfloat *verts,
         mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2]);
 
     if (norms) {
-        createBuffer(&p->norm_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, norms);
+// TODO: tsone: testing normal generation in code. would save some space
+#if 0
+            GLfloat *ns = meshGenerateNormals(num_verts, num_elems, verts, elems);
+            createBuffer(&p->norm_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, ns);
+            free(ns);
+#else
+            createBuffer(&p->norm_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, norms);
+#endif
+        }
     }
-    if (uvs) {
-        createBuffer(&p->uv_buf, GL_ARRAY_BUFFER, 2*sizeof(GLfloat)*num_verts, uvs);
+
+    if (extra) {
+        createBuffer(&p->extra_buf, GL_ARRAY_BUFFER, extra_comps*sizeof(GLfloat)*num_verts, extra);
     }
+
     if (elems) {
         createBuffer(&p->elem_buf, GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)*num_elems, elems);
     }
@@ -235,7 +330,7 @@ void deleteMesh(es2_mesh *p)
 {
     deleteBuffer(&p->vert_buf);
     deleteBuffer(&p->norm_buf);
-    deleteBuffer(&p->uv_buf);
+    deleteBuffer(&p->extra_buf);
     deleteBuffer(&p->elem_buf);
 }
 
@@ -252,12 +347,12 @@ void meshRender(es2_mesh *p)
         glDisableVertexAttribArray(NORM_LOC);
     }
 
-    if (p->uv_buf) {
-        glEnableVertexAttribArray(UV_LOC);
-        glBindBuffer(GL_ARRAY_BUFFER, p->uv_buf);
-        glVertexAttribPointer(UV_LOC, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    if (p->extra_buf) {
+        glEnableVertexAttribArray(EXTRA_LOC);
+        glBindBuffer(GL_ARRAY_BUFFER, p->extra_buf);
+        glVertexAttribPointer(EXTRA_LOC, p->extra_comps, GL_FLOAT, GL_FALSE, 0, 0);
     } else {
-        glDisableVertexAttribArray(UV_LOC);
+        glDisableVertexAttribArray(EXTRA_LOC);
     }
 
     if (p->elem_buf) {
@@ -266,5 +361,45 @@ void meshRender(es2_mesh *p)
     } else {
 	    glDrawArrays(GL_TRIANGLE_STRIP, 0, p->num_elems);
     }
+}
+
+// num_elems: Must be 3*<number of triangles>, i.e. index buffer number of elements.
+int *createUniqueEdges(int *num_edges, int num_elems, const GLushort *elems)
+{
+    int *edges = (int*) malloc(2*sizeof(int) * num_elems);
+//    int *face_edges = (int*) malloc(sizeof(int) * num_elems);
+    int n = 0;
+    // Find unique edges using O(n^2) process. Small, but not fast.
+    for (int i = 0; i < num_elems; i += 3) {
+        for (int j = 0; j < 3; ++j) {
+            int a0 = elems[i+j];
+            int b0 = elems[i+((j+1)%3)];
+            int k;
+            // Check if we already have the same edge.
+            for (k = 0; k < n; k += 2) {
+                int a1 = edges[k];
+                int b1 = edges[k+1];
+                if (a0 == b1 && b0 == a1) {
+                    // Duplicate edge with opposite direction.
+//                    k = -k;
+                    break;
+                }
+                if (a0 == a1 && b0 == b1) {
+                    // Duplicate edge with same direction.
+                    break;
+                }
+            }
+            if (k == n) {
+                edges[n] = a0;
+                edges[n+1] = b0;
+                n += 2;
+            }
+            // Set found edge as face edge.
+//            face_edges[i+j] = k / 2;
+        }
+    }
+
+    *num_edges = n / 2;
+    return edges;
 }
 

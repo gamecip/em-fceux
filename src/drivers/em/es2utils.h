@@ -9,17 +9,24 @@ typedef struct t_es2_mesh
 {
     GLuint vert_buf;
     GLuint norm_buf;
-    GLuint uv_buf;
+    GLuint extra_buf;
     GLuint elem_buf;
 
-    GLint num_elems;
+    int num_elems;
+    int extra_comps;
 } es2_mesh;
 
-GLfloat vec3Dot(const GLfloat *a, const GLfloat *b);
 void vec3Set(GLfloat *c, const GLfloat *a);
 void vec3Sub(GLfloat *c, const GLfloat *a, const GLfloat *b);
 void vec3Add(GLfloat *c, const GLfloat *a, const GLfloat *b);
-void vec3Scale(GLfloat *c, const GLfloat *a, GLfloat scale);
+void vec3MulScalar(GLfloat *c, const GLfloat *a, GLfloat s);
+void vec3DivScalar(GLfloat *c, const GLfloat *a, GLfloat s);
+GLfloat vec3Dot(const GLfloat *a, const GLfloat *b);
+void vec3Cross(GLfloat *result, const GLfloat *a, const GLfloat *b);
+GLfloat vec3Length2(const GLfloat *a);
+GLfloat vec3Length(const GLfloat *a);
+GLfloat vec3Normalize(GLfloat *c, const GLfloat *a);
+GLfloat vec3ClosestOnSegment(GLfloat *result, const GLfloat *p, const GLfloat *a, const GLfloat *b);
 void mat4Persp(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar);
 void mat4Trans(GLfloat *p, GLfloat *trans);
 void mat4Mul(GLfloat *p, const GLfloat *a, const GLfloat *b);
@@ -33,8 +40,9 @@ void createTex(GLuint *tex, int w, int h, GLenum format, GLenum min_filter, GLen
 void deleteTex(GLuint *tex);
 void createFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum min_filter, GLenum mag_filter);
 void deleteFBTex(GLuint *tex, GLuint *fb);
-void createMesh(es2_mesh *p, int num_verts, int num_elems, const GLfloat *verts, const GLfloat *norms, const GLfloat *uvs, const GLushort *elems);
+void createMesh(es2_mesh *p, int num_verts, int num_elems, int extra_comps, const GLfloat *verts, const GLfloat *norms, const GLfloat *extra, const GLushort *elems);
 void deleteMesh(es2_mesh *p);
 void meshRender(es2_mesh *p);
+int *createUniqueEdges(int *num_edges, int num_elems, const GLushort *elems);
 
 #endif

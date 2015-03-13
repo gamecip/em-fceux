@@ -791,9 +791,9 @@ void FCEUD_SetInput (bool fourscore, bool microphone, ESI port0, ESI port1,
 static EM_BOOL FCEM_MouseCallback(int type, const EmscriptenMouseEvent *event, void *)
 {
 	// Map element coords to NES screen coords.
-	uint32 t = PtoV(event->targetX, event->targetY);
-	MouseData[0] = t & 0xFFFF;
-	MouseData[1] = (t >> 16) & 0xFFFF;
+	MouseData[0] = event->targetX;
+	MouseData[1] = event->targetY;
+	PtoV(&MouseData[0], &MouseData[1]);
 	// Bit 0 set if primary button down, bit 1 set if secondary down.
 	MouseData[2] = event->buttons & 3;
 	return 1;

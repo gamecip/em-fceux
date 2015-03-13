@@ -10,6 +10,14 @@
 #define STR(s_) _STR(s_)
 #define _STR(s_) #s_
 
+// TODO: tsone: set elsewhere?
+#define DBG_MODE 1
+#if DBG_MODE
+#define DBG(x_) x_;
+#else
+#define DBG(x_)
+#endif
+
 #define IDX_I       0
 #define DEEMP_I     1
 #define LOOKUP_I    2
@@ -274,8 +282,21 @@ static void genLookupTex(es2n *p)
 	free(result);
 }
 
+#if DBG_MODE
+extern int MouseData[3];
+static void updateUniformsDebug()
+{
+    GLint prog = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &prog);
+    int k = glGetUniformLocation(prog, "u_mouse");
+    GLfloat mouse[3] = { MouseData[0], MouseData[1], MouseData[2] };
+    glUniform3fv(k, 1, mouse);
+}
+#endif
+
 static void updateUniformsRGB(const es2n_controls *c)
 {
+    DBG(updateUniformsDebug())
     GLfloat v;
     v = 0.15f * c->brightness;
     glUniform1f(c->_brightness_loc, v);
@@ -291,6 +312,7 @@ static void updateUniformsRGB(const es2n_controls *c)
 
 static void updateUniformsStretch(const es2n_controls *c)
 {
+    DBG(updateUniformsDebug())
     GLfloat v;
     v = c->crt_enabled * 0.5f * c->scanlines;
     glUniform1f(c->_scanlines_loc, v);
@@ -298,9 +320,10 @@ static void updateUniformsStretch(const es2n_controls *c)
 
 static void updateUniformsScreen(const es2n *p, int final_pass)
 {
+    DBG(updateUniformsDebug())
     const es2n_controls *c = &p->controls;
     GLfloat v;
-    v = c->crt_enabled * -2.0f * c->convergence;
+    v = c->crt_enabled * 2.0f * c->convergence;
     glUniform1f(c->_convergence_loc, v);
 
     if (c->crt_enabled) {
@@ -312,16 +335,20 @@ static void updateUniformsScreen(const es2n *p, int final_pass)
     }
 
     v = (0.9f-c->rgbppu) * 0.4f * (c->sharpness+0.5f);
-    GLfloat sharpen_kernel[3 * 3] = {
-        0.0f, -v, 0.0f, 
-        0.0f, 1.0f+2.0f*v, 0.0f, 
-        0.0f, -v, 0.0f 
+    GLfloat sharpen_kernel[] = {
+        -v, -v, -v,
+        1, 0, 0, 
+        2*v, 1+2*v, 2*v, 
+        0, 0, 1, 
+        -v, -v, -v
     };
-    glUniformMatrix3fv(c->_sharpen_kernel_loc, 1, GL_FALSE, sharpen_kernel);
+
+    glUniform3fv(c->_sharpen_kernel_loc, 5, sharpen_kernel);
 }
 
 static void updateUniformsDownsample(const es2n *p, int w, int h, int texIdx, int isHorzPass)
 {
+    DBG(updateUniformsDebug())
     float offsets[2*8];
     if (isHorzPass) {
         for (int i = 0; i < 8; ++i) {
@@ -342,12 +369,14 @@ static void updateUniformsDownsample(const es2n *p, int w, int h, int texIdx, in
 // TODO: tsone: not necessary?
 static void updateUniformsTV(const es2n *p)
 {
+    DBG(updateUniformsDebug())
 }
 
 static void updateUniformsCombine(const es2n *p)
 {
+    DBG(updateUniformsDebug())
     const es2n_controls *c = &p->controls;
-    GLfloat v = 0.08f + 0.08f*c->glow;
+    GLfloat v = 0.07f + 0.07f*c->glow;
     glUniform1f(c->_combine_glow_loc, v);
 }
 
@@ -547,7 +576,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glEnableVertexAttribArray(0);
 
-    createMesh(&p->quad_mesh, mesh_quad_vert_num, 2*mesh_quad_face_num, mesh_quad_verts, mesh_quad_norms, mesh_quad_uvs, 0);
+    createMesh(&p->quad_mesh, mesh_quad_vert_num, 2*mesh_quad_face_num, 2, mesh_quad_verts, mesh_quad_norms, mesh_quad_uvs, 0);
 
     // Setup input pixels texture.
     glActiveTexture(TEX(IDX_I));
@@ -587,50 +616,42 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Setup screen shader.
     p->screen_prog = buildShader(screen_vert_src, screen_frag_src);
-    createMesh(&p->screen_mesh, mesh_screen_vert_num, 3*mesh_screen_face_num, mesh_screen_verts, mesh_screen_norms, mesh_screen_uvs, mesh_screen_faces);
+    createMesh(&p->screen_mesh, mesh_screen_vert_num, 3*mesh_screen_face_num, 2, mesh_screen_verts, mesh_screen_norms, mesh_screen_uvs, mesh_screen_faces);
     initUniformsScreen(p);
 
     // Setup TV shader.
     p->tv_prog = buildShader(tv_vert_src, tv_frag_src);
-// TODO: tsone: generate uvs as distances to crt screen edges
-    GLfloat *rim_uvs = (GLfloat*) malloc(2*sizeof(GLfloat) * mesh_rim_vert_num);
+// TODO: tsone: generate distances to crt screen edges
+    int num_edges = 0;
+    int *edges = createUniqueEdges(&num_edges, 3*mesh_screen_face_num, mesh_screen_faces);
+    num_edges *= 2;
+
+    GLfloat *rim_extra = (GLfloat*) malloc(3*sizeof(GLfloat) * mesh_rim_vert_num);
     for (int i = 0; i < mesh_rim_vert_num; ++i) {
         GLfloat p[3];
         vec3Set(p, &mesh_rim_verts[3*i]);
         GLfloat shortest[3] = { 0, 0, 0 };
         GLfloat shortestDist = 1000000.0f;
-        for (int j = 0; j < mesh_screen_face_num; ++j) {
-            for (int m = 0; m < 3; ++m) {
-                int ai = mesh_screen_faces[3*j+m];
-                int bi = mesh_screen_faces[3*j+((m+1)%3)];
-                GLfloat a[3], b[3], pa[3], ba[3];
-                vec3Set(a, &mesh_screen_verts[3*ai]);
-                vec3Set(b, &mesh_screen_verts[3*bi]);
-                vec3Sub(pa, p, a);
-                vec3Sub(ba, b, a);
-                GLfloat dotbaba = vec3Dot(ba, ba);
-                GLfloat t = 0;
-                if (dotbaba != 0) {
-                    t = vec3Dot(pa, ba) / dotbaba;
-                    if (t < 0) t = 0;
-                    else if (t > 1) t = 1;
-                }
-                vec3Scale(ba, ba, t);
-                vec3Add(a, a, ba);
-                vec3Sub(a, a, p);
-                GLfloat dist = vec3Dot(a, a);
-                if (dist < shortestDist) {
-                    shortestDist = dist;
-                    vec3Set(shortest, a);
-                }
+        for (int j = 0; j < num_edges; j += 2) {
+            int ai = 3*edges[j];
+            int bi = 3*edges[j+1];
+            GLfloat diff[3];
+            vec3ClosestOnSegment(diff, p, &mesh_screen_verts[ai], &mesh_screen_verts[bi]);
+            vec3Sub(diff, diff, p);
+            GLfloat dist = vec3Length2(diff);
+            if (dist < shortestDist) {
+                shortestDist = dist;
+                vec3Set(shortest, diff);
             }
         }
 // TODO: tsone: could interpolate uv with vert normal here, and not in vertex shader
-        rim_uvs[2*i  ] = shortest[0];
-        rim_uvs[2*i+1] = shortest[1];
+        rim_extra[3*i] = shortest[0];
+        rim_extra[3*i+1] = shortest[1];
+        rim_extra[3*i+2] = shortest[2];
     }
-    createMesh(&p->tv_mesh, mesh_rim_vert_num, 3*mesh_rim_face_num, mesh_rim_verts, mesh_rim_norms, rim_uvs, mesh_rim_faces);
-    free(rim_uvs);
+    createMesh(&p->tv_mesh, mesh_rim_vert_num, 3*mesh_rim_face_num, 3, mesh_rim_verts, mesh_rim_norms, rim_extra, mesh_rim_faces);
+    free(edges);
+    free(rim_extra);
     initUniformsTV(p);
 
     // Setup combine shader.

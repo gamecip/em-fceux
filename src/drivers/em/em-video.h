@@ -6,7 +6,7 @@
 #include <SDL/SDL.h>
 #endif
 
-uint32 PtoV(uint16 x, uint16 y);
+void PtoV(int *x, int *y);
 bool FCEUD_ShouldDrawInputAids();
 bool FCEUI_AviDisableMovieMessages();
 static SDL_Surface *s_screen;
