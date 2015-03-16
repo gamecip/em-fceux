@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 /* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
@@ -106,3 +107,4 @@ int ParseArguments(int argc, char *argv[], ARGPSTRUCT *argsps)
  return argc;
 }
 
+#endif // EMSCRIPTEN

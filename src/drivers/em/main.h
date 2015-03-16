@@ -46,6 +46,7 @@ extern const char *GamePadNames[GAMEPAD_NUM_BUTTONS];
 extern const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES];
 extern const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS];
 
+#if PERI
 // PowerPad defaults
 #define POWERPAD_NUM_DEVICES 2
 #define POWERPAD_NUM_BUTTONS 12
@@ -88,5 +89,6 @@ extern const int DefaultFTrainer[FTRAINER_NUM_BUTTONS];
 extern const char *FamilyKeyBoardNames[FAMILYKEYBOARD_NUM_BUTTONS];
 extern const char *DefaultFamilyKeyBoardDevice;
 extern const int DefaultFamilyKeyBoard[FAMILYKEYBOARD_NUM_BUTTONS];
+#endif //PERI
 
 #endif

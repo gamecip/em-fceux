@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 // Several parts of this were significantly customized to be compatible with FCEUX input
 // and output. Drop-in replacement is not an option.
 
@@ -309,3 +310,5 @@ void nes_ntsc_blit( nes_ntsc_t const* ntsc, NES_NTSC_IN_T const* input, long in_
 }
 
 #endif
+
+#endif //EMSCRIPTEN

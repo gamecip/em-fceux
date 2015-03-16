@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 //hq2x filter demo program
 //----------------------------------------------------------
 //Copyright (C) 2003 MaxSt ( maxst@hiend3d.com )
@@ -2992,3 +2993,5 @@ int main(int argc, char* argv[])
   return 0;
 }
 #endif
+
+#endif //EMSCRIPTEN

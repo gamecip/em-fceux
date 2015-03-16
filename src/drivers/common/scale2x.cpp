@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 /*
  * This file is part of the Scale2x project.
  *
@@ -922,3 +923,4 @@ void scale2x_32_mmx(scale2x_uint32* dst0, scale2x_uint32* dst1, const scale2x_ui
 
 #endif
 
+#endif //EMSCRIPTEN

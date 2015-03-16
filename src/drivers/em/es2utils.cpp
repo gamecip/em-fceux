@@ -4,9 +4,9 @@
 #include <string.h>
 #include <math.h>
 
-#define VERT_LOC 0
-#define NORM_LOC 1
-#define EXTRA_LOC 2
+#define MAX_VARRAYS 8
+
+static int is_varray_enabled[MAX_VARRAYS];
 
 void vec3Set(GLfloat *c, const GLfloat *a)
 {
@@ -160,9 +160,11 @@ GLuint linkShader(GLuint vert_shader, GLuint frag_shader)
     GLuint prog = glCreateProgram();
     glAttachShader(prog, vert_shader);
     glAttachShader(prog, frag_shader);
-    glBindAttribLocation(prog, VERT_LOC, "a_vert");
-    glBindAttribLocation(prog, NORM_LOC, "a_norm");
-    glBindAttribLocation(prog, EXTRA_LOC, "a_extra");
+    char name[] = "a_0";
+    for (int i = 0; i < MAX_VARRAYS; i++) {
+        glBindAttribLocation(prog, i, name);
+        name[2]++;
+    }
     glLinkProgram(prog);
     glUseProgram(prog);
     return prog;
@@ -249,6 +251,8 @@ void deleteFBTex(GLuint *tex, GLuint *fb)
     }
 }
 
+// TODO: tsone: disabled for now...?
+#if 0
 // Inverse edge length weighted method. As described in Real-time rendering (3rd ed.) p.546.
 // Ref: Max, N. L., (1999) 'Weights for computing vertex normals from facet normals'
 //   in Journal of grahics tools, vol.4, no.2, pp.1-6.
@@ -280,18 +284,62 @@ static GLfloat* meshGenerateNormals(int num_verts, int num_elems, const GLfloat 
 
     return norms;
 }
+#endif
 
-// DEBUG: tsone: for code to find mesh AABB below
-#include <stdio.h>
+static int type2Size(GLenum type)
+{
+    switch (type) {
+    case GL_FLOAT: return sizeof(GLfloat);
+    case GL_UNSIGNED_BYTE:
+    case GL_BYTE: return sizeof(GLbyte);
+    case GL_UNSIGNED_SHORT:
+    case GL_SHORT: return sizeof(GLshort);
+    case GL_UNSIGNED_INT:
+    case GL_INT: return sizeof(GLint);
+    default: return 0;
+    }
+}
 
-void createMesh(es2_mesh *p, int num_verts, int num_elems, int extra_comps, const GLfloat *verts, const GLfloat *norms, const GLfloat *extra, const GLushort *elems)
+static int verts2Type(int num_verts)
+{
+    if (num_verts <= 256) return GL_UNSIGNED_BYTE;
+    else if (num_verts <= 65536) return GL_UNSIGNED_SHORT;
+    else return GL_UNSIGNED_INT;
+}
+
+void createMesh(es2_mesh *p, int num_verts, int num_varrays, es2_varray *varrays, int num_elems, const void *elems)
 {
     memset(p, 0, sizeof(es2_mesh));
+    p->num_varrays = num_varrays;
+    p->varrays = varrays;
     p->num_elems = num_elems;
-    p->extra_comps = extra_comps;
+    p->elem_type = verts2Type(num_verts);
 
-    createBuffer(&p->vert_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, verts);
+    for (int i = 0; i < num_varrays; i++) {
+        GLsizei size = varrays[i].count * type2Size(varrays[i].type) * num_verts;
+        const GLushort *enc = (const GLushort*) varrays[i].data;
+        GLfloat *norms = 0;
+        if (varrays[i].flags & VARRAY_ENCODED_NORMALS) {
+            norms = (GLfloat*) malloc(size);
+            for (int j = 0; j < num_verts; j++) {
+                float a = 1.0*M_PI * enc[2*j  ] / 65535.0;
+                float b = 2.0*M_PI * enc[2*j+1] / 65535.0;
+                norms[3*j  ] = sin(a) * cos(b);
+                norms[3*j+1] = sin(a) * sin(b);
+                norms[3*j+2] = cos(a);
+            }
+        }
+
+        if (norms) {
+            createBuffer(&varrays[i]._buf, GL_ARRAY_BUFFER, size, norms);
+            free(norms);
+        } else {
+            createBuffer(&varrays[i]._buf, GL_ARRAY_BUFFER, size, varrays[i].data);
+        }
+    }
+
 // DEBUG: tsone: code to find mesh AABB
+#if 0
     GLfloat mins[3] = { .0f, .0f, .0f }, maxs[3] = { .0f, .0f, .0f };
     for (int i = 0; i < 3*num_verts; i += 3) {
         for (int j = 0; j < 3; ++j) {
@@ -304,76 +352,79 @@ void createMesh(es2_mesh *p, int num_verts, int num_elems, int extra_comps, cons
     }
     printf("verts:%d aabb: min:%.5f,%.5f,%.5f max:%.5f,%.5f,%.5f\n", num_verts,
         mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2]);
+#endif
 
-    if (norms) {
 // TODO: tsone: testing normal generation in code. would save some space
 #if 0
-            GLfloat *ns = meshGenerateNormals(num_verts, num_elems, verts, elems);
-            createBuffer(&p->norm_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, ns);
-            free(ns);
-#else
-            createBuffer(&p->norm_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, norms);
+        GLfloat *ns = meshGenerateNormals(num_verts, num_elems, verts, elems);
+        createBuffer(&p->norm_buf, GL_ARRAY_BUFFER, 3*sizeof(GLfloat)*num_verts, ns);
+        free(ns);
 #endif
-        }
-    }
-
-    if (extra) {
-        createBuffer(&p->extra_buf, GL_ARRAY_BUFFER, extra_comps*sizeof(GLfloat)*num_verts, extra);
-    }
 
     if (elems) {
-        createBuffer(&p->elem_buf, GL_ELEMENT_ARRAY_BUFFER, sizeof(GLushort)*num_elems, elems);
+        GLsizei size = type2Size(p->elem_type) * num_elems;
+        createBuffer(&p->elem_buf, GL_ELEMENT_ARRAY_BUFFER, size, elems);
     }
 }
 
 void deleteMesh(es2_mesh *p)
 {
-    deleteBuffer(&p->vert_buf);
-    deleteBuffer(&p->norm_buf);
-    deleteBuffer(&p->extra_buf);
+    for (int i = 0; i < p->num_varrays; i++) {
+        deleteBuffer(&p->varrays[i]._buf);
+    }
     deleteBuffer(&p->elem_buf);
 }
 
 void meshRender(es2_mesh *p)
 {
-    glBindBuffer(GL_ARRAY_BUFFER, p->vert_buf);
-    glVertexAttribPointer(VERT_LOC, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-    if (p->norm_buf) {
-        glEnableVertexAttribArray(NORM_LOC);
-        glBindBuffer(GL_ARRAY_BUFFER, p->norm_buf);
-        glVertexAttribPointer(NORM_LOC, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    } else {
-        glDisableVertexAttribArray(NORM_LOC);
-    }
-
-    if (p->extra_buf) {
-        glEnableVertexAttribArray(EXTRA_LOC);
-        glBindBuffer(GL_ARRAY_BUFFER, p->extra_buf);
-        glVertexAttribPointer(EXTRA_LOC, p->extra_comps, GL_FLOAT, GL_FALSE, 0, 0);
-    } else {
-        glDisableVertexAttribArray(EXTRA_LOC);
+    for (int i = 0; i < MAX_VARRAYS; i++) {
+        if (i < p->num_varrays && p->varrays[i]._buf) {
+            glEnableVertexAttribArray(i);
+            is_varray_enabled[i] = 1;
+            glBindBuffer(GL_ARRAY_BUFFER, p->varrays[i]._buf);
+            GLboolean normalized = (p->varrays[i].type == GL_FLOAT) ? GL_FALSE : GL_TRUE;
+            glVertexAttribPointer(i, p->varrays[i].count, p->varrays[i].type, normalized, 0, 0);
+        } else if (is_varray_enabled[i]) {
+            glDisableVertexAttribArray(i);
+            is_varray_enabled[i] = 0;
+        }
     }
 
     if (p->elem_buf) {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, p->elem_buf);
-        glDrawElements(GL_TRIANGLES, p->num_elems, GL_UNSIGNED_SHORT, 0);
+        glDrawElements(GL_TRIANGLES, p->num_elems, p->elem_type, 0);
     } else {
-	    glDrawArrays(GL_TRIANGLE_STRIP, 0, p->num_elems);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, p->num_elems);
     }
 }
 
 // num_elems: Must be 3*<number of triangles>, i.e. index buffer number of elements.
-int *createUniqueEdges(int *num_edges, int num_elems, const GLushort *elems)
+int *createUniqueEdges(int *num_edges, int num_verts, int num_elems, const void *elems)
 {
+    GLuint *elems_copy = (GLuint*) malloc(sizeof(GLuint) * num_elems);
+
+    if (num_verts <= 256) {
+        const GLubyte *e = (const GLubyte*) elems;
+        for (GLuint i = 0; i < num_elems; i++) {
+            elems_copy[i] = e[i];
+        }
+    } else if (num_verts <= 65536) {
+        const GLushort *e = (const GLushort*) elems;
+        for (GLuint i = 0; i < num_elems; i++) {
+            elems_copy[i] = e[i];
+        }
+    } else {
+        memcpy(elems_copy, elems, sizeof(GLuint) * num_elems);
+    }
+
     int *edges = (int*) malloc(2*sizeof(int) * num_elems);
 //    int *face_edges = (int*) malloc(sizeof(int) * num_elems);
     int n = 0;
     // Find unique edges using O(n^2) process. Small, but not fast.
     for (int i = 0; i < num_elems; i += 3) {
         for (int j = 0; j < 3; ++j) {
-            int a0 = elems[i+j];
-            int b0 = elems[i+((j+1)%3)];
+            int a0 = elems_copy[i+j];
+            int b0 = elems_copy[i+((j+1)%3)];
             int k;
             // Check if we already have the same edge.
             for (k = 0; k < n; k += 2) {
@@ -399,6 +450,7 @@ int *createUniqueEdges(int *num_edges, int num_elems, const GLushort *elems)
         }
     }
 
+    free(elems_copy);
     *num_edges = n / 2;
     return edges;
 }

@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 //hq3x filter demo program
 //----------------------------------------------------------
 //Copyright (C) 2003 MaxSt ( maxst@hiend3d.com )
@@ -3863,3 +3864,4 @@ void hq3x_Kill(void)
  free(RGBtoYUV);
 }
 
+#endif //EMSCRIPTEN

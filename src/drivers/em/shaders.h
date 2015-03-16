@@ -9,20 +9,20 @@ static const char* rgb_vert_src =
 DBG_PROLOG()
     DEFINE(NUM_TAPS)
     DEFINE(IDX_W)
-    "attribute vec4 a_vert;\n"
-    "attribute vec2 a_extra;\n"
+    "attribute vec4 a_0;\n"
+    "attribute vec2 a_2;\n"
     "varying vec2 v_uv[int(NUM_TAPS)];\n"
     "varying vec2 v_deemp_uv;\n"
     "#define UV_OUT(i_, o_) v_uv[i_] = vec2(uv.x + (o_)/IDX_W, uv.y)\n"
     "void main() {\n"
-    "vec2 uv = a_extra;\n"
+    "vec2 uv = a_2;\n"
     "UV_OUT(0,-2.0);\n"
     "UV_OUT(1,-1.0);\n"
     "UV_OUT(2, 0.0);\n"
     "UV_OUT(3, 1.0);\n"
     "UV_OUT(4, 2.0);\n"
     "v_deemp_uv = vec2(uv.y, 0.0);\n"
-    "gl_Position = a_vert;\n"
+    "gl_Position = a_0;\n"
     "}\n";
 static const char* rgb_frag_src =
     "precision highp float;\n"
@@ -91,14 +91,14 @@ static const char* stretch_vert_src =
     DEFINE(IDX_H)
     "precision highp float;\n"
 DBG_PROLOG()
-    "attribute vec4 a_vert;\n"
-    "attribute vec2 a_extra;\n"
+    "attribute vec4 a_0;\n"
+    "attribute vec2 a_2;\n"
     "varying vec2 v_uv[2];\n"
     "void main() {\n"
-    "vec2 uv = a_extra;\n"
+    "vec2 uv = a_2;\n"
     "v_uv[0] = vec2(uv.x, 1.0 - uv.y);\n"
     "v_uv[1] = vec2(v_uv[0].x, v_uv[0].y - 0.25/IDX_H);\n"
-    "gl_Position = a_vert;\n"
+    "gl_Position = a_0;\n"
     "}\n";
 static const char* stretch_frag_src =
     "precision highp float;\n"
@@ -128,9 +128,9 @@ static const char* screen_vert_src =
 DBG_PROLOG()
     DEFINE(RGB_W)
     DEFINE(M_PI)
-    "attribute vec4 a_vert;\n"
-    "attribute vec3 a_norm;\n"
-    "attribute vec2 a_extra;\n"
+    "attribute vec4 a_0;\n"
+    "attribute vec3 a_1;\n"
+    "attribute vec2 a_2;\n"
     "uniform float u_convergence;\n"
     "uniform mat4 u_mvp;\n"
     "uniform vec2 u_uvScale;\n"
@@ -141,7 +141,7 @@ DBG_PROLOG()
 
     "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
     "void main() {\n"
-    "vec2 uv = 0.5 + u_uvScale.xy * (a_extra - 0.5);\n"
+    "vec2 uv = 0.5 + u_uvScale.xy * (a_2 - 0.5);\n"
     "TAP(0,-4.0);\n"
     "TAP(1, u_convergence);\n"
     "TAP(2, 0.0);\n"
@@ -151,11 +151,11 @@ DBG_PROLOG()
 #if 1
     "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
     "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
-    "vec3 n = normalize(a_norm);\n"
-    "v_norm = a_norm;\n"
-    "v_pos = a_vert.xyz;\n"
-    "vec3 v = normalize(view_pos - a_vert.xyz);\n"
-    "vec3 p2l = light_pos - a_vert.xyz;\n"
+    "vec3 n = normalize(a_1);\n"
+    "v_norm = a_1;\n"
+    "v_pos = a_0.xyz;\n"
+    "vec3 v = normalize(view_pos - a_0.xyz);\n"
+    "vec3 p2l = light_pos - a_0.xyz;\n"
     "float p2lL = length(p2l);\n"
     "vec3 l = p2l / p2lL;\n"
     "vec3 h = normalize(l + v);\n"
@@ -178,7 +178,7 @@ DBG_PROLOG()
 // TODO: tsone: This color must be linearized
     "v_color = vec3(0.0);\n"
 #endif
-    "gl_Position = u_mvp * a_vert;\n"
+    "gl_Position = u_mvp * a_0;\n"
     "}\n";
 static const char* screen_frag_src =
 "precision highp float;\n"
@@ -303,8 +303,10 @@ DEFINE(M_PI)
 static const char* tv_vert_src =
     "precision highp float;\n"
 DBG_PROLOG()
-    "attribute vec4 a_vert;\n"
-    "attribute vec3 a_norm;\n"
+    "attribute vec4 a_0;\n"
+    "attribute vec3 a_1;\n"
+    "attribute vec3 a_2;\n"
+    "attribute vec3 a_3;\n"
     "uniform mat4 u_mvp;\n"
     "varying vec3 v_color;\n"
     "varying vec3 v_p;\n"
@@ -312,7 +314,6 @@ DBG_PROLOG()
     "varying vec3 v_v;\n"
 
 // TODO: tsone: testing distances in uvs
-    "attribute vec3 a_extra;\n"
     "varying vec2 v_uv;\n"
     "varying vec2 v_blends;\n"
 
@@ -321,29 +322,29 @@ DBG_PROLOG()
     "void main() {\n"
         "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
         "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
-        "vec4 p = u_mvp * a_vert;\n"
-        "vec3 n = normalize(a_norm);\n"
-        "vec3 v = normalize(view_pos - a_vert.xyz);\n"
-        "vec3 l = normalize(light_pos - a_vert.xyz);\n"
+        "vec4 p = u_mvp * a_0;\n"
+        "vec3 n = normalize(a_1);\n"
+        "vec3 v = normalize(view_pos - a_0.xyz);\n"
+        "vec3 l = normalize(light_pos - a_0.xyz);\n"
         "vec3 h = normalize(l + v);\n"
         "float ndotl = max(dot(n, l), 0.0);\n"
         "float ndoth = max(dot(n, h), 0.0);\n"
         "v_color = vec3(0.000 + 0.004*ndotl + 0.00*pow(ndoth, 19.0));\n"
-// TODO: tsone: disable light for now
-        "v_color = vec3(0.0);\n"
+// TODO: tsone: pass baked vertex color as v_color
+        "v_color = a_3 * a_3;\n" // Input seems to be gamma encoded(?), need to decode here.
         "v_n = n;\n"
         "v_v = v;\n"
-        "v_p = a_vert.xyz;\n"
-        "gl_Position = u_mvp * a_vert;\n"
+        "v_p = a_0.xyz;\n"
+        "gl_Position = u_mvp * a_0;\n"
     
-        "float andy = length(a_extra);\n"
-        "float les = length(a_extra.xy);\n"
-        "vec2 clay = (les > 0.0) ? a_extra.xy / les : vec2(0.0);\n"
+        "float andy = length(a_2);\n"
+        "float les = length(a_2.xy);\n"
+        "vec2 clay = (les > 0.0) ? a_2.xy / les : vec2(0.0);\n"
         "vec2 nxy = normalize(v_n.xy);\n"
         "float mixer = max(1.0 - 30.0*les, 0.0);\n"
 //        "float mixer = max(1.0 - 50.0*andy, 0.0);\n"
         "vec2 pool = normalize(mix(clay, nxy, mixer));\n"
-        "vec4 tmp = u_mvp * vec4(a_vert.xy + 5.5*vec2(1.0, 7.0/8.0)*(vec2(les) + vec2(0.0014, 0.0019))*pool, a_vert.zw);\n"
+        "vec4 tmp = u_mvp * vec4(a_0.xy + 5.5*vec2(1.0, 7.0/8.0)*(vec2(les) + vec2(0.0014, 0.0019))*pool, a_0.zw);\n"
         "v_uv = 0.5 + 0.5 * tmp.xy / tmp.w;\n"
 
 // TODO: tsone: testing with real 3D distance to screen
@@ -351,7 +352,7 @@ DBG_PROLOG()
         "v_blends.x = andy;\n"
 #else
 //        "float w = 3.0 * (1.0 - pow(1.0 + 3.5*andy, -4.0));\n"
-        "float w = (u_mouse.x/256.0)*50.0*andy;\n"
+        "float w = (u_mouse.x/256.0)*70.0*andy;\n"
 //        "float w = 0.0*andy;\n"
 //        "float w = 51.0*les;\n"
         "if (w < 1.0) {\n"
@@ -367,7 +368,7 @@ DBG_PROLOG()
             "v_blends.y = 1.0;\n"
         "}\n"
 // TODO: tsone: is this better?
-        "v_blends = smoothstep01(v_blends);\n"
+//        "v_blends = smoothstep01(v_blends);\n"
 //        "v_blends *= v_blends;\n"
 //        "v_blends *= v_blends;\n"
 #endif
@@ -446,9 +447,10 @@ DBG_PROLOG()
 //    "float h = 1.0 + 96.0 * dot(d, d);\n"
 //    "float spec = (0.1 * (2.0+6.0)/(2.0*M_PI)) * pow(ndoth, 6.0);\n"
 //    "float diff = (0.9/M_PI) * (ndotl/(1.0 + h*h));\n"
-    "float diff = 1.0;\n"
+    "float diff = v_color.r;\n"
+    "float spec = v_color.g;\n"
     // sample and mix
-    "color = v_color;\n"
+    "color = vec3(0.0);\n"
     "vec2 nuv = 2.0*v_uv - 1.0;\n"
     "float vignette = max(1.0 - length(nuv), 0.0);\n"
 
@@ -465,10 +467,14 @@ DBG_PROLOG()
     "float w = v_blends.x;\n"
     "w = 1.0 + w*w;\n"
     "color = (ds0/(u_mouse.x*w/4.0) + ds1/(u_mouse.y*w/4.0) + ds2/(w)) / 3.0;\n"
+#elif 1
+//    "color = diff*ds2 + spec*ds1;\n"
+    "color = diff*mix(ds1, ds2, v_blends.x) + spec*mix(ds0, ds1, v_blends.x);\n"
 #else
     "color = mix(mix(ds0, ds1, v_blends.x), ds2, v_blends.y);\n"
-#endif
     "color *= diff;\n"
+#endif
+//    "color = v_color;\n"
     // Gamma encode color w/ sqrt().
     "gl_FragColor = vec4(sqrt(color), 1.0);\n"
     "}\n";
@@ -478,14 +484,14 @@ static const char* downsample_vert_src =
     "precision highp float;\n"
 DBG_PROLOG()
     "uniform vec2 u_offsets[8];\n"
-    "attribute vec4 a_vert;\n"
-    "attribute vec2 a_extra;\n"
+    "attribute vec4 a_0;\n"
+    "attribute vec2 a_2;\n"
     "varying vec2 v_uv[8];\n"
 
     "void main() {\n"
-    "gl_Position = a_vert;\n"
+    "gl_Position = a_0;\n"
     "for (int i = 0; i < 8; i++) {\n"
-        "v_uv[i] = a_extra + u_offsets[i];\n"
+        "v_uv[i] = a_2 + u_offsets[i];\n"
     "}\n"
     "}\n";
 static const char* downsample_frag_src =
@@ -508,12 +514,12 @@ DBG_PROLOG()
 static const char* combine_vert_src =
     "precision highp float;\n"
 DBG_PROLOG()
-    "attribute vec4 a_vert;\n"
-    "attribute vec2 a_extra;\n"
+    "attribute vec4 a_0;\n"
+    "attribute vec2 a_2;\n"
     "varying vec2 v_uv;\n"
     "void main() {\n"
-        "gl_Position = a_vert;\n"
-        "v_uv = a_extra;\n"
+        "gl_Position = a_0;\n"
+        "v_uv = a_2;\n"
     "}\n";
 static const char* combine_frag_src =
     "precision highp float;\n"

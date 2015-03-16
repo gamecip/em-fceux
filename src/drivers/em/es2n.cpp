@@ -9,6 +9,7 @@
 
 #define STR(s_) _STR(s_)
 #define _STR(s_) #s_
+#define ARRAY_SIZE(a_) (sizeof(a_) / sizeof(*(a_)))
 
 // TODO: tsone: set elsewhere?
 #define DBG_MODE 1
@@ -87,6 +88,25 @@ static const GLfloat mesh_quad_norms[] = {
      0.0f,  0.0f, 1.0f,
      0.0f,  0.0f, 1.0f,
      0.0f,  0.0f, 1.0f
+};
+static es2_varray mesh_quad_varrays[] = {
+    { 3, GL_FLOAT, 0, (const void*) mesh_quad_verts },
+    { 3, GL_FLOAT, 0, (const void*) mesh_quad_norms },
+    { 2, GL_FLOAT, 0, (const void*) mesh_quad_uvs }
+};
+
+static es2_varray mesh_screen_varrays[] = {
+    { 3, GL_FLOAT, 0, (const void*) mesh_screen_verts },
+    { 3, GL_FLOAT, VARRAY_ENCODED_NORMALS, (const void*) mesh_screen_norms },
+    { 2, GL_FLOAT, 0, (const void*) mesh_screen_uvs }
+};
+
+static es2_varray mesh_rim_varrays[] = {
+    { 3, GL_FLOAT, 0, (const void*) mesh_rim_verts },
+    { 3, GL_FLOAT, VARRAY_ENCODED_NORMALS, (const void*) mesh_rim_norms },
+    { 3, GL_FLOAT, 0, 0 },
+//    { 3, GL_FLOAT, (const void*) mesh_rim_vcols }
+    { 3, GL_UNSIGNED_BYTE, 0, (const void*) mesh_rim_vcols }
 };
 
 static const GLfloat mat4_identity[] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
@@ -576,7 +596,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glEnableVertexAttribArray(0);
 
-    createMesh(&p->quad_mesh, mesh_quad_vert_num, 2*mesh_quad_face_num, 2, mesh_quad_verts, mesh_quad_norms, mesh_quad_uvs, 0);
+    createMesh(&p->quad_mesh, mesh_quad_vert_num, ARRAY_SIZE(mesh_quad_varrays), mesh_quad_varrays, 2*mesh_quad_face_num, 0);
 
     // Setup input pixels texture.
     glActiveTexture(TEX(IDX_I));
@@ -616,14 +636,14 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Setup screen shader.
     p->screen_prog = buildShader(screen_vert_src, screen_frag_src);
-    createMesh(&p->screen_mesh, mesh_screen_vert_num, 3*mesh_screen_face_num, 2, mesh_screen_verts, mesh_screen_norms, mesh_screen_uvs, mesh_screen_faces);
+    createMesh(&p->screen_mesh, mesh_screen_vert_num, ARRAY_SIZE(mesh_screen_varrays), mesh_screen_varrays, 3*mesh_screen_face_num, mesh_screen_faces);
     initUniformsScreen(p);
 
     // Setup TV shader.
     p->tv_prog = buildShader(tv_vert_src, tv_frag_src);
 // TODO: tsone: generate distances to crt screen edges
     int num_edges = 0;
-    int *edges = createUniqueEdges(&num_edges, 3*mesh_screen_face_num, mesh_screen_faces);
+    int *edges = createUniqueEdges(&num_edges, mesh_screen_vert_num, 3*mesh_screen_face_num, mesh_screen_faces);
     num_edges *= 2;
 
     GLfloat *rim_extra = (GLfloat*) malloc(3*sizeof(GLfloat) * mesh_rim_vert_num);
@@ -649,7 +669,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         rim_extra[3*i+1] = shortest[1];
         rim_extra[3*i+2] = shortest[2];
     }
-    createMesh(&p->tv_mesh, mesh_rim_vert_num, 3*mesh_rim_face_num, 3, mesh_rim_verts, mesh_rim_norms, rim_extra, mesh_rim_faces);
+    mesh_rim_varrays[2].data = rim_extra;
+    createMesh(&p->tv_mesh, mesh_rim_vert_num, ARRAY_SIZE(mesh_rim_varrays), mesh_rim_varrays, 3*mesh_rim_face_num, mesh_rim_faces);
     free(edges);
     free(rim_extra);
     initUniformsTV(p);

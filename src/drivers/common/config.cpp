@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 /* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
@@ -373,3 +374,5 @@ void LoadFCEUConfig(const char *filename, CFGSTRUCT *cfgst)
 
 	fclose(fp);
 }
+
+#endif //EMSCRIPTEN

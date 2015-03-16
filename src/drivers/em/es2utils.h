@@ -5,15 +5,24 @@
 #include <GLES2/gl2ext.h>
 #include <GLES2/gl2platform.h>
 
+#define VARRAY_ENCODED_NORMALS 1
+
+typedef struct t_es2_varray
+{
+    int count;
+    GLenum type;
+    int flags;
+    const void *data;
+    GLuint _buf;
+} es2_varray;
+
 typedef struct t_es2_mesh
 {
-    GLuint vert_buf;
-    GLuint norm_buf;
-    GLuint extra_buf;
+    es2_varray *varrays;
+    int num_varrays;
     GLuint elem_buf;
-
+    GLenum elem_type;
     int num_elems;
-    int extra_comps;
 } es2_mesh;
 
 void vec3Set(GLfloat *c, const GLfloat *a);
@@ -40,9 +49,9 @@ void createTex(GLuint *tex, int w, int h, GLenum format, GLenum min_filter, GLen
 void deleteTex(GLuint *tex);
 void createFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum min_filter, GLenum mag_filter);
 void deleteFBTex(GLuint *tex, GLuint *fb);
-void createMesh(es2_mesh *p, int num_verts, int num_elems, int extra_comps, const GLfloat *verts, const GLfloat *norms, const GLfloat *extra, const GLushort *elems);
+void createMesh(es2_mesh *p, int num_verts, int num_varrays, es2_varray *varrays, int num_elems, const void *elems);
 void deleteMesh(es2_mesh *p);
 void meshRender(es2_mesh *p);
-int *createUniqueEdges(int *num_edges, int num_elems, const GLushort *elems);
+int *createUniqueEdges(int *num_edges, int num_verts, int num_elems, const void *elems);
 
 #endif

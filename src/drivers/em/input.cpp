@@ -94,7 +94,7 @@ ParseGIInput (FCEUGI * gi)
 	cspec = gi->cspecial;
 }
 
-
+#if PERI
 static uint8 QuizKingData = 0;
 static uint8 HyperShotData = 0;
 static uint32 MahjongData = 0;
@@ -103,12 +103,15 @@ static uint8 TopRiderData = 0;
 static uint8 BWorldData[1 + 13 + 1];
 
 static void UpdateFKB (void);
+#endif
 static void UpdateGamepad (void);
+#if PERI
 static void UpdateQuizKing (void);
 static void UpdateHyperShot (void);
 static void UpdateMahjong (void);
 static void UpdateFTrainer (void);
 static void UpdateTopRider (void);
+#endif
 
 static uint32 JSreturn = 0;
 
@@ -145,7 +148,9 @@ _keyonly (int a)
 
 #define keyonly(__a) _keyonly(MKK(__a))
 
+#if PERI
 static int g_fkbEnabled = 0;
+#endif //PERI
 
 // TODO: tsone: dummy functions
 void FCEUD_MovieRecordTo() {}
@@ -647,6 +652,7 @@ UpdateGamepad(void)
 	JSreturn = JS;
 }
 
+#if PERI
 static ButtConfig powerpadsc[2][12] = {
 	{
 		MK (O), MK (P), MK (BRACKET_LEFT),
@@ -685,6 +691,7 @@ UpdatePPadData (int w)
 }
 
 static uint8 fkbkeys[0x48];
+#endif //PERI
 
 /**
  * Update all of the input devices required for the active game.
@@ -710,10 +717,12 @@ void FCEUD_UpdateInput ()
 			case SI_ZAPPER:
 				t |= 2;
 				break;
+#if PERI
 			case SI_POWERPADA:
 			case SI_POWERPADB:
 				powerpadbuf[x] = UpdatePPadData (x);
 				break;
+#endif //PERI
 		}
 	}
 
@@ -725,6 +734,7 @@ void FCEUD_UpdateInput ()
 		case SIFC_SHADOW:
 			t |= 2;
 			break;
+#if PERI
 		case SIFC_FKB:
 			if (g_fkbEnabled)
 			{
@@ -747,6 +757,7 @@ void FCEUD_UpdateInput ()
 		case SIFC_TOPRIDER:
 			UpdateTopRider ();
 			break;
+#endif //PERI
 		case SIFC_OEKAKIDS:
 			t |= 2;
 			break;
@@ -795,6 +806,12 @@ static EM_BOOL FCEM_MouseCallback(int type, const EmscriptenMouseEvent *event, v
 	MouseData[1] = event->targetY;
 	PtoV(&MouseData[0], &MouseData[1]);
 	// Bit 0 set if primary button down, bit 1 set if secondary down.
+// TODO: tsone: to get debug (x,y) form mouse, disable from final
+#if 1
+	if ((event->buttons & 1) && !(MouseData[2] & 1)) {
+		printf("DEBUG: mouse pos: %d,%d\n", MouseData[0], MouseData[1]);
+	}
+#endif
 	MouseData[2] = event->buttons & 3;
 	return 1;
 }
@@ -817,10 +834,12 @@ void InitInputInterface ()
 
 		switch (CurInputType[x])
 		{
+#if PERI
 			case SI_POWERPADA:
 			case SI_POWERPADB:
 				InputDPtr = &powerpadbuf[x];
 				break;
+#endif //PERI
 			case SI_GAMEPAD:
 				InputDPtr = &JSreturn;
 				break;
@@ -855,6 +874,7 @@ void InitInputInterface ()
 			InputDPtr = MouseData;
 			t |= 1;
 			break;
+#if PERI
 		case SIFC_FKB:
 			InputDPtr = fkbkeys;
 			break;
@@ -877,6 +897,7 @@ void InitInputInterface ()
 		case SIFC_FTRAINERB:
 			InputDPtr = &FTrainerData;
 			break;
+#endif //PERI
 	}
 
 	FCEUI_SetInputFC ((ESIFC) CurInputType[2], InputDPtr, attrib);
@@ -890,6 +911,7 @@ void InitInputInterface ()
 }
 
 
+#if PERI
 static ButtConfig fkbmap[0x48] = {
 	MK (F1), MK (F2), MK (F3), MK (F4), MK (F5), MK (F6), MK (F7), MK (F8),
 	MK (1), MK (2), MK (3), MK (4), MK (5), MK (6), MK (7), MK (8), MK (9),
@@ -1041,6 +1063,7 @@ UpdateFTrainer ()
 		}
 	}
 }
+#endif //PERI
 
 //
 // TODO: tsone: revisit this input config code later?
@@ -1199,6 +1222,7 @@ void ConfigDevice (int which, int arg)
 
 	switch (which)
 	{
+#if PERI
 		case FCFGD_QUIZKING:
 			prefix = "SDL.Input.QuizKing.";
 			for (x = 0; x < 6; x++)
@@ -1279,6 +1303,7 @@ void ConfigDevice (int which, int arg)
 			g_config->setOption (prefix + "DeviceNum",
 					powerpadsc[arg & 1][0].DeviceNum[0]);
 			break;
+#endif //PERI
 
 		case FCFGD_GAMEPAD:
 			snprintf (buf, 256, "SDL.Input.GamePad.%d", arg);
@@ -1326,6 +1351,7 @@ void InputCfg (const std::string & text)
 		}
 		ConfigDevice (FCFGD_GAMEPAD, device);
 	}
+#if PERI
 	else if (text.find ("powerpad") != std::string::npos)
 	{
 		int device = (text[strlen ("powerpad")] - '1');
@@ -1345,6 +1371,7 @@ void InputCfg (const std::string & text)
 	{
 		ConfigDevice (FCFGD_QUIZKING, 0);
 	}
+#endif //PERI
 }
 #endif // EMSCRIPTEN
 
@@ -1476,6 +1503,7 @@ UpdateInput (Config * config)
 		}
 	}
 
+#if PERI
 	// PowerPad 0 - 1
 	for (unsigned int i = 0; i < POWERPAD_NUM_DEVICES; i++)
 	{
@@ -1664,6 +1692,7 @@ UpdateInput (Config * config)
 		fkbmap[j].ButtonNum[0] = button;
 		fkbmap[j].NumC = 1;
 	}
+#endif
 }
 
 // Definitions from main.h:
@@ -1681,6 +1710,7 @@ const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS] =
 {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
+#if PERI
 // PowerPad defaults
 const char *PowerPadNames[POWERPAD_NUM_BUTTONS] =
 { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B" };
@@ -1768,3 +1798,5 @@ const int DefaultFamilyKeyBoard[FAMILYKEYBOARD_NUM_BUTTONS] =
 	SDLK_RSHIFT, SDLK_LALT, SDLK_SPACE, SDLK_DELETE, SDLK_END, SDLK_PAGEDOWN,
 	SDLK_UP, SDLK_LEFT, SDLK_RIGHT, SDLK_DOWN
 };
+
+#endif //PERI

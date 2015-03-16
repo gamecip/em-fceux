@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 /* FCE Ultra - NES/Famicom Emulator
  *
  * Copyright notice for this file:
@@ -909,3 +910,5 @@ void Blit8ToHigh(uint8 *src, uint8 *dest, int xr, int yr, int pitch,
   }
  }
 }
+
+#endif //EMSCRIPTEN

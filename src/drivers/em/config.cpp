@@ -144,6 +144,7 @@ InitConfig()
 		}
 	}
     
+#if PERI
 	// PowerPad 0 - 1
 	for(unsigned int i = 0; i < POWERPAD_NUM_DEVICES; i++) {
 		char buf[64];
@@ -205,6 +206,7 @@ InitConfig()
 		config->addOption(prefix + FamilyKeyBoardNames[j],
 						DefaultFamilyKeyBoard[j]);
 	}
+#endif //PERI
 
 	// for FAMICOM microphone in pad 2 pad 1 didn't have it
 	// Takeshi no Chousenjou uses it for example.

@@ -31,7 +31,6 @@
 
 #include "../../utils/memory.h"
 
-#include "em-icon.h"
 #include "dface.h"
 
 #include "../common/configSys.h"
@@ -46,8 +45,6 @@ extern Config *g_config;
 
 // STATIC GLOBALS
 extern SDL_Surface *s_screen;
-
-static SDL_Surface *s_IconSurface = NULL;
 
 static int s_curbpp;
 static int s_srendline, s_erendline;
@@ -78,12 +75,6 @@ bool FCEUD_ShouldDrawInputAids()
 int
 KillVideo()
 {
-	// if the IconSurface has been initialized, destroy it
-	if(s_IconSurface) {
-		SDL_FreeSurface(s_IconSurface);
-		s_IconSurface=0;
-	}
-
 	// return failure if the video system was not initialized
 	if(s_inited == 0)
 		return -1;
@@ -212,17 +203,6 @@ InitVideo(FCEUGI *gi)
 		}
 	}
 
-	// create the surface for displaying graphical messages
-#ifdef LSB_FIRST
-	s_IconSurface = SDL_CreateRGBSurfaceFrom((void *)fceu_playicon.pixel_data,
-											32, 32, 24, 32 * 3,
-											0xFF, 0xFF00, 0xFF0000, 0x00);
-#else
-	s_IconSurface = SDL_CreateRGBSurfaceFrom((void *)fceu_playicon.pixel_data,
-											32, 32, 24, 32 * 3,
-											0xFF0000, 0xFF00, 0xFF, 0x00);
-#endif
-	SDL_WM_SetIcon(s_IconSurface,0);
 	s_paletterefresh = 1;
 
 	if(s_curbpp > 8) {
