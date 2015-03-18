@@ -205,23 +205,25 @@ void deleteBuffer(GLuint *buf)
     }
 }
 
-void createTex(GLuint *tex, int w, int h, GLenum format, GLenum min_filter, GLenum mag_filter, void *data)
+void createTex(GLuint *tex, int w, int h, GLenum format, GLenum filter, GLenum wrap, void *data)
 {
     glGenTextures(1, tex);
     glBindTexture(GL_TEXTURE_2D, *tex);
     glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, format, GL_UNSIGNED_BYTE, data);
 
+// TODO: tsone: no mipmaps, remove?
+/*
     if ((min_filter == GL_LINEAR_MIPMAP_LINEAR)
             || (min_filter == GL_LINEAR_MIPMAP_NEAREST)
             || (min_filter == GL_NEAREST_MIPMAP_LINEAR)
             || (min_filter == GL_NEAREST_MIPMAP_NEAREST)) {
         glGenerateMipmap(GL_TEXTURE_2D);
     }
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
+*/
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
 }
 
 void deleteTex(GLuint *tex)
@@ -232,9 +234,9 @@ void deleteTex(GLuint *tex)
     }
 }
 
-void createFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum min_filter, GLenum mag_filter)
+void createFBTex(GLuint *tex, GLuint *fb, int w, int h, GLenum format, GLenum filter, GLenum wrap)
 {
-    createTex(tex, w, h, format, min_filter, mag_filter, 0);
+    createTex(tex, w, h, format, filter, wrap, 0);
 
     glGenFramebuffers(1, fb);
     glBindFramebuffer(GL_FRAMEBUFFER, *fb);

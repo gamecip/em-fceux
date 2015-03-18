@@ -10,19 +10,22 @@ typedef struct t_es2n_controls
     GLfloat color;      // Color control.
     GLfloat gamma;      // Gamma control.
     GLfloat glow;       // Glow control.
+    GLfloat sharpness;  // Sharpness control.
     GLfloat rgbppu;     // RGB PPU control.
 
     // Controls for CRT emulation. If CRT emulation is disabled, these do nothing.
     int crt_enabled;    // Set to zero to disable CRT emulation.
     GLfloat scanlines;  // CRT scanlines strength.
     GLfloat convergence; // CRT red-blue convergence.
-    GLfloat sharpness;  // CRT sharpness control.
+    GLfloat noise;      // CRT noise control.
 
     // Uniform locations.
     GLint _brightness_loc;
     GLint _contrast_loc;
     GLint _color_loc;
     GLint _gamma_loc;
+    GLint _noiseAmp_loc;
+    GLint _noiseRnd_loc;
     GLint _screen_uvScale_loc;
     GLint _screen_mvp_loc;
     GLint _rgbppu_loc;
@@ -39,6 +42,8 @@ typedef struct t_es2n
     GLuint idx_tex;     // Input indexed color texture (NES palette, 256x240).
     GLuint deemp_tex;   // Input de-emphasis bits per row (240x1).
     GLuint lookup_tex;  // Palette to voltage levels lookup texture.
+
+    GLuint noise_tex;   // Noise texture.
 
     GLuint rgb_fb;      // Framebuffer for output RGB texture generation.
     GLuint rgb_tex;     // Output RGB texture.

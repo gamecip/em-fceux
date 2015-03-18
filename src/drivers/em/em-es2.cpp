@@ -26,13 +26,14 @@ void BlitOpenGL(uint8 *buf)
     s_es2n.controls.color = EM_ASM_DOUBLE_V({ return Module.colorControl||0; });
     s_es2n.controls.gamma = EM_ASM_DOUBLE_V({ return Module.gammaControl||0; });
     s_es2n.controls.glow = EM_ASM_DOUBLE_V({ return Module.glowControl||0; });
-    s_es2n.controls.rgbppu = EM_ASM_DOUBLE_V({ return Module.rgbppuControl||0; });
     s_es2n.controls.sharpness = EM_ASM_DOUBLE_V({ return Module.sharpnessControl||0; });
+    s_es2n.controls.rgbppu = EM_ASM_DOUBLE_V({ return Module.rgbppuControl||0; });
 
     // Update CRT emulation controls (from js).
     s_es2n.controls.crt_enabled = EM_ASM_INT_V({ return Module.crtControl||0; });
     s_es2n.controls.scanlines = EM_ASM_DOUBLE_V({ return Module.scanlinesControl||0; });
     s_es2n.controls.convergence = EM_ASM_DOUBLE_V({ return Module.convergenceControl||0; });
+    s_es2n.controls.noise = EM_ASM_DOUBLE_V({ return Module.noiseControl||0; });
 
     es2nRender(&s_es2n, buf, deempScan, PALRAM[0]);
 	SDL_GL_SwapBuffers();

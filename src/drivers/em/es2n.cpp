@@ -24,7 +24,7 @@
 #define LOOKUP_I    2
 #define RGB_I       3
 #define STRETCH_I   4
-// NOTE: tsone: these must be in incremental order
+// NOTE: tsone: tv and downsample texture must be in incremental order
 #define TV_I        5
 #define DOWNSAMPLE0_I 6
 #define DOWNSAMPLE1_I 7
@@ -32,6 +32,7 @@
 #define DOWNSAMPLE3_I 9
 #define DOWNSAMPLE4_I 10
 #define DOWNSAMPLE5_I 11
+#define NOISE_I     12
 #define TEX(i_)     (GL_TEXTURE0+(i_))
 
 #define PERSISTENCE_R 0.165 // Red phosphor persistence.
@@ -52,12 +53,14 @@
 #define NUM_PHASES 3
 #define NUM_SUBPS 4
 #define NUM_TAPS 5
-// Following must be POT >= NUM_PHASES*NUM_TAPS*NUM_SUBPS, ex. 3*5*4=60 -> 64
+// Lookup width must be POT >= NUM_PHASES*NUM_TAPS*NUM_SUBPS, ex. 3*5*4=60 -> 64
 #define LOOKUP_W 64
 // Set overscan on left and right sides as 12px (total 24px).
 #define OVERSCAN_W 12
 #define IDX_W (256 + 2*OVERSCAN_W)
 #define IDX_H 240
+#define NOISE_W 256 
+#define NOISE_H 256 
 #define RGB_W (NUM_SUBPS * IDX_W)
 #define STRETCH_H (4 * 240)
 // Half-width of Y and C box filter kernels.
@@ -295,11 +298,50 @@ static void genLookupTex(es2n *p)
     }
 
 	glActiveTexture(TEX(LOOKUP_I));
-    createTex(&p->lookup_tex, LOOKUP_W, NUM_COLORS, GL_RGB, GL_NEAREST, GL_NEAREST, result);
+    createTex(&p->lookup_tex, LOOKUP_W, NUM_COLORS, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE, result);
 
 	free(ys);
 	free(yiqs);
 	free(result);
+}
+
+// Get uniformly distributed random number in [0,1] range.
+static double rand01()
+{
+    return (double) rand() / (double) RAND_MAX;
+}
+
+// Clamp gaussian noise values to 0..255 range.
+static int noiseClamp(double v)
+{
+    if (v < 0) v = 0;
+    else if (v > 1) v = 1;
+    return (int) (0.5 + 255.0*v);
+}
+
+static void genNoiseTex(es2n *p)
+{
+    GLubyte *noise = (GLubyte*) malloc(NOISE_W*NOISE_H);
+
+    // Box-Muller method gaussian noise. Generates two values at a time.
+    // Results are clamped to 0..255 range, which skews the distribution slightly.
+    const double SIGMA = 0.5/2.0; // Set 95% of noise values in [-0.5,0.5] range.
+    const double MU = 0.5; // Offset range by +0.5 to map to [0,1].
+    for (int i = 0; i < NOISE_W*NOISE_H; i += 2) {
+        double x;
+        do {
+		x = rand01();
+	} while (x < 1e-7); // Epsilon to avoid log(0).
+        double r = SIGMA * sqrt(-2.0 * log10(x));
+        double t = 2.0*M_PI * rand01();
+        noise[i  ] = noiseClamp(MU + r*sin(t));
+        noise[i+1] = noiseClamp(MU + r*cos(t));
+    }
+
+    glActiveTexture(TEX(NOISE_I));
+    createTex(&p->noise_tex, NOISE_W, NOISE_H, GL_LUMINANCE, GL_LINEAR, GL_REPEAT, noise);
+
+    free(noise);
 }
 
 #if DBG_MODE
@@ -328,6 +370,9 @@ static void updateUniformsRGB(const es2n_controls *c)
     glUniform1f(c->_rgbppu_loc, v);
     v = 2.4f/2.2f + 0.3f*c->gamma;
     glUniform1f(c->_gamma_loc, v);
+    v = c->crt_enabled * 0.13f*c->noise;
+    glUniform1f(c->_noiseAmp_loc, v);
+    glUniform2f(c->_noiseRnd_loc, rand01(), rand01());
 }
 
 static void updateUniformsStretch(const es2n_controls *c)
@@ -411,6 +456,8 @@ static void initUniformsRGB(es2n *p)
     glUniform1i(k, DEEMP_I);
     k = glGetUniformLocation(prog, "u_lookupTex");
     glUniform1i(k, LOOKUP_I);
+    k = glGetUniformLocation(prog, "u_noiseTex");
+    glUniform1i(k, NOISE_I);
     k = glGetUniformLocation(prog, "u_mins");
     glUniform3fv(k, 1, p->yiq_mins);
     k = glGetUniformLocation(prog, "u_maxs");
@@ -422,6 +469,8 @@ static void initUniformsRGB(es2n *p)
     c->_color_loc = glGetUniformLocation(prog, "u_color");
     c->_rgbppu_loc = glGetUniformLocation(prog, "u_rgbppu");
     c->_gamma_loc = glGetUniformLocation(prog, "u_gamma");
+    c->_noiseAmp_loc = glGetUniformLocation(prog, "u_noiseAmp");
+    c->_noiseRnd_loc = glGetUniformLocation(prog, "u_noiseRnd");
     updateUniformsRGB(&p->controls);
 }
 
@@ -600,34 +649,35 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Setup input pixels texture.
     glActiveTexture(TEX(IDX_I));
-    createTex(&p->idx_tex, IDX_W, IDX_H, GL_LUMINANCE, GL_NEAREST, GL_NEAREST, 0);
+    createTex(&p->idx_tex, IDX_W, IDX_H, GL_LUMINANCE, GL_NEAREST, GL_CLAMP_TO_EDGE, 0);
 
     // Setup input de-emphasis rows texture.
     glActiveTexture(TEX(DEEMP_I));
-    createTex(&p->deemp_tex, IDX_H, 1, GL_LUMINANCE, GL_NEAREST, GL_NEAREST, 0);
+    createTex(&p->deemp_tex, IDX_H, 1, GL_LUMINANCE, GL_NEAREST, GL_CLAMP_TO_EDGE, 0);
 
     genLookupTex(p);
+    genNoiseTex(p);
 
     // Configure RGB framebuffer.
     glActiveTexture(TEX(RGB_I));
-    createFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, IDX_H, GL_RGB, GL_NEAREST, GL_NEAREST);
+    createFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, IDX_H, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
     p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
     initUniformsRGB(p);
 
     // Setup stretch framebuffer.
     glActiveTexture(TEX(STRETCH_I));
-    createFBTex(&p->stretch_tex, &p->stretch_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_LINEAR);
+    createFBTex(&p->stretch_tex, &p->stretch_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
     p->stretch_prog = buildShader(stretch_vert_src, stretch_frag_src);
     initUniformsStretch(p);
 
     // Setup screen/TV framebuffer.
     glActiveTexture(TEX(TV_I));
-    createFBTex(&p->tv_tex, &p->tv_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_LINEAR);
+    createFBTex(&p->tv_tex, &p->tv_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
     // Setup downsample framebuffers.
     for (int i = 0; i < 6; ++i) {
       glActiveTexture(TEX(DOWNSAMPLE0_I + i));
-      createFBTex(&p->downsample_tex[i], &p->downsample_fb[i], s_downsample_widths[i+1], s_downsample_heights[i+1], GL_RGB, GL_LINEAR, GL_LINEAR);
+      createFBTex(&p->downsample_tex[i], &p->downsample_fb[i], s_downsample_widths[i+1], s_downsample_heights[i+1], GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
     }
 
     // Setup downsample shader.
@@ -691,6 +741,7 @@ void es2nDeinit(es2n *p)
     deleteTex(&p->idx_tex);
     deleteTex(&p->deemp_tex);
     deleteTex(&p->lookup_tex);
+    deleteTex(&p->noise_tex);
     deleteShader(&p->rgb_prog);
     deleteShader(&p->stretch_prog);
     deleteShader(&p->screen_prog);

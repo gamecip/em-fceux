@@ -417,11 +417,12 @@
         Module.colorControl = 0;
         Module.gammaControl = 0;
         Module.glowControl = -0.4;
+        Module.sharpnessControl = 0.1;
         Module.rgbppuControl = 0;
         Module.crtControl = 1;
         Module.scanlinesControl = 0.1;
         Module.convergenceControl = 0.4;
-        Module.sharpnessControl = 0.1;
+        Module.noiseControl = 0.1;
       }
     </script>
 
@@ -436,6 +437,7 @@
     CRT Emulation <input type="checkbox" checked="1" oninput="changeControl('crt', this.checked)" onchange="changeControl('crt', this.checked)"/><br/>
     CRT Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="changeControl('scanlines', this.value)" onchange="changeControl('scanlines', this.value)"/><br/>
     CRT Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="changeControl('convergence', this.value)" onchange="changeControl('convergence', this.value)"/><br/>
+    CRT Noise <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="changeControl('noise', this.value)" onchange="changeControl('noise', this.value)"/><br/>
     <input type="button" value="Reset" onclick="resetControls()"/><br/>
 
     <div hidden="1">
