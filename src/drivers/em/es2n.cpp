@@ -441,7 +441,7 @@ static void updateUniformsCombine(const es2n *p)
 {
     DBG(updateUniformsDebug())
     const es2n_controls *c = &p->controls;
-    double v = 0.07 + 0.07*c->glow;
+    double v = 0.1 * c->glow;
     glUniform1f(c->_combine_glow_loc, v);
 }
 
@@ -516,6 +516,8 @@ static void initUniformsTV(es2n *p)
     glUniform1i(k, DOWNSAMPLE3_I);
     k = glGetUniformLocation(prog, "u_downsample5Tex");
     glUniform1i(k, DOWNSAMPLE5_I);
+    k = glGetUniformLocation(prog, "u_noiseTex");
+    glUniform1i(k, NOISE_I);
     k = glGetUniformLocation(prog, "u_mvp");
     glUniformMatrix4fv(k, 1, GL_FALSE, p->mvp_mat);
 

@@ -416,7 +416,7 @@
         Module.contrastControl = 0;
         Module.colorControl = 0;
         Module.gammaControl = 0;
-        Module.glowControl = -0.4;
+        Module.glowControl = 0.4;
         Module.sharpnessControl = 0.1;
         Module.rgbppuControl = 0;
         Module.crtControl = 1;
@@ -426,12 +426,12 @@
       }
     </script>
 
-    <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(true, false)"/><br/>
+    <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(false, false)"/><br/>
     Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('brightness', this.value)" onchange="changeControl('brightness', this.value)"/><br/>
     Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('contrast', this.value)" onchange="changeControl('contrast', this.value)"/><br/>
     Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('color', this.value)" onchange="changeControl('color', this.value)"/><br/>
     Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
-    Glow <input type="range" min="-1" max="1" value="-0.4" step="0.2" oninput="changeControl('glow', this.value)" onchange="changeControl('glow', this.value)"/><br/>
+    Glow <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="changeControl('glow', this.value)" onchange="changeControl('glow', this.value)"/><br/>
     Sharpness <input type="range" min="-0.5" max="0.5" value="0.1" step="0.1" oninput="changeControl('sharpness', this.value)" onchange="changeControl('sharpness', this.value)"/><br/>
     RGB PPU <input type="range" min="-0.1" max="0.9" value="0" step="0.1" oninput="changeControl('rgbppu', this.value)" onchange="changeControl('rgbppu', this.value)"/><br/>
     CRT Emulation <input type="checkbox" checked="1" oninput="changeControl('crt', this.checked)" onchange="changeControl('crt', this.checked)"/><br/>

@@ -312,76 +312,63 @@ DEFINE(M_PI)
 
 static const char* tv_vert_src =
     "precision highp float;\n"
+DEFINE(NOISE_W)
+DEFINE(NOISE_H)
 DBG_PROLOG()
     "attribute vec4 a_0;\n"
     "attribute vec3 a_1;\n"
     "attribute vec3 a_2;\n"
     "attribute vec3 a_3;\n"
     "uniform mat4 u_mvp;\n"
-    "varying vec3 v_color;\n"
-    "varying vec3 v_p;\n"
-    "varying vec3 v_n;\n"
-    "varying vec3 v_v;\n"
-
-// TODO: tsone: testing distances in uvs
+    "varying vec3 v_radiance;\n"
+    "varying vec2 v_noiseUVs[2];\n"
     "varying vec2 v_uv;\n"
-    "varying vec2 v_blends;\n"
-
-    "#define smoothstep01(x_) ((3.0 - 2.0*(x_)) * (x_)*(x_))\n"
+    "varying float v_blend;\n"
 
     "void main() {\n"
+        "vec4 p = a_0;\n"
+        "vec4 tp = u_mvp * p;\n"
+        "gl_Position = tp;\n"
+
+        "vec3 n = normalize(a_1);\n"
+        "vec3 dl = a_2;\n"
+
+// TODO: tsone: lighting from ceiling lamp
+#if 0
         "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
         "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
-        "vec4 p = u_mvp * a_0;\n"
-        "vec3 n = normalize(a_1);\n"
         "vec3 v = normalize(view_pos - a_0.xyz);\n"
         "vec3 l = normalize(light_pos - a_0.xyz);\n"
         "vec3 h = normalize(l + v);\n"
         "float ndotl = max(dot(n, l), 0.0);\n"
         "float ndoth = max(dot(n, h), 0.0);\n"
         "v_color = vec3(0.000 + 0.004*ndotl + 0.00*pow(ndoth, 19.0));\n"
-// TODO: tsone: pass baked vertex color as v_color
-        "v_color = a_3 * a_3;\n" // Input seems to be gamma encoded(?), need to decode here.
-        "v_n = n;\n"
-        "v_v = v;\n"
-        "v_p = a_0.xyz;\n"
-        "gl_Position = u_mvp * a_0;\n"
-    
-        "float andy = length(a_2);\n"
-        "float les = length(a_2.xy);\n"
-        "vec2 clay = (les > 0.0) ? a_2.xy / les : vec2(0.0);\n"
-        "vec2 nxy = normalize(v_n.xy);\n"
+#endif
+
+        // Vertex color contains baked radiance from the TV screen.
+        // Radiance from diffuse is red and specular in green component
+        // (blue is unused).
+        // Gamma decode and modulate by material diffuse and specular.
+        "v_radiance = (a_3*a_3) * vec3(0.15, 0.20, 1.0);\n"
+
+// TODO: tsone: precalculate the uvs and blend coeff?
+        // Calculate texture coordinate for the downsampled texture sampling.
+        // Fake reflection inwards to the center of the TV screen based on
+        // distance to the nearest TV screen point/edge (precalculated).
+        "float andy = length(dl);\n"
+        "float les = length(dl.xy);\n"
+        "vec2 clay = (les > 0.0) ? dl.xy / les : vec2(0.0);\n"
+        "vec2 nxy = normalize(n.xy);\n"
         "float mixer = max(1.0 - 30.0*les, 0.0);\n"
-//        "float mixer = max(1.0 - 50.0*andy, 0.0);\n"
         "vec2 pool = normalize(mix(clay, nxy, mixer));\n"
-        "vec4 tmp = u_mvp * vec4(a_0.xy + 5.5*vec2(1.0, 7.0/8.0)*(vec2(les) + vec2(0.0014, 0.0019))*pool, a_0.zw);\n"
+        "vec4 tmp = u_mvp * vec4(p.xy + 5.5*vec2(1.0, 7.0/8.0)*(vec2(les) + vec2(0.0014, 0.0019))*pool, p.zw);\n"
         "v_uv = 0.5 + 0.5 * tmp.xy / tmp.w;\n"
 
-// TODO: tsone: testing with real 3D distance to screen
-#if 0
-        "v_blends.x = andy;\n"
-#else
-//        "float w = 3.0 * (1.0 - pow(1.0 + 3.5*andy, -4.0));\n"
-        "float w = (u_mouse.x/256.0)*70.0*andy;\n"
-//        "float w = 0.0*andy;\n"
-//        "float w = 51.0*les;\n"
-        "if (w < 1.0) {\n"
-            "v_blends.x = w;\n"
-            "v_blends.y = 0.0;\n"
-//        "} else if (w < 2.0) {\n"
-        "} else if (w < 4.0) {\n"
-            "v_blends.x = 1.0;\n"
-//            "v_blends.y = 1.0*w - 1.0;\n"
-            "v_blends.y = 0.33333*w - 0.33333;\n"
-        "} else {\n"
-            "v_blends.x = 1.0;\n"
-            "v_blends.y = 1.0;\n"
-        "}\n"
-// TODO: tsone: is this better?
-//        "v_blends = smoothstep01(v_blends);\n"
-//        "v_blends *= v_blends;\n"
-//        "v_blends *= v_blends;\n"
-#endif
+// TODO: tsone: use output resolution appropriately
+        "v_noiseUVs[0] = 0.5 * vec2(1120.0/NOISE_W, 896.0/NOISE_H) * (tp.xy/tp.w);\n"
+        "v_noiseUVs[1] = 0.5 * v_noiseUVs[0];\n"
+
+        "v_blend = min(0.28*70.0 * andy, 1.0);\n"
     "}\n";
 static const char* tv_frag_src =
     "precision highp float;\n"
@@ -390,14 +377,13 @@ DBG_PROLOG()
     "uniform sampler2D u_downsample1Tex;\n"
     "uniform sampler2D u_downsample3Tex;\n"
     "uniform sampler2D u_downsample5Tex;\n"
-    "varying vec3 v_color;\n"
-    "varying vec3 v_p;\n"
-    "varying vec3 v_n;\n"
-    "varying vec3 v_v;\n"
-
+    "uniform sampler2D u_noiseTex;\n"
+    "varying vec3 v_radiance;\n"
+    "varying vec2 v_noiseUVs[2];\n"
     "varying vec2 v_uv;\n"
-    "varying vec2 v_blends;\n"
+    "varying float v_blend;\n"
 
+#if 0
 // TODO: tsone: duplicate code (screen & tv)
 //
 // Optimized cubic texture interpolation. Uses 4 texture samples for the 4x4 texel area.
@@ -437,57 +423,42 @@ DBG_PROLOG()
     "const vec3 c_center = vec3(0.0, 0.000135, -0.04427);\n"
     "const vec3 c_size = vec3(0.95584, 0.703985, 0.04986);\n"
 //    "const vec3 c_size = vec3(0.95584-0.011, 0.703985-0.011, 0.04986);\n"
-
-    "void main(void) {\n"
-        "vec3 color;\n"
-
-#if 1
-    "vec3 d = vec3(-v_uv, 0.0);\n"
-    "vec3 c = vec3(v_p.xy + v_uv, v_p.z);\n"
-#else
-    // calculate closest point 'c' on screen plane
-    "vec3 d = v_p - c_center;\n"
-    "vec3 q = min(abs(d) - c_size, 0.0) + c_size;\n"
-    "vec3 c = c_center + sign(d) * q;\n"
-    // point-light shading respective to 'c'
-    "d = v_p - c;\n"
 #endif
-//    "float ndoth = max(dot(n, normalize(normalize(v_v) + l)), 0.0);\n"
-//    "vec3 l = normalize(vec3(0.0, 0.0, 0.02) - v_p);\n" // light at "center"
-//    "float h = 1.0 + 96.0 * dot(d, d);\n"
-//    "float spec = (0.1 * (2.0+6.0)/(2.0*M_PI)) * pow(ndoth, 6.0);\n"
-//    "float diff = (0.9/M_PI) * (ndotl/(1.0 + h*h));\n"
-    "float diff = v_color.r;\n"
-    "float spec = v_color.g;\n"
-    // sample and mix
-    "color = vec3(0.0);\n"
-    "vec2 nuv = 2.0*v_uv - 1.0;\n"
-    "float vignette = max(1.0 - length(nuv), 0.0);\n"
 
-    // Sample from downsampled (blurry) textures and linearize.
+"void main(void) {\n"
+    // Sample noise at low and high frequencies.
+    "float noiseLF = texture2D(u_noiseTex, v_noiseUVs[1]).r;\n"
+    "float noiseHF = texture2D(u_noiseTex, v_noiseUVs[0]).r;\n"
+
+    // Sample downsampled (blurry) textures and gamma decode.
     "vec3 ds0 = texture2D(u_downsample1Tex, v_uv).rgb;\n"
     "vec3 ds1 = texture2D(u_downsample3Tex, v_uv).rgb;\n"
     "vec3 ds2 = texture2D(u_downsample5Tex, v_uv).rgb;\n"
     "ds0 *= ds0;\n"
     "ds1 *= ds1;\n"
     "ds2 *= ds2;\n"
-    // Blend together to mimic glossy reflection and ambient diffuse.
-// TODO: tsone: testing other types of blendings
-#if 0
-    "float w = v_blends.x;\n"
-    "w = 1.0 + w*w;\n"
-    "color = (ds0/(u_mouse.x*w/4.0) + ds1/(u_mouse.y*w/4.0) + ds2/(w)) / 3.0;\n"
-#elif 1
-//    "color = diff*ds2 + spec*ds1;\n"
-    "color = diff*mix(ds1, ds2, v_blends.x) + spec*mix(ds0, ds1, v_blends.x);\n"
-#else
-    "color = mix(mix(ds0, ds1, v_blends.x), ds2, v_blends.y);\n"
-    "color *= diff;\n"
-#endif
-//    "color = v_color;\n"
+
+    "vec3 color;\n"
+
+    // Approximate diffuse and specular by sampling downsampled texture and
+    // blending according to the fragment distance from the TV screen (emitter).
+    "color = v_radiance.r * mix(ds1, ds2, v_blend);\n"
+    "color += v_radiance.g * mix(ds0, ds1, v_blend);\n"
+
+    // Add noise for rough plastic (and to hide interpolation artifacts).
+    "float noise = 2.0*0.4336 * (mix(noiseLF, noiseHF, 0.7366 * v_blend) - 0.5);\n"
+    "color *= 1.0 + noise;\n"
+
+// TODO: tsone: tone-mapping?
+
+// TODO: tsone: vignette?
+//    "color = vec3(0.0);\n"
+//    "vec2 nuv = 2.0*v_uv - 1.0;\n"
+//    "float vignette = max(1.0 - length(nuv), 0.0);\n"
+
     // Gamma encode color w/ sqrt().
     "gl_FragColor = vec4(sqrt(color), 1.0);\n"
-    "}\n";
+"}\n";
 
 // Downsample shader.
 static const char* downsample_vert_src =
