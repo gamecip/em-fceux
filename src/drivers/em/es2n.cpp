@@ -116,8 +116,8 @@ static const GLfloat mat4_identity[] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
 
 // Texture sample offsets and weights for gaussian w/ radius=8, sigma=4.
 // Eliminates aliasing and blurs for "faked" glossy reflections and AO.
-static const float s_downsample_offs[] = { -6.892337f, -4.922505f, -2.953262f, -0.98438f, 0.98438f, 2.953262f, 4.922505f, 6.892337f };
-static const float s_downsample_ws[] = { 0.045894f, 0.096038f, 0.157115f, 0.200954f, 0.200954f, 0.157115f, 0.096038f, 0.045894f };
+static const GLfloat s_downsample_offs[] = { -6.892337f, -4.922505f, -2.953262f, -0.98438f, 0.98438f, 2.953262f, 4.922505f, 6.892337f };
+static const GLfloat s_downsample_ws[] = { 0.045894f, 0.096038f, 0.157115f, 0.200954f, 0.200954f, 0.157115f, 0.096038f, 0.045894f };
 
 static const int s_downsample_widths[]  = { 1120, 280, 280,  70, 70, 18, 18 };
 static const int s_downsample_heights[] = {  960, 960, 240, 240, 60, 60, 15 };
@@ -131,7 +131,7 @@ static const int s_downsample_heights[] = {  960, 960, 240, 240, 60, 60, 15 };
 static double NTSCsignal(int pixel, int phase)
 {
     // Voltage levels, relative to synch voltage
-    const double levels[8] = {
+    const GLfloat levels[8] = {
         0.350, 0.518, 0.962, 1.550, // Signal low
         1.094, 1.506, 1.962, 1.962  // Signal high
     };
@@ -268,7 +268,7 @@ static void genLookupTex(es2n *p)
     for (int color = 0; color < NUM_COLORS; color++) {
         // For some reason we need additional shift of 1 sample (-30 degrees).
         const double shift = (12.0/360.0) * (180.0-30.0-33.0);
-        double yiq[3] = {0.0f, 0.0f, 0.0f};
+        double yiq[3] = {0, 0, 0};
 
         for (int s = 0; s < 12; s++) {
             double level0 = NTSCsignal(color, s) / 12.0;
@@ -359,18 +359,18 @@ static void updateUniformsDebug()
 static void updateUniformsRGB(const es2n_controls *c)
 {
     DBG(updateUniformsDebug())
-    GLfloat v;
-    v = 0.15f * c->brightness;
+    double v;
+    v = 0.15 * c->brightness;
     glUniform1f(c->_brightness_loc, v);
-    v = 1.0f + 0.4f*c->contrast;
+    v = 1.0 + 0.4*c->contrast;
     glUniform1f(c->_contrast_loc, v);
-    v = 1.0f + c->color;
+    v = 1.0 + c->color;
     glUniform1f(c->_color_loc, v);
-    v = c->rgbppu + 0.1f;
+    v = c->rgbppu + 0.1;
     glUniform1f(c->_rgbppu_loc, v);
-    v = 2.4f/2.2f + 0.3f*c->gamma;
+    v = 2.4/2.2 + 0.3*c->gamma;
     glUniform1f(c->_gamma_loc, v);
-    v = c->crt_enabled * 0.13f*c->noise;
+    v = c->crt_enabled * 0.13 * c->noise;
     glUniform1f(c->_noiseAmp_loc, v);
     glUniform2f(c->_noiseRnd_loc, rand01(), rand01());
 }
@@ -378,8 +378,8 @@ static void updateUniformsRGB(const es2n_controls *c)
 static void updateUniformsStretch(const es2n_controls *c)
 {
     DBG(updateUniformsDebug())
-    GLfloat v;
-    v = c->crt_enabled * 0.5f * c->scanlines;
+    double v;
+    v = c->crt_enabled * 0.5 * c->scanlines;
     glUniform1f(c->_scanlines_loc, v);
 }
 
@@ -387,8 +387,8 @@ static void updateUniformsScreen(const es2n *p, int final_pass)
 {
     DBG(updateUniformsDebug())
     const es2n_controls *c = &p->controls;
-    GLfloat v;
-    v = c->crt_enabled * 2.0f * c->convergence;
+    double v;
+    v = c->crt_enabled * 2.0 * c->convergence;
     glUniform1f(c->_convergence_loc, v);
 
     if (c->crt_enabled) {
@@ -399,7 +399,7 @@ static void updateUniformsScreen(const es2n *p, int final_pass)
         glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, mat4_identity);
     }
 
-    v = (0.9f-c->rgbppu) * 0.4f * (c->sharpness+0.5f);
+    v = (0.9-c->rgbppu) * 0.4 * (c->sharpness+0.5);
     GLfloat sharpen_kernel[] = {
         -v, -v, -v,
         1, 0, 0, 
@@ -414,7 +414,7 @@ static void updateUniformsScreen(const es2n *p, int final_pass)
 static void updateUniformsDownsample(const es2n *p, int w, int h, int texIdx, int isHorzPass)
 {
     DBG(updateUniformsDebug())
-    float offsets[2*8];
+    GLfloat offsets[2*8];
     if (isHorzPass) {
         for (int i = 0; i < 8; ++i) {
             offsets[2*i  ] = s_downsample_offs[i] / w;
@@ -441,7 +441,7 @@ static void updateUniformsCombine(const es2n *p)
 {
     DBG(updateUniformsDebug())
     const es2n_controls *c = &p->controls;
-    GLfloat v = 0.07f + 0.07f*c->glow;
+    double v = 0.07 + 0.07*c->glow;
     glUniform1f(c->_combine_glow_loc, v);
 }
 
@@ -641,8 +641,8 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
     glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
-    glBlendColor(PERSISTENCE_R, PERSISTENCE_G, PERSISTENCE_B, 0.0);
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glBlendColor(PERSISTENCE_R, PERSISTENCE_G, PERSISTENCE_B, 0);
+    glClearColor(0, 0, 0, 0);
     glEnableVertexAttribArray(0);
 
     createMesh(&p->quad_mesh, mesh_quad_vert_num, ARRAY_SIZE(mesh_quad_varrays), mesh_quad_varrays, 2*mesh_quad_face_num, 0);
@@ -701,14 +701,14 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
         GLfloat p[3];
         vec3Set(p, &mesh_rim_verts[3*i]);
         GLfloat shortest[3] = { 0, 0, 0 };
-        GLfloat shortestDist = 1000000.0f;
+        double shortestDist = 1000000;
         for (int j = 0; j < num_edges; j += 2) {
             int ai = 3*edges[j];
             int bi = 3*edges[j+1];
             GLfloat diff[3];
             vec3ClosestOnSegment(diff, p, &mesh_screen_verts[ai], &mesh_screen_verts[bi]);
             vec3Sub(diff, diff, p);
-            GLfloat dist = vec3Length2(diff);
+            double dist = vec3Length2(diff);
             if (dist < shortestDist) {
                 shortestDist = dist;
                 vec3Set(shortest, diff);

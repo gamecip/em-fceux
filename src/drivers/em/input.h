@@ -40,9 +40,6 @@ extern ButtConfig GamePadConfig[4][10];
 //extern ButtConfig QuizKingButtons[6];
 //extern ButtConfig FTrainerButtons[12];
 
-void IncreaseEmulationSpeed(void);
-void DecreaseEmulationSpeed(void);
-
 #ifndef EMSCRIPTEN
 int DTestButtonJoy(ButtConfig *bc);
 #else

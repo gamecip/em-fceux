@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 /// \file
 /// \brief 6502 assembler and disassembler
 
@@ -520,3 +521,4 @@ char *Disassemble(int addr, uint8 *opcode) {
 
 	return str;
 }
+#endif //EMSCRIPTEN

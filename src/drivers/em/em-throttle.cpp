@@ -1,3 +1,4 @@
+#ifndef EMSCRIPTEN
 /// \file
 /// \brief Handles emulation speed throttling using the SDL timing functions.
 
@@ -148,3 +149,5 @@ FCEUD_SetEmulationSpeed(int cmd)
 
 	FCEU_DispMessage("Emulation speed %.1f%%",0, g_fpsScale*100.0);
 }
+
+#endif //EMSCRIPTEN

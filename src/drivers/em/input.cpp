@@ -25,6 +25,7 @@
 
 #include "em-video.h"
 #include "em.h"
+#include "throttle.h"
 
 #include "../common/cheat.h"
 #include "../../movie.h"

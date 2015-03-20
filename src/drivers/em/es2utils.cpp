@@ -4,7 +4,7 @@
 #include <string.h>
 #include <math.h>
 
-#define MAX_VARRAYS 8
+#define MAX_VARRAYS 4
 
 static int is_varray_enabled[MAX_VARRAYS];
 
@@ -29,21 +29,21 @@ void vec3Add(GLfloat *c, const GLfloat *a, const GLfloat *b)
     c[2] = a[2] + b[2];
 }
 
-void vec3MulScalar(GLfloat *c, const GLfloat *a, GLfloat s)
+void vec3MulScalar(GLfloat *c, const GLfloat *a, double s)
 {
     c[0] = a[0] * s;
     c[1] = a[1] * s;
     c[2] = a[2] * s;
 }
 
-void vec3DivScalar(GLfloat *c, const GLfloat *a, GLfloat s)
+void vec3DivScalar(GLfloat *c, const GLfloat *a, double s)
 {
     c[0] = a[0] / s;
     c[1] = a[1] / s;
     c[2] = a[2] / s;
 }
 
-GLfloat vec3Dot(const GLfloat *a, const GLfloat *b)
+double vec3Dot(const GLfloat *a, const GLfloat *b)
 {
     return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
 }
@@ -55,19 +55,19 @@ void vec3Cross(GLfloat *result, const GLfloat *a, const GLfloat *b)
     result[2] = a[0]*b[1] - a[1]*b[0];
 }
 
-GLfloat vec3Length2(const GLfloat *a)
+double vec3Length2(const GLfloat *a)
 {
     return vec3Dot(a, a);
 }
 
-GLfloat vec3Length(const GLfloat *a)
+double vec3Length(const GLfloat *a)
 {
     return sqrt(vec3Length2(a));
 }
 
-GLfloat vec3Normalize(GLfloat *c, const GLfloat *a)
+double vec3Normalize(GLfloat *c, const GLfloat *a)
 {
-    GLfloat d = vec3Length(a);
+    double d = vec3Length(a);
     if (d > 0) {
         vec3DivScalar(c, a, d);
     } else {
@@ -76,13 +76,13 @@ GLfloat vec3Normalize(GLfloat *c, const GLfloat *a)
     return d;
 }
 
-GLfloat vec3ClosestOnSegment(GLfloat *result, const GLfloat *p, const GLfloat *a, const GLfloat *b)
+double vec3ClosestOnSegment(GLfloat *result, const GLfloat *p, const GLfloat *a, const GLfloat *b)
 {
     GLfloat pa[3], ba[3];
     vec3Sub(pa, p, a);
     vec3Sub(ba, b, a);
-    GLfloat dotbaba = vec3Length2(ba);
-    GLfloat t = 0;
+    double dotbaba = vec3Length2(ba);
+    double t = 0;
     if (dotbaba != 0) {
         t = vec3Dot(pa, ba) / dotbaba;
         if (t < 0) t = 0;
@@ -93,24 +93,24 @@ GLfloat vec3ClosestOnSegment(GLfloat *result, const GLfloat *p, const GLfloat *a
     return t;
 }
 
-void mat4Persp(GLfloat *p, GLfloat fovy, GLfloat aspect, GLfloat zNear, GLfloat zFar)
+void mat4Persp(GLfloat *p, double fovy, double aspect, double zNear, double zFar)
 {
-    const GLfloat f = 1.0 / tan(fovy / 2.0);
+    const double f = 1.0 / tan(fovy / 2.0);
     memset(p, 0, 4*4*sizeof(GLfloat));
     p[4*0+0] = f / aspect;
     p[4*1+1] = f;
     p[4*2+2] = (zNear+zFar) / (zNear-zFar);
-    p[4*2+3] = -1.0f;
-    p[4*3+2] = (2.0f*zNear*zFar) / (zNear-zFar);
+    p[4*2+3] = -1.0;
+    p[4*3+2] = (2.0*zNear*zFar) / (zNear-zFar);
 }
 
 void mat4Trans(GLfloat *p, GLfloat *trans)
 {
     memset(p, 0, 4*4*sizeof(GLfloat));
-    p[4*0+0] = 1.0f;
-    p[4*1+1] = 1.0f;
-    p[4*2+2] = 1.0f;
-    p[4*3+3] = 1.0f;
+    p[4*0+0] = 1.0;
+    p[4*1+1] = 1.0;
+    p[4*2+2] = 1.0;
+    p[4*3+3] = 1.0;
     p[4*3+0] = trans[0];
     p[4*3+1] = trans[1];
     p[4*3+2] = trans[2];
@@ -120,7 +120,7 @@ void mat4Mul(GLfloat *p, const GLfloat *a, const GLfloat *b)
 {
     for (int j = 0; j < 4; j++) {
         for (int i = 0; i < 4; i++) {
-            GLfloat v = 0;
+            double v = 0;
             for (int k = 0; k < 4; k++) {
                 v += a[4*k + j] * b[4*i + k];
             }
@@ -134,6 +134,8 @@ GLuint compileShader(GLenum type, const char *src)
     GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &src, 0);
     glCompileShader(shader);
+
+//    printf("%d\n", strlen(src));
 
     GLint value;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &value);
@@ -260,8 +262,7 @@ void deleteFBTex(GLuint *tex, GLuint *fb)
 //   in Journal of grahics tools, vol.4, no.2, pp.1-6.
 static GLfloat* meshGenerateNormals(int num_verts, int num_elems, const GLfloat *verts, const GLushort *elems)
 {
-    num_verts *= 3;
-    GLfloat *norms = (GLfloat*) calloc(num_verts, sizeof(GLfloat));
+    GLfloat *norms = (GLfloat*) calloc(3*num_verts, sizeof(GLfloat));
     GLfloat e1[3], e2[3], no[3];
 
     for (int i = 0; i < num_elems; i += 3) {
@@ -274,13 +275,13 @@ static GLfloat* meshGenerateNormals(int num_verts, int num_elems, const GLfloat 
             vec3Sub(e2, &verts[a], &verts[b]);
             vec3Cross(no, e1, e2);
 
-            GLfloat d = vec3Length2(e1) * vec3Length2(e2);
+            double d = vec3Length2(e1) * vec3Length2(e2);
             vec3DivScalar(no, no, d);
             vec3Add(&norms[b], &norms[b], no);
         }
     }
 
-    for (int i = 0; i < num_verts; i += 3) {
+    for (int i = 0; i < 3*num_verts; i += 3) {
         vec3Normalize(&norms[i], &norms[i]);
     }
 
@@ -324,8 +325,8 @@ void createMesh(es2_mesh *p, int num_verts, int num_varrays, es2_varray *varrays
         if (varrays[i].flags & VARRAY_ENCODED_NORMALS) {
             norms = (GLfloat*) malloc(size);
             for (int j = 0; j < num_verts; j++) {
-                float a = 1.0*M_PI * enc[2*j  ] / 65535.0;
-                float b = 2.0*M_PI * enc[2*j+1] / 65535.0;
+                double a = 1.0*M_PI * enc[2*j  ] / 65535.0;
+                double b = 2.0*M_PI * enc[2*j+1] / 65535.0;
                 norms[3*j  ] = sin(a) * cos(b);
                 norms[3*j+1] = sin(a) * sin(b);
                 norms[3*j+2] = cos(a);
