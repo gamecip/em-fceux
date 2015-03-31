@@ -63,6 +63,7 @@
 #define NOISE_H 256 
 #define RGB_W (NUM_SUBPS * IDX_W)
 #define STRETCH_H (4 * 240)
+#define SCREEN_H (4 * 224)
 // Half-width of Y and C box filter kernels.
 #define YW2 6.0
 #define CW2 12.0
@@ -311,35 +312,39 @@ static double rand01()
     return (double) rand() / (double) RAND_MAX;
 }
 
-// Clamp gaussian noise values to 0..255 range.
-static int noiseClamp(double v)
-{
-    if (v < 0) v = 0;
-    else if (v > 1) v = 1;
-    return (int) (0.5 + 255.0*v);
-}
-
 static void genNoiseTex(es2n *p)
 {
     GLubyte *noise = (GLubyte*) malloc(NOISE_W*NOISE_H);
 
-    // Box-Muller method gaussian noise. Generates two values at a time.
+#if 0
+    for (int j = 0; j < NOISE_H; j++) {
+        for (int i = 0; i < NOISE_W; i++) {
+            if ((i % 2) == 0) noise[NOISE_W*j+i] = 255;
+            else noise[NOISE_W*j+i] = 0;
+        }
+    }
+#else
+    // Box-Muller method gaussian noise.
     // Results are clamped to 0..255 range, which skews the distribution slightly.
     const double SIGMA = 0.5/2.0; // Set 95% of noise values in [-0.5,0.5] range.
     const double MU = 0.5; // Offset range by +0.5 to map to [0,1].
-    for (int i = 0; i < NOISE_W*NOISE_H; i += 2) {
+    double t = 0;
+    for (int i = 0; i < NOISE_W*NOISE_H; i++) {
         double x;
         do {
 		x = rand01();
 	} while (x < 1e-7); // Epsilon to avoid log(0).
         double r = SIGMA * sqrt(-2.0 * log10(x));
-        double t = 2.0*M_PI * rand01();
-        noise[i  ] = noiseClamp(MU + r*sin(t));
-        noise[i+1] = noiseClamp(MU + r*cos(t));
+        t = fmod(t + 2.0*M_PI * rand01(), 2.0*M_PI); // Spin phase.
+        r = MU + r*sin(t); // Take real part only, discard complex part as it's related.
+        // Clamp result to [0,1].
+        noise[i] = (r <= 0) ? 0 : (r >= 1) ? 255 : (int) (0.5 + 255.0*r);
     }
+#endif
 
     glActiveTexture(TEX(NOISE_I));
     createTex(&p->noise_tex, NOISE_W, NOISE_H, GL_LUMINANCE, GL_LINEAR, GL_REPEAT, noise);
+//    createTex(&p->noise_tex, NOISE_W, NOISE_H, GL_LUMINANCE, GL_LINEAR, GL_CLAMP_TO_EDGE, noise);
 
     free(noise);
 }
@@ -494,8 +499,8 @@ static void initUniformsScreen(es2n *p)
 
     k = glGetUniformLocation(prog, "u_stretchTex");
     glUniform1i(k, STRETCH_I);
-    k = glGetUniformLocation(prog, "u_downsample3Tex");
-    glUniform1i(k, DOWNSAMPLE3_I);
+    k = glGetUniformLocation(prog, "u_noiseTex");
+    glUniform1i(k, NOISE_I);
 
     es2n_controls *c = &p->controls;
     c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
@@ -588,7 +593,7 @@ static void passDownsample(es2n *p)
 static void passScreen(es2n *p)
 {
     glBindFramebuffer(GL_FRAMEBUFFER, p->tv_fb);
-    glViewport(0, 0, RGB_W, STRETCH_H);
+    glViewport(0, 0, RGB_W, SCREEN_H);
     glUseProgram(p->screen_prog);
     updateUniformsScreen(p, 1);
 
@@ -605,7 +610,8 @@ static void passTV(es2n *p)
         return;
     }
     glBindFramebuffer(GL_FRAMEBUFFER, p->tv_fb);
-    glViewport(0, 0, RGB_W, STRETCH_H);
+    glViewport(0, 0, RGB_W, SCREEN_H);
+
     glUseProgram(p->tv_prog);
     updateUniformsTV(p);
     meshRender(&p->tv_mesh);
@@ -674,7 +680,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 
     // Setup screen/TV framebuffer.
     glActiveTexture(TEX(TV_I));
-    createFBTex(&p->tv_tex, &p->tv_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    createFBTex(&p->tv_tex, &p->tv_fb, RGB_W, SCREEN_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
     // Setup downsample framebuffers.
     for (int i = 0; i < 6; ++i) {

@@ -137,6 +137,9 @@ static const char* screen_vert_src =
     "precision highp float;\n"
 DBG_PROLOG()
     DEFINE(RGB_W)
+    DEFINE(SCREEN_H)
+    DEFINE(NOISE_W)
+    DEFINE(NOISE_H)
     DEFINE(M_PI)
     "attribute vec4 a_0;\n"
     "attribute vec3 a_1;\n"
@@ -145,9 +148,10 @@ DBG_PROLOG()
     "uniform mat4 u_mvp;\n"
     "uniform vec2 u_uvScale;\n"
     "varying vec2 v_uv[5];\n"
-    "varying vec3 v_color;\n"
+    "varying vec3 v_shade;\n"
     "varying vec3 v_norm;\n"
     "varying vec3 v_pos;\n"
+    "varying vec2 v_noiseUV;\n"
 
     "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
     "void main() {\n"
@@ -157,111 +161,28 @@ DBG_PROLOG()
     "TAP(2, 0.0);\n"
     "TAP(3,-u_convergence);\n"
     "TAP(4, 4.0);\n"
-// TODO: tsone: have some light on screen or not?
-#if 1
-    "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
-    "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
-    "vec3 n = normalize(a_1);\n"
     "v_norm = a_1;\n"
     "v_pos = a_0.xyz;\n"
-    "vec3 v = normalize(view_pos - a_0.xyz);\n"
-    "vec3 p2l = light_pos - a_0.xyz;\n"
-    "float p2lL = length(p2l);\n"
-    "vec3 l = p2l / p2lL;\n"
-    "vec3 h = normalize(l + v);\n"
-    "float ndotl = max(dot(n, l), 0.0);\n"
-    "float ndoth = max(dot(n, h), 0.0);\n"
-    "float ndotv = max(dot(n, v), 0.0);\n"
-    "float Cd = 0.5;\n"
-    "float Cs = 0.5;\n"
-    "float m = 11.0;\n"
-    "float Cd0 = Cd / M_PI;\n"
-    "float Cs0 = (Cs * (m + 8.0) / (8.0 * M_PI)) * pow(ndoth, m);\n"
-    "float R = 10.0;\n"
-    "float El = R / (1.0 + dot(p2l, p2l));\n"
-//    "float Rf0 = 0.03;\n"
-//    "float Rf = Rf0 + (1.0-Rf0) * pow(1.0-ndotl, 5.0);\n"
-//    "float Cd2 = (21.0/(20.0*M_PI * (1.0-Rf0))) * (1.0-pow(1.0-ndotl, 5.0)) * (1.0-pow(1.0-ndotv, 5.0));\n"
-//    "v_color = vec3(0.006*ndotl + 0.04*pow(ndoth, e));\n"
-    "v_color = vec3((Cd0 + Cs0) * El*ndotl);\n"
-#else
-// TODO: tsone: This color must be linearized
-    "v_color = vec3(0.0);\n"
-#endif
+// TODO: tsone: duplicated (screen, tv), manual homogenization
     "gl_Position = u_mvp * a_0;\n"
+    "gl_Position = vec4(gl_Position.xy / gl_Position.w, 0.0, 1.0);\n"
+    "vec2 vwc = gl_Position.xy * 0.5 + 0.5;\n"
+    "v_noiseUV = vec2(RGB_W, SCREEN_H) * vwc / vec2(NOISE_W, NOISE_H);\n"
     "}\n";
 static const char* screen_frag_src =
 "precision highp float;\n"
 DBG_PROLOG()
 DEFINE(M_PI)
 "uniform sampler2D u_stretchTex;\n"
+"uniform sampler2D u_noiseTex;\n"
 // TODO: tsone: for debug
 "uniform float u_convergence;\n"
 "uniform vec3 u_sharpenKernel[5];\n"
 "varying vec2 v_uv[5];\n"
-"varying vec3 v_color;\n"
+"varying vec3 v_shade;\n"
 "varying vec3 v_norm;\n"
 "varying vec3 v_pos;\n"
-
-//
-// From 'Improved texture interpolation' by Inigo Quilez (2009):
-// http://iquilezles.org/www/articles/texture/texture.htm
-//
-// Modifies linear interpolation by applying a smoothstep function to
-// texture image coordinate fractional part. This causes derivatives of
-// the interpolation slope to be zero, avoiding discontinuities.
-// Quintic smoothstep makes 1st & 2nd order derivates zero, and regular
-// (cubic) smoothstep makes only 1st order derivate zero.
-//
-// Not only it is useful for normal and bump map texture intepolation,
-// it also gives appearance slightly similar to nearest interpolation,
-// but smoother. This is useful for surfaces that should appear "pixelated",
-// for example LCD and TV screens.
-//
-"vec3 texture2DSmooth( const sampler2D tex, const vec2 uv, const vec2 texResolution ) {\n"
-    "vec2 p = uv * texResolution + 0.5;\n"
-    "vec2 i = floor( p );\n"
-    "vec2 f = p - i;\n"
-    "f = ( ( 6.0 * f - 15.0 ) * f + 10.0 ) * f*f*f;\n" // Quintic smoothstep.
-//    "f = ( 3.0 - 2.0 * f ) * f*f;\n" // Cubic smoothstep.
-    "p = ( i + f - 0.5 ) / texResolution;\n"
-    "return texture2D( tex, p ).rgb;\n"
-"}\n"
-
-// TODO: tsone: duplicate code (screen & tv)
-//
-// Optimized cubic texture interpolation. Uses 4 texture samples for the 4x4 texel area.
-//
-// http://stackoverflow.com/questions/13501081/efficient-bicubic-filtering-code-in-glsl
-//
-"vec4 cubic( const float v ) {\n"
-    "vec4 n = vec4( 1.0, 2.0, 3.0, 4.0 ) - v;\n"
-    "vec4 s = n * n * n;\n"
-    "float x = s.x;\n"
-    "float y = s.y - 4.0 * s.x;\n"
-    "float z = s.z - 4.0 * s.y + 6.0 * s.x;\n"
-    "float w = 6.0 - x - y - z;\n"
-    "return vec4( x, y, z, w );\n"
-"}\n"
-"vec3 texture2DCubic( const sampler2D tex, in vec2 uv, const vec2 reso ) {\n"
-    "uv = uv * reso - 0.5;\n"
-    "float fx = fract( uv.x );\n"
-    "float fy = fract( uv.y );\n"
-    "uv.x -= fx;\n"
-    "uv.y -= fy;\n"
-    "vec4 xcub = cubic( fx );\n"
-    "vec4 ycub = cubic( fy );\n"
-    "vec4 c = uv.xxyy + vec4( - 0.5, 1.5, - 0.5, 1.5 );\n"
-    "vec4 s = vec4( xcub.xz, ycub.xz ) + vec4( xcub.yw, ycub.yw );\n"
-    "vec4 offs = c + vec4( xcub.yw, ycub.yw ) / s;\n"
-    "vec3 s0 = texture2D( tex, offs.xz / reso ).rgb;\n"
-    "vec3 s1 = texture2D( tex, offs.yz / reso ).rgb;\n"
-    "vec3 s2 = texture2D( tex, offs.xw / reso ).rgb;\n"
-    "vec3 s3 = texture2D( tex, offs.yw / reso ).rgb;\n"
-    "float sx = s.x / (s.x + s.y);\n"
-    "float sy = s.z / (s.z + s.w);\n"
-    "return mix( mix( s3, s2, sx ), mix( s1, s0, sx ), sy );\n"
-"}\n"
+"varying vec2 v_noiseUV;\n"
 
 "void main(void) {\n"
     "vec3 color = vec3(0.0);\n"
@@ -274,46 +195,44 @@ DEFINE(M_PI)
     "vec3 n = normalize(v_norm);\n"
     "color += 0.018*texture2D(u_stretchTex, v_uv[2] - 0.021*n.xy).rgb;\n"
 
-#if 1
-    "const vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
-    "const vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
-    "vec3 p = v_pos;\n"
-    "vec3 v = normalize(view_pos - p);\n"
-    "vec3 p2l = light_pos - p;\n"
-    "float p2lL = length(p2l);\n"
-    "vec3 l = p2l / p2lL;\n"
-    "vec3 h = normalize(l + v);\n"
-    "float ndotl = max(dot(n, l), 0.0);\n"
-    "float ndoth = max(dot(n, h), 0.0);\n"
-    "float ndotv = max(dot(n, v), 0.0);\n"
-    "float albedo = 0.13;\n"
-    "float Cd = albedo;\n"
-    "float Cs = 0.0;\n"
-    "float m = 11.0;\n"
-    "float Cd0 = Cd / M_PI;\n"
-    "float Cs0 = (Cs * (m + 8.0) / (8.0 * M_PI)) * pow(ndoth, m);\n"
-    "float R = 10.0;\n"
-    "float El = R / (dot(p2l, p2l));\n"
-//    "float Rf0 = 0.03;\n"
-//    "float Rf = Rf0 + (1.0-Rf0) * pow(1.0-ndotl, 5.0);\n"
-//    "float Cd2 = (21.0/(20.0*M_PI * (1.0-Rf0))) * (1.0-pow(1.0-ndotl, 5.0)) * (1.0-pow(1.0-ndotv, 5.0));\n"
-//    "color += vec3((Cd0 + Cs0) * El*ndotl);\n"
-#else
-    "vec3 n = normalize(v_norm);\n"
-//    "vec3 p = v_pos;\n"
-//    "color = v_color;\n"
-//    "color = vec3(0.0, u_convergence/2.0+p.z-n.y, 0.0);\n"
-    "color = vec3(n.y, -n.y, 0.0);\n"
-#endif
+// TODO: tsone: lighting from ceiling lamp, duplicated code
+// Using python oneliners:
+// from math import *
+// def rot(a,b): return [sin(a)*sin(b), -sin(a)*cos(b), -cos(a)]
+// def rad(d): return pi*d/180
+// rot(rad(90-65),rad(15))
+        "const float cdiff = 0.001;\n"
+        "const float cspec = 0.064;\n"
+        "const float m = 40.0;\n"
+        "const float fr0 = 0.04;\n"
+        "const float frm = 5.0;\n"
+        "const vec3 light_dir = -vec3(0.109381654946615, -0.40821789367673483, -0.9063077870366499);\n"
+        "const vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
+// TODO: calculate in vertex shader?
+        "vec3 v = normalize(view_pos - v_pos);\n"
+        "vec3 l = light_dir;\n"
+        "vec3 h = normalize(l + v);\n"
+        "float ndotl = max(dot(n, l), 0.0);\n"
+        "float ndoth = max(dot(n, h), 0.0);\n"
+        "float fr = fr0 + (1.0-fr0) * pow(1.0-ndotl, frm);\n"
+        "vec3 shade = vec3(mix(cdiff/M_PI, (cspec * (m+8.0) / (8.0*M_PI)) * pow(ndoth, m), fr) * ndotl);\n"
+
+    "float noise = (1.5/128.0) * (texture2D(u_noiseTex, v_noiseUV).r - 0.5);\n"
 
     // Use gamma encoding as we may output smooth color changes here.
-    "gl_FragColor = vec4(sqrt(color), 1.0);\n"
+    "gl_FragColor = vec4(sqrt(color + shade) + noise, 1.0);\n"
+//    "gl_FragColor = vec4(vec3(2.0*abs((128.0/1.5) * noise)), 1.0);\n"
+//    "gl_FragColor = vec4(vec3(texture2D(u_noiseTex, v_noiseUV).r), 1.0);\n"
+//    "gl_FragColor = vec4(vec3(texture2D(u_noiseTex, gl_FragCoord.xy/256.0 - 2.0).r), 1.0);\n"
 "}\n";
 
 static const char* tv_vert_src =
     "precision highp float;\n"
+DEFINE(RGB_W)
+DEFINE(SCREEN_H)
 DEFINE(NOISE_W)
 DEFINE(NOISE_H)
+DEFINE(M_PI)
 DBG_PROLOG()
     "attribute vec4 a_0;\n"
     "attribute vec3 a_1;\n"
@@ -323,27 +242,19 @@ DBG_PROLOG()
     "varying vec3 v_radiance;\n"
     "varying vec2 v_noiseUVs[2];\n"
     "varying vec2 v_uv;\n"
+    "varying vec3 v_pos;\n"
+    "varying vec3 v_norm;\n"
     "varying float v_blend;\n"
+    "varying vec3 v_shade;\n"
 
     "void main() {\n"
         "vec4 p = a_0;\n"
-        "vec4 tp = u_mvp * p;\n"
-        "gl_Position = tp;\n"
-
+// TODO: tsone: no need to normalize?
         "vec3 n = normalize(a_1);\n"
         "vec3 dl = a_2;\n"
 
-// TODO: tsone: lighting from ceiling lamp
-#if 0
-        "vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
-        "vec3 light_pos = vec3(-1.0, 6.0, 3.0);\n"
-        "vec3 v = normalize(view_pos - a_0.xyz);\n"
-        "vec3 l = normalize(light_pos - a_0.xyz);\n"
-        "vec3 h = normalize(l + v);\n"
-        "float ndotl = max(dot(n, l), 0.0);\n"
-        "float ndoth = max(dot(n, h), 0.0);\n"
-        "v_color = vec3(0.000 + 0.004*ndotl + 0.00*pow(ndoth, 19.0));\n"
-#endif
+	"v_norm = a_1;\n"
+	"v_pos = a_0.xyz;\n"
 
         // Vertex color contains baked radiance from the TV screen.
         // Radiance from diffuse is red and specular in green component
@@ -364,8 +275,11 @@ DBG_PROLOG()
         "vec4 tmp = u_mvp * vec4(p.xy + 5.5*vec2(1.0, 7.0/8.0)*(vec2(les) + vec2(0.0014, 0.0019))*pool, p.zw);\n"
         "v_uv = 0.5 + 0.5 * tmp.xy / tmp.w;\n"
 
-// TODO: tsone: use output resolution appropriately
-        "v_noiseUVs[0] = 0.5 * vec2(1120.0/NOISE_W, 896.0/NOISE_H) * (tp.xy/tp.w);\n"
+// TODO: tsone: duplicated (screen, tv), manual homogenization
+    "gl_Position = u_mvp * a_0;\n"
+    "gl_Position = vec4(gl_Position.xy / gl_Position.w, 0.0, 1.0);\n"
+    "vec2 vwc = gl_Position.xy * 0.5 + 0.5;\n"
+    "v_noiseUVs[0] = vec2(RGB_W, SCREEN_H) * vwc / vec2(NOISE_W, NOISE_H);\n"
         "v_noiseUVs[1] = 0.5 * v_noiseUVs[0];\n"
 
         "v_blend = min(0.28*70.0 * andy, 1.0);\n"
@@ -380,50 +294,10 @@ DBG_PROLOG()
     "uniform sampler2D u_noiseTex;\n"
     "varying vec3 v_radiance;\n"
     "varying vec2 v_noiseUVs[2];\n"
+    "varying vec3 v_pos;\n"
+    "varying vec3 v_norm;\n"
     "varying vec2 v_uv;\n"
     "varying float v_blend;\n"
-
-#if 0
-// TODO: tsone: duplicate code (screen & tv)
-//
-// Optimized cubic texture interpolation. Uses 4 texture samples for the 4x4 texel area.
-//
-// http://stackoverflow.com/questions/13501081/efficient-bicubic-filtering-code-in-glsl
-//
-"vec4 cubic( const float v ) {\n"
-    "vec4 n = vec4( 1.0, 2.0, 3.0, 4.0 ) - v;\n"
-    "vec4 s = n * n * n;\n"
-    "float x = s.x;\n"
-    "float y = s.y - 4.0 * s.x;\n"
-    "float z = s.z - 4.0 * s.y + 6.0 * s.x;\n"
-    "float w = 6.0 - x - y - z;\n"
-    "return vec4( x, y, z, w );\n"
-"}\n"
-"vec3 texture2DCubic( const sampler2D tex, in vec2 uv, const vec2 reso ) {\n"
-    "uv = uv * reso - 0.5;\n"
-    "float fx = fract( uv.x );\n"
-    "float fy = fract( uv.y );\n"
-    "uv.x -= fx;\n"
-    "uv.y -= fy;\n"
-    "vec4 xcub = cubic( fx );\n"
-    "vec4 ycub = cubic( fy );\n"
-    "vec4 c = uv.xxyy + vec4( - 0.5, 1.5, - 0.5, 1.5 );\n"
-    "vec4 s = vec4( xcub.xz, ycub.xz ) + vec4( xcub.yw, ycub.yw );\n"
-    "vec4 offs = c + vec4( xcub.yw, ycub.yw ) / s;\n"
-    "vec3 s0 = texture2D( tex, offs.xz / reso ).rgb;\n"
-    "vec3 s1 = texture2D( tex, offs.yz / reso ).rgb;\n"
-    "vec3 s2 = texture2D( tex, offs.xw / reso ).rgb;\n"
-    "vec3 s3 = texture2D( tex, offs.yw / reso ).rgb;\n"
-    "float sx = s.x / (s.x + s.y);\n"
-    "float sy = s.z / (s.z + s.w);\n"
-    "return mix( mix( s3, s2, sx ), mix( s1, s0, sx ), sy );\n"
-"}\n"
-
-    "const vec2 c_uvMult = vec2(0.892, 0.827);\n"
-    "const vec3 c_center = vec3(0.0, 0.000135, -0.04427);\n"
-    "const vec3 c_size = vec3(0.95584, 0.703985, 0.04986);\n"
-//    "const vec3 c_size = vec3(0.95584-0.011, 0.703985-0.011, 0.04986);\n"
-#endif
 
 "void main(void) {\n"
     // Sample noise at low and high frequencies.
@@ -446,8 +320,37 @@ DBG_PROLOG()
     "color += v_radiance.g * mix(ds0, ds1, v_blend);\n"
 
     // Add noise for rough plastic (and to hide interpolation artifacts).
-    "float noise = 2.0*0.4336 * (mix(noiseLF, noiseHF, 0.7366 * v_blend) - 0.5);\n"
-    "color *= 1.0 + noise;\n"
+//    "float noise = 2.0*0.4336 * (mix(noiseHF, noiseLF, 0.7366 * v_blend) - 0.5);\n"
+//    "float noise = 2.0*0.4336 * (mix(noiseLF, 1.0, 0.7366 * v_blend) - 0.5);\n"
+//    "float noise = 2.0*0.4336 * (mix(1.0, noiseLF, 0.7366 * v_blend) - 0.5);\n"
+    "float noiseLFa = 2.0*abs(noiseLF - 0.5);\n"
+    "float noiseHFa = 2.0*abs(noiseHF - 0.5);\n"
+    "float noise = -1.5*0.4336 * (noiseHFa + noiseLFa * 0.7366*v_blend);\n"
+//    "color *= 1.0 + noise;\n"
+//    "color = vec3(noiseHFa);\n"
+
+        "vec3 n = normalize(v_norm);\n"
+// TODO: tsone: lighting from ceiling lamp, duplicated code
+// Using python oneliners:
+// from math import *
+// def rot(a,b): return [sin(a)*sin(b), -sin(a)*cos(b), -cos(a)]
+// def rad(d): return pi*d/180
+// rot(rad(90-65),rad(15))
+        "const float cdiff = 0.004;\n"
+        "const float cspec = 0.042;\n"
+        "const float m = 50.0;\n"
+        "const float fr0 = 0.03;\n"
+        "const float frm = 5.0;\n"
+        "const vec3 light_dir = -vec3(0.109381654946615, -0.40821789367673483, -0.9063077870366499);\n"
+        "const vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
+// TODO: calculate in vertex shader?
+        "vec3 v = normalize(view_pos - v_pos);\n"
+        "vec3 l = light_dir;\n"
+        "vec3 h = normalize(l + v);\n"
+        "float ndotl = max(dot(n, l), 0.0);\n"
+        "float ndoth = max(dot(n, h), 0.0);\n"
+        "float fr = fr0 + (1.0-fr0) * pow(1.0-ndotl, frm);\n"
+        "vec3 shade = vec3(mix(cdiff/M_PI, (cspec * (m+8.0) / (8.0*M_PI)) * pow(ndoth, m), fr) * ndotl);\n"
 
 // TODO: tsone: tone-mapping?
 
@@ -455,9 +358,11 @@ DBG_PROLOG()
 //    "color = vec3(0.0);\n"
 //    "vec2 nuv = 2.0*v_uv - 1.0;\n"
 //    "float vignette = max(1.0 - length(nuv), 0.0);\n"
+//    "vec3 lightColor = vec3(v_shade);\n"
 
     // Gamma encode color w/ sqrt().
-    "gl_FragColor = vec4(sqrt(color), 1.0);\n"
+    "gl_FragColor = vec4(sqrt(color + shade) + (1.5/128.0) * (noiseHF-0.5), 1.0);\n"
+
 "}\n";
 
 // Downsample shader.
