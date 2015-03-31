@@ -447,7 +447,7 @@ static void updateUniformsCombine(const es2n *p)
     DBG(updateUniformsDebug())
     const es2n_controls *c = &p->controls;
     double v = 0.1 * c->glow;
-    glUniform1f(c->_combine_glow_loc, v);
+    glUniform3f(c->_combine_glow_loc, v, v*v, v + v*v);
 }
 
 static void initUniformsRGB(es2n *p)
@@ -510,6 +510,14 @@ static void initUniformsScreen(es2n *p)
     updateUniformsScreen(p, 1);
 }
 
+// Using python oneliners:
+// from math import *
+// def rot(a,b): return [sin(a)*sin(b), -sin(a)*cos(b), -cos(a)]
+// def rad(d): return pi*d/180
+// rot(rad(90-65),rad(15))
+static GLfloat s_lightDir[] = { -0.109381654946615, 0.40821789367673483, 0.9063077870366499 };
+static GLfloat s_viewPos[] = { 0, 0, 2.5 };
+
 static void initUniformsTV(es2n *p)
 {
     GLint k;
@@ -525,6 +533,18 @@ static void initUniformsTV(es2n *p)
     glUniform1i(k, NOISE_I);
     k = glGetUniformLocation(prog, "u_mvp");
     glUniformMatrix4fv(k, 1, GL_FALSE, p->mvp_mat);
+    k = glGetUniformLocation(prog, "u_lightDir");
+    glUniform3fv(k, 1, s_lightDir);
+    k = glGetUniformLocation(prog, "u_viewPos");
+    glUniform3fv(k, 1, s_viewPos);
+
+    const float m = 50.0;
+    k = glGetUniformLocation(prog, "u_material");
+    glUniform4f(k, 0.004/M_PI, 0.042 * (m+8.0) / (8.0*M_PI), m, 0.006/M_PI);
+
+    const float fr0 = 0.03;
+    k = glGetUniformLocation(prog, "u_fresnel");
+    glUniform3f(k, fr0, 1-fr0, 5.0);
 
     updateUniformsTV(p);
 }
@@ -550,6 +570,8 @@ static void initUniformsCombine(es2n *p)
     glUniform1i(k, DOWNSAMPLE3_I);
     k = glGetUniformLocation(prog, "u_downsample5Tex");
     glUniform1i(k, DOWNSAMPLE5_I);
+    k = glGetUniformLocation(prog, "u_noiseTex");
+    glUniform1i(k, NOISE_I);
 
     es2n_controls *c = &p->controls;
     c->_combine_glow_loc = glGetUniformLocation(prog, "u_glow");

@@ -119,7 +119,7 @@ InitVideo(FCEUGI *gi)
 {
 	// XXX soules - const?  is this necessary?
 	const SDL_VideoInfo *vinf;
-	int error, flags = 0;
+	int error;
 
 	FCEUI_printf("Initializing video...");
 
@@ -128,9 +128,6 @@ InitVideo(FCEUGI *gi)
 	// check the starting, ending, and total scan lines
 	FCEUI_GetCurrentVidSystem(&s_srendline, &s_erendline);
 	s_tlines = s_erendline - s_srendline + 1;
-
-    // check for OpenGL and set the global flags
-	flags = SDL_OPENGL;
 
 	// initialize the SDL video subsystem if it is not already active
 	if(!SDL_WasInit(SDL_INIT_VIDEO)) {
@@ -142,11 +139,7 @@ InitVideo(FCEUGI *gi)
 	}
 	s_inited = 1;
 
-	// determine if we can allocate the display on the video card
 	vinf = SDL_GetVideoInfo();
-	if(vinf->hw_available) {
-		flags |= SDL_HWSURFACE;
-	}
     
 	// get the monitor's current resolution if we do not already have it
 	if(s_nativeWidth < 0) {
@@ -158,18 +151,17 @@ InitVideo(FCEUGI *gi)
 
 	FCEUI_SetShowFPS(0);
     
-// TODO: tsone: not sure if we need this with emscripten?
-	flags |= SDL_NOFRAME;
 
 	FCEU_printf("Initializing with OpenGL.\n");
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+//	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+//	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 2);
 
 	// Scale x to compensate the 24px overscan.
 	s_exs = 4.0 * (280.0/256.0) + 0.5/256.0;
 	s_eys = 4.0;
 
-	// -Video Modes Tag-
-
+	const int flags = SDL_HWSURFACE | SDL_OPENGL | SDL_NOFRAME;
 	s_screen = SDL_SetVideoMode((int)(NWIDTH * s_exs), (int)(s_tlines * s_eys), 32, flags);
 	if(!s_screen) {
 		FCEUD_PrintError(SDL_GetError());

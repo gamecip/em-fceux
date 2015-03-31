@@ -280,7 +280,7 @@ DBG_PROLOG()
     "gl_Position = vec4(gl_Position.xy / gl_Position.w, 0.0, 1.0);\n"
     "vec2 vwc = gl_Position.xy * 0.5 + 0.5;\n"
     "v_noiseUVs[0] = vec2(RGB_W, SCREEN_H) * vwc / vec2(NOISE_W, NOISE_H);\n"
-        "v_noiseUVs[1] = 0.5 * v_noiseUVs[0];\n"
+        "v_noiseUVs[1] = 0.707*v_noiseUVs[0] + 0.5 / vec2(NOISE_W, NOISE_H);\n"
 
         "v_blend = min(0.28*70.0 * andy, 1.0);\n"
     "}\n";
@@ -292,6 +292,10 @@ DBG_PROLOG()
     "uniform sampler2D u_downsample3Tex;\n"
     "uniform sampler2D u_downsample5Tex;\n"
     "uniform sampler2D u_noiseTex;\n"
+    "uniform vec3 u_lightDir;\n"
+    "uniform vec3 u_viewPos;\n"
+    "uniform vec4 u_material;\n"
+    "uniform vec3 u_fresnel;\n"
     "varying vec3 v_radiance;\n"
     "varying vec2 v_noiseUVs[2];\n"
     "varying vec3 v_pos;\n"
@@ -319,38 +323,22 @@ DBG_PROLOG()
     "color = v_radiance.r * mix(ds1, ds2, v_blend);\n"
     "color += v_radiance.g * mix(ds0, ds1, v_blend);\n"
 
-    // Add noise for rough plastic (and to hide interpolation artifacts).
-//    "float noise = 2.0*0.4336 * (mix(noiseHF, noiseLF, 0.7366 * v_blend) - 0.5);\n"
-//    "float noise = 2.0*0.4336 * (mix(noiseLF, 1.0, 0.7366 * v_blend) - 0.5);\n"
-//    "float noise = 2.0*0.4336 * (mix(1.0, noiseLF, 0.7366 * v_blend) - 0.5);\n"
-    "float noiseLFa = 2.0*abs(noiseLF - 0.5);\n"
-    "float noiseHFa = 2.0*abs(noiseHF - 0.5);\n"
-    "float noise = -1.5*0.4336 * (noiseHFa + noiseLFa * 0.7366*v_blend);\n"
-//    "color *= 1.0 + noise;\n"
-//    "color = vec3(noiseHFa);\n"
+    // Add slight graininess for rough plastic (also to hide interpolation artifacts).
+    "float graininess = 0.15625 * v_blend + 0.14578;\n"
+    "color *= 1.0 - graininess * sqrt(abs(2.0*noiseLF - 1.0));\n"
 
         "vec3 n = normalize(v_norm);\n"
-// TODO: tsone: lighting from ceiling lamp, duplicated code
-// Using python oneliners:
-// from math import *
-// def rot(a,b): return [sin(a)*sin(b), -sin(a)*cos(b), -cos(a)]
-// def rad(d): return pi*d/180
-// rot(rad(90-65),rad(15))
-        "const float cdiff = 0.004;\n"
-        "const float cspec = 0.042;\n"
-        "const float m = 50.0;\n"
-        "const float fr0 = 0.03;\n"
-        "const float frm = 5.0;\n"
-        "const vec3 light_dir = -vec3(0.109381654946615, -0.40821789367673483, -0.9063077870366499);\n"
-        "const vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
-// TODO: calculate in vertex shader?
-        "vec3 v = normalize(view_pos - v_pos);\n"
-        "vec3 l = light_dir;\n"
-        "vec3 h = normalize(l + v);\n"
-        "float ndotl = max(dot(n, l), 0.0);\n"
+        "vec3 v = normalize(u_viewPos - v_pos);\n"
+        "vec3 h = normalize(u_lightDir + v);\n"
+        "float ndotl = dot(n, u_lightDir);\n"
+        "float shade;\n"
+        "if (ndotl > 0.0) {"
         "float ndoth = max(dot(n, h), 0.0);\n"
-        "float fr = fr0 + (1.0-fr0) * pow(1.0-ndotl, frm);\n"
-        "vec3 shade = vec3(mix(cdiff/M_PI, (cspec * (m+8.0) / (8.0*M_PI)) * pow(ndoth, m), fr) * ndotl);\n"
+        "float fr = u_fresnel[0] + u_fresnel[1] * pow(1.0-ndotl, u_fresnel[2]);\n"
+        "shade = mix(u_material[0], u_material[1] * pow(ndoth, u_material[2]), fr) * ndotl;\n"
+        "} else {\n"
+        "shade = -u_material[3] * ndotl;\n"
+        "}\n"
 
 // TODO: tsone: tone-mapping?
 
@@ -400,12 +388,19 @@ DBG_PROLOG()
 static const char* combine_vert_src =
     "precision highp float;\n"
 DBG_PROLOG()
+DEFINE(NOISE_W)
+DEFINE(NOISE_H)
+// TODO: tsone: these are wrong, proper size must be from a uniform
+DEFINE(RGB_W)
+DEFINE(SCREEN_H)
     "attribute vec4 a_0;\n"
     "attribute vec2 a_2;\n"
     "varying vec2 v_uv;\n"
+    "varying vec2 v_noiseUV;\n"
     "void main() {\n"
         "gl_Position = a_0;\n"
         "v_uv = a_2;\n"
+        "v_noiseUV = (vec2(RGB_W, SCREEN_H) / vec2(NOISE_W, NOISE_H)) * a_2;\n"
     "}\n";
 static const char* combine_frag_src =
     "precision highp float;\n"
@@ -413,8 +408,10 @@ DBG_PROLOG()
     "uniform sampler2D u_tvTex;\n"
     "uniform sampler2D u_downsample3Tex;\n"
     "uniform sampler2D u_downsample5Tex;\n"
-    "uniform float u_glow;\n"
+    "uniform sampler2D u_noiseTex;\n"
+    "uniform vec3 u_glow;\n"
     "varying vec2 v_uv;\n"
+    "varying vec2 v_noiseUV;\n"
 
     "void main(void) {\n"
         // Sample screen/tv and downsampled (blurry) textures for glow.
@@ -426,8 +423,10 @@ DBG_PROLOG()
         "ds3 *= ds3;\n"
         "ds5 *= ds5;\n"
         // Blend in glow as blurry highlight allowing slight bleeding on higher u_glow values.
-        "float g2 = u_glow * u_glow;\n"
-        "color = (color + u_glow*ds3 + g2*ds5) / (1.0 + g2);\n"
+        "color = (color + u_glow[0]*ds3 + u_glow[1]*ds5) / (1.0 + u_glow[1]);\n"
+//        "float noise = u_glow * (u_mouse.x/256.0) * (1.5/128.0) * (texture2D(u_noiseTex, v_noiseUV).r - 0.5);\n"
+//        "float noise = u_glow[2] * (u_mouse.x/256.0) * (8.0/128.0) * (texture2D(u_noiseTex, v_noiseUV).r - 0.5);\n"
+        "float noise = u_glow[2] * (6.0/128.0) * (texture2D(u_noiseTex, v_noiseUV).r - 0.5);\n"
         // Gamma encode w/ sqrt() to something similar to sRGB space.
-        "gl_FragColor = vec4(sqrt(color), 1.0);\n"
+        "gl_FragColor = vec4(sqrt(color) + noise, 1.0);\n"
     "}\n";
