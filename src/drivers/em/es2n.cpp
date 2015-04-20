@@ -586,6 +586,7 @@ static void passRGB(es2n *p)
 
     if (p->controls.crt_enabled) {
         glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
     }
     meshRender(&p->quad_mesh);
     glDisable(GL_BLEND);
@@ -631,8 +632,10 @@ static void passTV(es2n *p)
     if (!p->controls.crt_enabled) {
         return;
     }
-    glBindFramebuffer(GL_FRAMEBUFFER, p->tv_fb);
+//    glBindFramebuffer(GL_FRAMEBUFFER, p->tv_fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, RGB_W, SCREEN_H);
+    glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(p->tv_prog);
     updateUniformsTV(p);
@@ -645,7 +648,10 @@ static void passCombine(es2n *p)
     glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
     glUseProgram(p->combine_prog);
     updateUniformsCombine(p);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE);
     meshRender(&p->quad_mesh);
+    glDisable(GL_BLEND);
 }
 
 // TODO: reformat inputs to something more meaningful
@@ -670,9 +676,11 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
     glDisable(GL_CULL_FACE);
-    glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
     glBlendColor(PERSISTENCE_R, PERSISTENCE_G, PERSISTENCE_B, 0);
     glClearColor(0, 0, 0, 0);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthMask(GL_FALSE);
+    glStencilMask(GL_FALSE);
     glEnableVertexAttribArray(0);
 
     createMesh(&p->quad_mesh, mesh_quad_vert_num, ARRAY_SIZE(mesh_quad_varrays), mesh_quad_varrays, 2*mesh_quad_face_num, 0);

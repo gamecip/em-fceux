@@ -314,8 +314,10 @@
         preRun: [function() {
           console.log("!!!! preRun");
           resetControls();
-          // Disable unnecessary SDL surface copy-on-lock feature.
+          // Disable unnecessary SDL surface features.
           SDL.defaults.copyOnLock = false;
+          SDL.defaults.discardOnLock = true;
+          SDL.defaults.opaqueFrontBuffer = false;
           // Mount IndexedDB file system (IDBFS) to /fceux.
           FS.mkdir('/fceux');
           FS.mount(IDBFS, {}, '/fceux');

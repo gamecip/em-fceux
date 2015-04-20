@@ -24,7 +24,6 @@
 
 #include "em.h"
 #include "em-es2.h"
-//#include "../common/vidblit.h"
 #include "../../fceu.h"
 #include "../../version.h"
 #include "../../video.h"
@@ -40,11 +39,11 @@
 #include <cstring>
 #include <cstdlib>
 
+#include <emscripten.h>
+#include <emscripten/html5.h>
+
 // GLOBALS
 extern Config *g_config;
-
-// STATIC GLOBALS
-extern SDL_Surface *s_screen;
 
 static int s_curbpp;
 static int s_srendline, s_erendline;
@@ -58,9 +57,6 @@ static int s_nativeHeight = -1;
 
 #define NWIDTH	(256 - (s_clipSides ? 16 : 0))
 #define NOFFSET	(s_clipSides ? 8 : 0)
-
-static int s_paletterefresh;
-
 
 //draw input aids if we are fullscreen
 bool FCEUD_ShouldDrawInputAids()
@@ -82,9 +78,6 @@ KillVideo()
 	// if the rest of the system has been initialized, shut it down
 	// check for OpenGL and shut it down
 	KillOpenGL();
-
-	// shut down the SDL video sub-system
-	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 
 	s_inited = 0;
 	return 0;
@@ -117,6 +110,53 @@ void FCEUD_VideoChanged()
 int
 InitVideo(FCEUGI *gi)
 {
+#if 1
+	s_clipSides = 0; // Don't clip left side.
+
+	// check the starting, ending, and total scan lines
+	FCEUI_GetCurrentVidSystem(&s_srendline, &s_erendline);
+	s_tlines = s_erendline - s_srendline + 1;
+
+	// Scale x to compensate the 24px overscan.
+	s_exs = 4.0 * (280.0/256.0) + 0.5/256.0;
+	s_eys = 4.0;
+	int w = (int) (NWIDTH * s_exs);
+	int h = (int) (s_tlines * s_eys);
+	s_nativeWidth = w;
+	s_nativeHeight = h;
+
+	s_inited = 1;
+
+	FCEUI_SetShowFPS(0);
+    
+	FCEU_printf("Initializing with OpenGL.\n");
+
+  emscripten_set_canvas_size(w, h);
+  EmscriptenWebGLContextAttributes attr;
+  emscripten_webgl_init_context_attributes(&attr);
+  attr.alpha = attr.antialias = attr.premultipliedAlpha = 1;
+  attr.depth = attr.stencil = attr.preserveDrawingBuffer = attr.preferLowPowerToHighPerformance = attr.failIfMajorPerformanceCaveat = 0;
+  attr.enableExtensionsByDefault = 0;
+  attr.majorVersion = 1;
+  attr.minorVersion = 0;
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context(0, &attr);
+  emscripten_webgl_make_context_current(ctx);
+
+	s_curbpp = 32;
+
+		if(!InitOpenGL(NOFFSET, 256 - (s_clipSides ? 8 : 0),
+					s_srendline, s_erendline + 1,
+					s_exs, s_eys,
+					0, 0)) 
+		{
+			FCEUD_PrintError("Error initializing OpenGL.");
+			KillVideo();
+			return -1;
+		}
+
+    return 0;
+
+#else
 	// XXX soules - const?  is this necessary?
 	const SDL_VideoInfo *vinf;
 	int error;
@@ -137,6 +177,7 @@ InitVideo(FCEUGI *gi)
 			return -1;
 		}
 	}
+
 	s_inited = 1;
 
 	vinf = SDL_GetVideoInfo();
@@ -154,19 +195,26 @@ InitVideo(FCEUGI *gi)
 
 	FCEU_printf("Initializing with OpenGL.\n");
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-//	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-//	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 2);
+	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 32);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 2);
 
 	// Scale x to compensate the 24px overscan.
 	s_exs = 4.0 * (280.0/256.0) + 0.5/256.0;
 	s_eys = 4.0;
 
-	const int flags = SDL_HWSURFACE | SDL_OPENGL | SDL_NOFRAME;
+	const int flags = SDL_DOUBLEBUF | SDL_HWSURFACE | SDL_OPENGL;
 	s_screen = SDL_SetVideoMode((int)(NWIDTH * s_exs), (int)(s_tlines * s_eys), 32, flags);
 	if(!s_screen) {
 		FCEUD_PrintError(SDL_GetError());
 		return -1;
 	}
+
+//	SDL_SetAlpha(s_screen, SDL_SRCALPHA, 255);
 	 
 	s_curbpp = s_screen->format->BitsPerPixel;
 	if(!s_screen) {
@@ -175,9 +223,11 @@ InitVideo(FCEUGI *gi)
 		return -1;
 	}
 
-	FCEU_printf(" Video Mode: %d x %d x %d bpp %s\n",
-				s_screen->w, s_screen->h, s_screen->format->BitsPerPixel,
-				"");
+	int alphaBits = 0;
+	SDL_GL_GetAttribute(SDL_GL_ALPHA_SIZE, &alphaBits);
+
+	FCEU_printf(" Video Mode: %d x %d x %d bpp %d alpha\n",
+				s_screen->w, s_screen->h, s_screen->format->BitsPerPixel, alphaBits);
 
 	if(s_curbpp != 8 && s_curbpp != 16 && s_curbpp != 24 && s_curbpp != 32) {
 		FCEU_printf("  Sorry, %dbpp modes are not supported by FCE Ultra.  Supported bit depths are 8bpp, 16bpp, and 32bpp.\n", s_curbpp);
@@ -195,13 +245,11 @@ InitVideo(FCEUGI *gi)
 		}
 	}
 
-	s_paletterefresh = 1;
-
 	if(s_curbpp > 8) {
 		if(!InitOpenGL(NOFFSET, 256 - (s_clipSides ? 8 : 0),
 					s_srendline, s_erendline + 1,
 					s_exs, s_eys,
-					0, 0, s_screen)) 
+					0, 0)) 
 		{
 			FCEUD_PrintError("Error initializing OpenGL.");
 			KillVideo();
@@ -209,70 +257,33 @@ InitVideo(FCEUGI *gi)
 		}
 	}
 	return 0;
+#endif
 }
 
-static SDL_Color* s_psdl = 0;
+// TODO: tsone: may be removed if fceux doesn't really use these..
+static unsigned int *s_pal = 0;
 
-/**
- * Sets the color for a particular index in the palette.
- */
 void
 FCEUD_SetPalette(uint8 index,
                  uint8 r,
                  uint8 g,
                  uint8 b)
 {
-    FCEU_ARRAY_EM(s_psdl, SDL_Color, 256); 
-
-	s_psdl[index].r = r;
-	s_psdl[index].g = g;
-	s_psdl[index].b = b;
-
-	s_paletterefresh = 1;
+	FCEU_ARRAY_EM(s_pal, unsigned int, 256); 
+	s_pal[index] = (b << 16) | (g << 8) | r;
 }
 
-/**
- * Gets the color for a particular index in the palette.
- */
 void
 FCEUD_GetPalette(uint8 index,
 				uint8 *r,
 				uint8 *g,
 				uint8 *b)
 {
-	if (s_psdl) {
-		*r = s_psdl[index].r;
-		*g = s_psdl[index].g;
-		*b = s_psdl[index].b;
+	if (s_pal) {
+		*r = s_pal[index] & 255;
+		*g = (s_pal[index] >> 8) & 255;
+		*b = (s_pal[index] >> 16) & 255;
 	}
-}
-
-/** 
- * Pushes the palette structure into the underlying video subsystem.
- */
-static void RedoPalette()
-{
-	if (s_psdl) {
-    		SetOpenGLPalette((uint8*)s_psdl);
-	}
-}
-
-/**
- * Pushes the given buffer of bits to the screen.
- */
-void BlitScreen(uint8 *XBuf)
-{
-	if(!s_screen) {
-		return;
-	}
-
-	// refresh the palette if required
-	if(s_paletterefresh) {
-		RedoPalette();
-		s_paletterefresh = 0;
-	}
-
-	BlitOpenGL(XBuf);
 }
 
 /**

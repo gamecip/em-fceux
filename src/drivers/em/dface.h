@@ -13,7 +13,8 @@ void WriteSound(int32 *Buffer, int Count);
 int KillSound(void);
 int GetSoundBufferCount(void);
 
-void SilenceSound(int s); /* DOS and SDL */
+// TODO: tsone: huh? remove?
+void SilenceSound(int s);
 
 #ifndef EMSCRIPTEN
 int InitJoysticks(void);

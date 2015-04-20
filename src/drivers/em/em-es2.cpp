@@ -17,7 +17,7 @@ void SetOpenGLPalette(uint8*)
 {
 }
 
-void BlitOpenGL(uint8 *buf)
+void BlitScreen(uint8 *buf)
 {
 // TODO: possibly move somewhere else?
     // Update NTSC controls (from js).
@@ -36,7 +36,7 @@ void BlitOpenGL(uint8 *buf)
     s_es2n.controls.noise = EM_ASM_DOUBLE_V({ return Module.noiseControl||0; });
 
     es2nRender(&s_es2n, buf, deempScan, PALRAM[0]);
-	SDL_GL_SwapBuffers();
+//	SDL_GL_SwapBuffers();
 }
 
 void KillOpenGL(void)
@@ -51,9 +51,10 @@ int InitOpenGL(int left,
 		double xscale,
 		double yscale,
 		int stretchx,
-		int stretchy,
-		SDL_Surface *screen)
+		int stretchy)
 {
+// TODO: tsone: erhrm, what?
+/*
 	if(screen->flags & SDL_FULLSCREEN)
 	{
 		xscale=(double)screen->w / (double)(right-left);
@@ -61,24 +62,26 @@ int InitOpenGL(int left,
 		if(xscale<yscale) yscale = xscale;
 		if(yscale<xscale) xscale = yscale;
 	}
+*/
 
 	{
 		int rw=(int)((right-left)*xscale);
 		int rh=(int)((bottom-top)*yscale);
-		int sx=(screen->w-rw)/2;    // Start x
-		int sy=(screen->h-rh)/2;    // Start y
+//		int sx=(screen->w-rw)/2;    // Start x
+//		int sy=(screen->h-rh)/2;    // Start y
 
-		if(stretchx) { sx=0; rw=screen->w; }
-		if(stretchy) { sy=0; rh=screen->h; }
-		glViewport(sx, sy, rw, rh);
+//		if(stretchx) { sx=0; rw=screen->w; }
+//		if(stretchy) { sy=0; rh=screen->h; }
+//		glViewport(sx, sy, rw, rh);
+		glViewport(0, 0, rw, rh);
 	}
 
     es2nInit(&s_es2n, left, right, top, bottom);
 
-	glClear(GL_COLOR_BUFFER_BIT);
-	SDL_GL_SwapBuffers();
-	glClear(GL_COLOR_BUFFER_BIT);
-	SDL_GL_SwapBuffers();
+//	glClear(GL_COLOR_BUFFER_BIT);
+//	SDL_GL_SwapBuffers();
+//	glClear(GL_COLOR_BUFFER_BIT);
+//	SDL_GL_SwapBuffers();
 	return 1;
 }
 

@@ -22,6 +22,7 @@
 #include "dface.h"
 #include "input.h"
 #include "config.h"
+#include <SDL.h>
 
 #include "em-video.h"
 #include "em.h"

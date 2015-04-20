@@ -20,6 +20,7 @@
  */
 
 #include <cstdio>
+#include <SDL.h>
 #include "em.h"
 #include "../../utils/memory.h"
 #include "../../fceu.h"

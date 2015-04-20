@@ -12,6 +12,7 @@
 
 #include "em.h"
 #include "em-video.h"
+#include <SDL.h>
 
 #include "../common/configSys.h"
 #include "../../oldmovie.h"
@@ -33,9 +34,6 @@
 #include <iostream>
 #include <fstream>
 
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-    #error "SDL 2.0 not supported"
-#endif
 
 #define TURBO_FRAMESKIPS 3
 
@@ -277,28 +275,18 @@ const char *FCEUD_GetCompilerString() {
 	return (const char *)s_linuxCompilerString;
 }
 
-/**
- * The main loop for the SDL.
- */
 int main(int argc, char *argv[])
 {
 	int error;
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
-	if(SDL_Init(SDL_INIT_VIDEO)) {
-		printf("Could not initialize SDL: %s.\n", SDL_GetError());
-		return(-1);
-	}
+// TODO: tsone: no flags, as they're not necessary for emscripten
+	SDL_Init(0);
 
 	// Initialize the configuration system
 	g_config = InitConfig();
 		
-	if(!g_config) {
-		SDL_Quit();
-		return -1;
-	}
-
 	// initialize the infrastructure
 	error = FCEUI_Initialize();
 	std::string s;
@@ -334,14 +322,16 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
+// TODO: tsone: is it necessary?
 uint64 FCEUD_GetTime()
 {
-	return SDL_GetTicks();
+	return emscripten_get_now();
 }
 
+// TODO: tsone: is it necessary?
 uint64 FCEUD_GetTimeFreq(void)
 {
-	// SDL_GetTicks() is in milliseconds
+	// emscripten_get_now() returns time in milliseconds.
 	return 1000;
 }
 
