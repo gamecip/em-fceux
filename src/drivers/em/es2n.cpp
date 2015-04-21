@@ -4,6 +4,7 @@
 #include <cmath>
 // TODO: remove, not needed
 #include <stdio.h>
+#include <emscripten.h>
 #include "es2utils.h"
 #include "meshes.h"
 
@@ -309,7 +310,8 @@ static void genLookupTex(es2n *p)
 // Get uniformly distributed random number in [0,1] range.
 static double rand01()
 {
-    return (double) rand() / (double) RAND_MAX;
+//    return (double) rand() / (double) RAND_MAX;
+    return emscripten_random();
 }
 
 static void genNoiseTex(es2n *p)
@@ -328,15 +330,13 @@ static void genNoiseTex(es2n *p)
     // Results are clamped to 0..255 range, which skews the distribution slightly.
     const double SIGMA = 0.5/2.0; // Set 95% of noise values in [-0.5,0.5] range.
     const double MU = 0.5; // Offset range by +0.5 to map to [0,1].
-    double t = 0;
     for (int i = 0; i < NOISE_W*NOISE_H; i++) {
         double x;
         do {
 		x = rand01();
 	} while (x < 1e-7); // Epsilon to avoid log(0).
         double r = SIGMA * sqrt(-2.0 * log10(x));
-        t = fmod(t + 2.0*M_PI * rand01(), 2.0*M_PI); // Spin phase.
-        r = MU + r*sin(t); // Take real part only, discard complex part as it's related.
+        r = MU + r*sin(2.0*M_PI * rand01()); // Take real part only, discard complex part as it's related.
         // Clamp result to [0,1].
         noise[i] = (r <= 0) ? 0 : (r >= 1) ? 255 : (int) (0.5 + 255.0*r);
     }
@@ -632,10 +632,10 @@ static void passTV(es2n *p)
     if (!p->controls.crt_enabled) {
         return;
     }
-//    glBindFramebuffer(GL_FRAMEBUFFER, p->tv_fb);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, p->tv_fb);
+//    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, RGB_W, SCREEN_H);
-    glClear(GL_COLOR_BUFFER_BIT);
+//    glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(p->tv_prog);
     updateUniformsTV(p);
@@ -648,10 +648,10 @@ static void passCombine(es2n *p)
     glViewport(p->viewport[0], p->viewport[1], p->viewport[2], p->viewport[3]);
     glUseProgram(p->combine_prog);
     updateUniformsCombine(p);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE);
+//    glEnable(GL_BLEND);
+//    glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE);
     meshRender(&p->quad_mesh);
-    glDisable(GL_BLEND);
+//    glDisable(GL_BLEND);
 }
 
 // TODO: reformat inputs to something more meaningful

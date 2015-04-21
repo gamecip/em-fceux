@@ -195,6 +195,14 @@ DEFINE(M_PI)
     "vec3 n = normalize(v_norm);\n"
     "color += 0.018*texture2D(u_stretchTex, v_uv[2] - 0.021*n.xy).rgb;\n"
 
+    // Set black if outside the border
+//    "vec2 uvd = max(abs(v_uv[2] - 0.5) - (0.4 + 0.1*u_mouse.xy / vec2(256.0, 224.0)), 0.0);\n"
+    "vec2 uvd = max(abs(v_uv[2] - 0.5) - (0.4 + 0.1*vec2(90.0, 76.0) / vec2(256.0, 224.0)), 0.0);\n"
+//    "color *= max(1.0 - 3000.0 * dot(uvd, uvd), 0.0);\n"
+    "color *= clamp(3.0 - 3.0*3000.0 * dot(uvd, uvd), 0.0, 1.0);\n"
+//    "const float LIME = 1.0/3000.0;\n"
+//    "color *= max(1.0 - max(2.0*dot(uvd, uvd) / LIME - 1.0, 0.0), 0.0);\n"
+
 // TODO: tsone: lighting from ceiling lamp, duplicated code
 // Using python oneliners:
 // from math import *
@@ -212,10 +220,14 @@ DEFINE(M_PI)
         "vec3 v = normalize(view_pos - v_pos);\n"
         "vec3 l = light_dir;\n"
         "vec3 h = normalize(l + v);\n"
+// TODO: max() may not be needed (if dot products are always non-negative)
         "float ndotl = max(dot(n, l), 0.0);\n"
         "float ndoth = max(dot(n, h), 0.0);\n"
         "float fr = fr0 + (1.0-fr0) * pow(1.0-ndotl, frm);\n"
         "vec3 shade = vec3(mix(cdiff/M_PI, (cspec * (m+8.0) / (8.0*M_PI)) * pow(ndoth, m), fr) * ndotl);\n"
+
+    // CRT emitter radiance attenuation from the curvature
+//    "color *= pow(dot(n, v), 16.0*(u_mouse.x/256.0));\n"
 
     "float noise = (1.5/128.0) * (texture2D(u_noiseTex, v_noiseUV).r - 0.5);\n"
 

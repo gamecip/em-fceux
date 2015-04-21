@@ -134,7 +134,7 @@ InitVideo(FCEUGI *gi)
   emscripten_set_canvas_size(w, h);
   EmscriptenWebGLContextAttributes attr;
   emscripten_webgl_init_context_attributes(&attr);
-  attr.alpha = attr.antialias = attr.premultipliedAlpha = 1;
+  attr.alpha = attr.antialias = attr.premultipliedAlpha = 0;
   attr.depth = attr.stencil = attr.preserveDrawingBuffer = attr.preferLowPowerToHighPerformance = attr.failIfMajorPerformanceCaveat = 0;
   attr.enableExtensionsByDefault = 0;
   attr.majorVersion = 1;

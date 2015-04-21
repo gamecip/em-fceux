@@ -1,4 +1,5 @@
 *.o
+*.blend?
 /.sconf_temp/
 /.sconsign.dblite
 /bin/
