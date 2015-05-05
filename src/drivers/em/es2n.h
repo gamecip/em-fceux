@@ -49,6 +49,10 @@ typedef struct t_es2n
     GLuint rgb_tex;     // Output RGB texture.
     GLuint rgb_prog;    // Shader for RGB.
 
+    GLuint sharpen_fb;  // Framebuffer for sharpened RGB texture.
+    GLuint sharpen_tex; // Sharpened RGB texture.
+    GLuint sharpen_prog; // Shader for sharpening.
+
     GLuint stretch_fb;   // Framebuffer for stretched RGB texture.
     GLuint stretch_tex;  // Output stretched RGB texture.
     GLuint stretch_prog; // Shader for stretched RGB.

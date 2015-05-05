@@ -109,14 +109,48 @@ DEFINE(CW2)
     "yiq.r += u_noiseAmp * (texture2D(u_noiseTex, v_noiseUV).r - 0.5);\n"
     "yiq.gb *= u_color;\n"
     "vec3 result = clamp(c_convMat * yiq, 0.0, 1.0);\n"
-    // Gamma convert RGB from NTSC space to space similar to SRGB.
+    // Gamma convert RGB from NTSC space to space similar to sRGB.
     "result = pow(result, vec3(u_gamma));\n"
     // NOTE: While this seems to be wrong (after gamma), it works well in practice...?
     "result = clamp(u_contrast * result + u_brightness, 0.0, 1.0);\n"
     // Write linear color (banding is not visible for pixelated graphics).
-// TODO: tsone: testing encoding everywhere
+// TODO: test encode gamma
     "gl_FragColor = vec4(result, 1.0);\n"
-//    "gl_FragColor = vec4(result * result, 1.0);\n"
+"}\n";
+
+static const char* sharpen_vert_src =
+    DEFINE(RGB_W)
+    "attribute vec4 a_0;\n"
+    "attribute vec2 a_2;\n"
+    "uniform float u_convergence;\n"
+    "varying vec2 v_uv[5];\n"
+    "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
+    "void main() {\n"
+    "vec2 uv = a_2;\n"
+    "TAP(0,-4.0);\n"
+    "TAP(1, u_convergence);\n"
+    "TAP(2, 0.0);\n"
+    "TAP(3,-u_convergence);\n"
+    "TAP(4, 4.0);\n"
+    "gl_Position = a_0;\n"
+    "}\n";
+static const char* sharpen_frag_src =
+"uniform sampler2D u_rgbTex;\n"
+"uniform float u_convergence;\n"
+"uniform vec3 u_sharpenKernel[5];\n"
+"varying vec2 v_uv[5];\n"
+"void main(void) {\n"
+    "vec3 color = vec3(0.0);\n"
+    // Sharpening done in linear color space. Output is linear.
+// TODO: test encode gamma
+    "for (int i = 0; i < 5; i++) {\n"
+        "vec3 tmp = texture2D(u_rgbTex, v_uv[i]).rgb;\n"
+        "color += u_sharpenKernel[i] * tmp*tmp;\n"
+//        "color += u_sharpenKernel[i] * texture2D(u_rgbTex, v_uv[i]).rgb;\n"
+    "}\n"
+    "gl_FragColor = vec4(sqrt(color), 1.0);\n"
+// TODO: test encode gamma
+//    "gl_FragColor = vec4(color, 1.0);\n"
 "}\n";
 
 static const char* stretch_vert_src =
@@ -133,21 +167,21 @@ static const char* stretch_vert_src =
 static const char* stretch_frag_src =
     DEFINE(IDX_H)
     "uniform float u_scanlines;\n"
-    "uniform sampler2D u_rgbTex;\n"
+    "uniform sampler2D u_sharpenTex;\n"
     "varying vec2 v_uv[2];\n"
     "void main(void) {\n"
     // Sample adjacent scanlines and average to smoothen slightly vertically.
-    "vec3 c0 = texture2D(u_rgbTex, v_uv[0]).rgb;\n"
-    "vec3 c1 = texture2D(u_rgbTex, v_uv[1]).rgb;\n"
-// TODO: tsone: testing encoding everywhere
-    "vec3 color = 0.5 * (c0*c0 + c1*c1);\n"
-//    "vec3 color = 0.5 * (c0 + c1);\n"
+    "vec3 c0 = texture2D(u_sharpenTex, v_uv[0]).rgb;\n"
+    "vec3 c1 = texture2D(u_sharpenTex, v_uv[1]).rgb;\n"
+// TODO: test encode gamma
+    "vec3 color = c0*c0 + c1*c1;\n"
+//    "vec3 color = c0 + c1;\n"
     // Use oscillator as scanline modulator.
     "float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*IDX_H * v_uv[0].y - M_PI*0.125)));\n"
-    // This formula dims dark colors, but keeps brights.
-// TODO: tsone: testing encoding everywhere
-    "gl_FragColor = vec4(sqrt(mix(color, max(2.0*color - 1.0, 0.0), scanlines)), 1.0);\n"
-//    "gl_FragColor = vec4(mix(color, max(2.0*color - 1.0, 0.0), scanlines), 1.0);\n"
+    // This formula dims dark colors, but keeps brights. Output is linear.
+// TODO: test encode gamma
+    "gl_FragColor = vec4(sqrt(mix(0.5 * color, max(color - 1.0, 0.0), scanlines)), 1.0);\n"
+//    "gl_FragColor = vec4(mix(0.5 * color, max(color - 1.0, 0.0), scanlines), 1.0);\n"
     "}\n";
 
 static const char* screen_vert_src =
@@ -158,22 +192,14 @@ static const char* screen_vert_src =
     "attribute vec4 a_0;\n"
     "attribute vec3 a_1;\n"
     "attribute vec2 a_2;\n"
-    "uniform float u_convergence;\n"
     "uniform mat4 u_mvp;\n"
     "uniform vec2 u_uvScale;\n"
-    "varying vec2 v_uv[5];\n"
+    "varying vec2 v_uv;\n"
     "varying vec3 v_norm;\n"
     "varying vec3 v_pos;\n"
     "varying vec2 v_noiseUV;\n"
-
-    "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
     "void main() {\n"
-    "vec2 uv = 0.5 + u_uvScale.xy * (a_2 - 0.5);\n"
-    "TAP(0,-4.0);\n"
-    "TAP(1, u_convergence);\n"
-    "TAP(2, 0.0);\n"
-    "TAP(3,-u_convergence);\n"
-    "TAP(4, 4.0);\n"
+    "v_uv = 0.5 + u_uvScale.xy * (a_2 - 0.5);\n"
     "v_norm = a_1;\n"
     "v_pos = a_0.xyz;\n"
 // TODO: tsone: duplicated (screen, tv), manual homogenization
@@ -185,28 +211,26 @@ static const char* screen_vert_src =
 static const char* screen_frag_src =
 "uniform sampler2D u_stretchTex;\n"
 "uniform sampler2D u_noiseTex;\n"
-// TODO: tsone: for debug
-"uniform float u_convergence;\n"
-"uniform vec3 u_sharpenKernel[5];\n"
-"varying vec2 v_uv[5];\n"
+"varying vec2 v_uv;\n"
 "varying vec3 v_norm;\n"
 "varying vec3 v_pos;\n"
 "varying vec2 v_noiseUV;\n"
 
 "void main(void) {\n"
-    "vec3 color = vec3(0.0);\n"
-    "for (int i = 0; i < 5; i++) {\n"
-        "vec3 tmp = texture2D(u_stretchTex, v_uv[i]).rgb;\n"
-        "color += u_sharpenKernel[i] * tmp*tmp;\n"
-    "}\n"
-    "color = clamp(color, 0.0, 1.0);\n"
-// TODO: tsone: test adding dust scatter
+    // Base radiance from phosphors.
+    "vec3 color = texture2D(u_stretchTex, v_uv).rgb;\n"
+// TODO: test encode gamma
+    "color *= color;\n"
+    // Radiance from dust scattering.
     "vec3 n = normalize(v_norm);\n"
-    "color += 0.018*texture2D(u_stretchTex, v_uv[2] - 0.021*n.xy).rgb;\n"
+// TODO: test encode gamma
+    "vec3 tmp = texture2D(u_stretchTex, v_uv - 0.021*n.xy).rgb;\n"
+    "color += 0.018 * tmp*tmp;\n"
+//    "color += 0.018 * texture2D(u_stretchTex, v_uv - 0.021*n.xy).rgb;\n"
 
     // Set black if outside the border
 //    "vec2 uvd = max(abs(v_uv[2] - 0.5) - (0.4 + 0.1*u_mouse.xy / vec2(256.0, 224.0)), 0.0);\n"
-    "vec2 uvd = max(abs(v_uv[2] - 0.5) - (0.4 + 0.1*vec2(90.0, 76.0) / vec2(256.0, 224.0)), 0.0);\n"
+    "vec2 uvd = max(abs(v_uv - 0.5) - (0.4 + 0.1*vec2(90.0, 76.0) / vec2(256.0, 224.0)), 0.0);\n"
 //    "color *= max(1.0 - 3000.0 * dot(uvd, uvd), 0.0);\n"
     "float border = clamp(3.0 - 3.0*3000.0 * dot(uvd, uvd), 0.0, 1.0);\n"
     "color *= border;\n"

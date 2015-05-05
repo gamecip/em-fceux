@@ -34,6 +34,7 @@
 #define DOWNSAMPLE4_I 10
 #define DOWNSAMPLE5_I 11
 #define NOISE_I     12
+#define SHARPEN_I   13
 #define TEX(i_)     (GL_TEXTURE0+(i_))
 
 #define PERSISTENCE_R 0.165 // Red phosphor persistence.
@@ -310,7 +311,6 @@ static void genLookupTex(es2n *p)
 // Get uniformly distributed random number in [0,1] range.
 static double rand01()
 {
-//    return (double) rand() / (double) RAND_MAX;
     return emscripten_random();
 }
 
@@ -371,40 +371,23 @@ static void updateUniformsRGB(const es2n_controls *c)
     glUniform1f(c->_contrast_loc, v);
     v = 1.0 + c->color;
     glUniform1f(c->_color_loc, v);
-    v = c->rgbppu + 0.1;
+    v = c->rgbppu;
     glUniform1f(c->_rgbppu_loc, v);
     v = 2.4/2.2 + 0.3*c->gamma;
     glUniform1f(c->_gamma_loc, v);
-    v = c->crt_enabled * 0.13 * c->noise;
+    v = c->crt_enabled * 0.08 * c->noise*c->noise;
     glUniform1f(c->_noiseAmp_loc, v);
     glUniform2f(c->_noiseRnd_loc, rand01(), rand01());
 }
 
-static void updateUniformsStretch(const es2n_controls *c)
-{
-    DBG(updateUniformsDebug())
-    double v;
-    v = c->crt_enabled * 0.5 * c->scanlines;
-    glUniform1f(c->_scanlines_loc, v);
-}
-
-static void updateUniformsScreen(const es2n *p, int final_pass)
+static void updateUniformsSharpen(const es2n *p)
 {
     DBG(updateUniformsDebug())
     const es2n_controls *c = &p->controls;
-    double v;
-    v = c->crt_enabled * 2.0 * c->convergence;
+    double v = c->crt_enabled * 2.0 * c->convergence;
     glUniform1f(c->_convergence_loc, v);
 
-    if (c->crt_enabled) {
-        glUniform2f(c->_screen_uvScale_loc, 278.0/IDX_W, 228.0/IDX_H);
-        glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, p->mvp_mat);
-    } else {
-        glUniform2f(c->_screen_uvScale_loc, 260.0/IDX_W, 224.0/IDX_H);
-        glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, mat4_identity);
-    }
-
-    v = (0.9-c->rgbppu) * 0.4 * (c->sharpness+0.5);
+    v = (1.0-c->rgbppu) * 0.4 * (c->sharpness+0.5);
     GLfloat sharpen_kernel[] = {
         -v, -v, -v,
         1, 0, 0, 
@@ -414,6 +397,28 @@ static void updateUniformsScreen(const es2n *p, int final_pass)
     };
 
     glUniform3fv(c->_sharpen_kernel_loc, 5, sharpen_kernel);
+}
+
+static void updateUniformsStretch(const es2n_controls *c)
+{
+    DBG(updateUniformsDebug())
+    double v;
+    v = c->crt_enabled * 0.45 * c->scanlines;
+    glUniform1f(c->_scanlines_loc, v);
+}
+
+static void updateUniformsScreen(const es2n *p, int final_pass)
+{
+    DBG(updateUniformsDebug())
+    const es2n_controls *c = &p->controls;
+
+    if (c->crt_enabled) {
+        glUniform2f(c->_screen_uvScale_loc, 278.0/IDX_W, 228.0/IDX_H);
+        glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, p->mvp_mat);
+    } else {
+        glUniform2f(c->_screen_uvScale_loc, 260.0/IDX_W, 224.0/IDX_H);
+        glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, mat4_identity);
+    }
 }
 
 static void updateUniformsDownsample(const es2n *p, int w, int h, int texIdx, int isHorzPass)
@@ -479,13 +484,27 @@ static void initUniformsRGB(es2n *p)
     updateUniformsRGB(&p->controls);
 }
 
+static void initUniformsSharpen(es2n *p)
+{
+    GLint k;
+    GLuint prog = p->sharpen_prog;
+
+    k = glGetUniformLocation(prog, "u_rgbTex");
+    glUniform1i(k, RGB_I);
+
+    es2n_controls *c = &p->controls;
+    c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
+    c->_sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
+    updateUniformsSharpen(p);
+}
+
 static void initUniformsStretch(es2n *p)
 {
     GLint k;
     GLuint prog = p->stretch_prog;
 
-    k = glGetUniformLocation(prog, "u_rgbTex");
-    glUniform1i(k, RGB_I);
+    k = glGetUniformLocation(prog, "u_sharpenTex");
+    glUniform1i(k, SHARPEN_I);
 
     es2n_controls *c = &p->controls;
     c->_scanlines_loc = glGetUniformLocation(prog, "u_scanlines");
@@ -528,8 +547,6 @@ static void initUniformsScreen(es2n *p)
     initShading(prog, 1.5, 0.001, 0.0, 0.065, 41, 0.04, 4);
 
     es2n_controls *c = &p->controls;
-    c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
-    c->_sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
     c->_screen_uvScale_loc = glGetUniformLocation(prog, "u_uvScale");
     c->_screen_mvp_loc = glGetUniformLocation(prog, "u_mvp");
     updateUniformsScreen(p, 1);
@@ -598,6 +615,15 @@ static void passRGB(es2n *p)
     }
     meshRender(&p->quad_mesh);
     glDisable(GL_BLEND);
+}
+
+static void passSharpen(es2n *p)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, p->sharpen_fb);
+    glViewport(0, 0, RGB_W, IDX_H);
+    glUseProgram(p->sharpen_prog);
+    updateUniformsSharpen(p);
+    meshRender(&p->quad_mesh);
 }
 
 static void passStretch(es2n *p)
@@ -710,6 +736,12 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src, common_src);
     initUniformsRGB(p);
 
+    // Setup sharpen framebuffer.
+    glActiveTexture(TEX(SHARPEN_I));
+    createFBTex(&p->sharpen_tex, &p->sharpen_fb, RGB_W, IDX_H, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
+    p->sharpen_prog = buildShader(sharpen_vert_src, sharpen_frag_src, common_src);
+    initUniformsSharpen(p);
+
     // Setup stretch framebuffer.
     glActiveTexture(TEX(STRETCH_I));
     createFBTex(&p->stretch_tex, &p->stretch_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
@@ -779,6 +811,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
 void es2nDeinit(es2n *p)
 {
     deleteFBTex(&p->rgb_tex, &p->rgb_fb);
+    deleteFBTex(&p->sharpen_tex, &p->sharpen_fb);
     deleteFBTex(&p->stretch_tex, &p->stretch_fb);
     deleteFBTex(&p->tv_tex, &p->tv_fb);
     for (int i = 0; i < 6; ++i) {
@@ -789,6 +822,7 @@ void es2nDeinit(es2n *p)
     deleteTex(&p->lookup_tex);
     deleteTex(&p->noise_tex);
     deleteShader(&p->rgb_prog);
+    deleteShader(&p->sharpen_prog);
     deleteShader(&p->stretch_prog);
     deleteShader(&p->screen_prog);
     deleteShader(&p->downsample_prog);
@@ -822,6 +856,7 @@ void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_c
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, IDX_H, 1, GL_LUMINANCE, GL_UNSIGNED_BYTE, row_deemp);
 
     passRGB(p);
+    passSharpen(p);
     passStretch(p);
     passScreen(p);
     passDownsample(p);
