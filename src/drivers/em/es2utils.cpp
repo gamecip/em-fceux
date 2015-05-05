@@ -172,8 +172,21 @@ GLuint linkShader(GLuint vert_shader, GLuint frag_shader)
     return prog;
 }
 
-GLuint buildShader(const char *vert_src, const char *frag_src)
+static char* prependShader(const char *src, const char *prepend)
 {
+    char* result = (char*) malloc(strlen(prepend) + strlen(src) + 1);
+    strcpy(result, prepend);
+    strcat(result, src);
+    return result;
+}
+
+GLuint buildShader(const char *vert_src, const char *frag_src, const char *prepend_src)
+{
+    if (prepend_src) {
+        vert_src = prependShader(vert_src, prepend_src);
+        frag_src = prependShader(frag_src, prepend_src);
+    }
+
     GLuint vert_shader = compileShader(GL_VERTEX_SHADER, vert_src);
     GLuint frag_shader = compileShader(GL_FRAGMENT_SHADER, frag_src);
     GLuint result = linkShader(vert_shader, frag_shader);
@@ -181,6 +194,11 @@ GLuint buildShader(const char *vert_src, const char *frag_src)
     glDetachShader(result, frag_shader);
     glDeleteShader(vert_shader);
     glDeleteShader(frag_shader);
+
+    if (prepend_src) {
+        free((char*) vert_src);
+        free((char*) frag_src);
+    }
     return result;
 }
 

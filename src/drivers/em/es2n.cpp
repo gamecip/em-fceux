@@ -492,6 +492,29 @@ static void initUniformsStretch(es2n *p)
     updateUniformsStretch(&p->controls);
 }
 
+// Using python oneliners:
+// from math import *
+// def rot(a,b): return [sin(a)*sin(b), -sin(a)*cos(b), -cos(a)]
+// def rad(d): return pi*d/180
+// rot(rad(90-65),rad(15))
+//static GLfloat s_lightDir[] = { -0.109381654946615, 0.40821789367673483, 0.9063077870366499 }; // 90-65, 15
+//static GLfloat s_lightDir[] = { -0.1830127018922193, 0.6830127018922193, 0.7071067811865476 }; // 90-45, 15
+//static GLfloat s_lightDir[] = { -0.22414386804201336, 0.8365163037378078, 0.5000000000000001 }; // 90-30, 15
+static GLfloat s_lightDir[] = { 0.0, 0.866025, 0.5 }; // 90-30, 0
+static GLfloat s_viewPos[] = { 0, 0, 2.5 };
+
+static void initShading(GLuint prog, float intensity, float diff, float fill, float spec, float m, float fr0, float frexp)
+{
+    int k = glGetUniformLocation(prog, "u_lightDir");
+    glUniform3fv(k, 1, s_lightDir);
+    k = glGetUniformLocation(prog, "u_viewPos");
+    glUniform3fv(k, 1, s_viewPos);
+    k = glGetUniformLocation(prog, "u_material");
+    glUniform4f(k, intensity*diff / M_PI, intensity*spec * (m+8.0) / (8.0*M_PI), m, intensity*fill / M_PI);
+    k = glGetUniformLocation(prog, "u_fresnel");
+    glUniform3f(k, fr0, 1-fr0, frexp);
+}
+
 static void initUniformsScreen(es2n *p)
 {
     GLint k;
@@ -502,6 +525,8 @@ static void initUniformsScreen(es2n *p)
     k = glGetUniformLocation(prog, "u_noiseTex");
     glUniform1i(k, NOISE_I);
 
+    initShading(prog, 1.5, 0.001, 0.0, 0.065, 41, 0.04, 4);
+
     es2n_controls *c = &p->controls;
     c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
     c->_sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
@@ -509,14 +534,6 @@ static void initUniformsScreen(es2n *p)
     c->_screen_mvp_loc = glGetUniformLocation(prog, "u_mvp");
     updateUniformsScreen(p, 1);
 }
-
-// Using python oneliners:
-// from math import *
-// def rot(a,b): return [sin(a)*sin(b), -sin(a)*cos(b), -cos(a)]
-// def rad(d): return pi*d/180
-// rot(rad(90-65),rad(15))
-static GLfloat s_lightDir[] = { -0.109381654946615, 0.40821789367673483, 0.9063077870366499 };
-static GLfloat s_viewPos[] = { 0, 0, 2.5 };
 
 static void initUniformsTV(es2n *p)
 {
@@ -531,20 +548,11 @@ static void initUniformsTV(es2n *p)
     glUniform1i(k, DOWNSAMPLE5_I);
     k = glGetUniformLocation(prog, "u_noiseTex");
     glUniform1i(k, NOISE_I);
+
     k = glGetUniformLocation(prog, "u_mvp");
     glUniformMatrix4fv(k, 1, GL_FALSE, p->mvp_mat);
-    k = glGetUniformLocation(prog, "u_lightDir");
-    glUniform3fv(k, 1, s_lightDir);
-    k = glGetUniformLocation(prog, "u_viewPos");
-    glUniform3fv(k, 1, s_viewPos);
 
-    const float m = 50.0;
-    k = glGetUniformLocation(prog, "u_material");
-    glUniform4f(k, 0.004/M_PI, 0.042 * (m+8.0) / (8.0*M_PI), m, 0.006/M_PI);
-
-    const float fr0 = 0.03;
-    k = glGetUniformLocation(prog, "u_fresnel");
-    glUniform3f(k, fr0, 1-fr0, 5.0);
+    initShading(prog, 1.5, 0.004, 0.004, 0.039, 49, 0.03, 4);
 
     updateUniformsTV(p);
 }
@@ -699,13 +707,13 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     // Configure RGB framebuffer.
     glActiveTexture(TEX(RGB_I));
     createFBTex(&p->rgb_tex, &p->rgb_fb, RGB_W, IDX_H, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
-    p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src);
+    p->rgb_prog = buildShader(rgb_vert_src, rgb_frag_src, common_src);
     initUniformsRGB(p);
 
     // Setup stretch framebuffer.
     glActiveTexture(TEX(STRETCH_I));
     createFBTex(&p->stretch_tex, &p->stretch_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    p->stretch_prog = buildShader(stretch_vert_src, stretch_frag_src);
+    p->stretch_prog = buildShader(stretch_vert_src, stretch_frag_src, common_src);
     initUniformsStretch(p);
 
     // Setup screen/TV framebuffer.
@@ -719,16 +727,16 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     }
 
     // Setup downsample shader.
-    p->downsample_prog = buildShader(downsample_vert_src, downsample_frag_src);
+    p->downsample_prog = buildShader(downsample_vert_src, downsample_frag_src, common_src);
     initUniformsDownsample(p);
 
     // Setup screen shader.
-    p->screen_prog = buildShader(screen_vert_src, screen_frag_src);
+    p->screen_prog = buildShader(screen_vert_src, screen_frag_src, common_src);
     createMesh(&p->screen_mesh, mesh_screen_vert_num, ARRAY_SIZE(mesh_screen_varrays), mesh_screen_varrays, 3*mesh_screen_face_num, mesh_screen_faces);
     initUniformsScreen(p);
 
     // Setup TV shader.
-    p->tv_prog = buildShader(tv_vert_src, tv_frag_src);
+    p->tv_prog = buildShader(tv_vert_src, tv_frag_src, common_src);
 // TODO: tsone: generate distances to crt screen edges
     int num_edges = 0;
     int *edges = createUniqueEdges(&num_edges, mesh_screen_vert_num, 3*mesh_screen_face_num, mesh_screen_faces);
@@ -764,7 +772,7 @@ void es2nInit(es2n *p, int left, int right, int top, int bottom)
     initUniformsTV(p);
 
     // Setup combine shader.
-    p->combine_prog = buildShader(combine_vert_src, combine_frag_src);
+    p->combine_prog = buildShader(combine_vert_src, combine_frag_src, common_src);
     initUniformsCombine(p);
 }
 

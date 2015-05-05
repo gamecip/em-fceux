@@ -1,12 +1,36 @@
-#if DBG_MODE
-#define DBG_PROLOG() \
-"uniform vec3 u_mouse;\n"
-#else
-#define DBG_PROLOG()
-#endif
-static const char* rgb_vert_src =
+static const char* common_src =
 "precision highp float;\n"
-DBG_PROLOG()
+DEFINE(M_PI)
+#if DBG_MODE
+"uniform vec3 u_mouse;\n"
+#endif
+"\n"
+"uniform vec3 u_lightDir;\n"
+"uniform vec3 u_viewPos;\n"
+"uniform vec4 u_material;\n"
+"uniform vec3 u_fresnel;\n"
+"\n"
+"float shadeBlinn(const vec3 p, const vec3 n)\n"
+"{\n"
+    "vec3 v = normalize(u_viewPos - p);\n"
+    "vec3 h = normalize(u_lightDir + v);\n"
+    "float ndotl = dot(n, u_lightDir);\n"
+    "float result;\n"
+    "if (ndotl > 0.0) {"
+        "float ndoth = max(dot(n, h), 0.0);\n"
+        "float fr = u_fresnel[0] + u_fresnel[1] * pow(1.0-ndotl, u_fresnel[2]);\n"
+        "result = mix(u_material[0], u_material[1] * pow(ndoth, u_material[2]), fr) * ndotl;\n"
+    "} else {\n"
+        "result = -ndotl * u_material[3];\n"
+    "}\n"
+//    "float ddiag = -1.8*u_mouse.y/256.0 + 0.9 + dot(vec3(0.0, -0.90630778703665, 0.42261826174069933), p);\n"//-0.7071, 0.7071), p);\n"
+    "float ddiag = -1.8*u_mouse.y/256.0 + 0.9 + dot(normalize(cross(vec3(1.0, 0.0, 0.0), u_lightDir)), p);\n"
+    "float dflat = 0.2*u_mouse.x/224.0 - 0.1 + p.z;\n"
+    "result *= clamp(52.0 * max(ddiag, dflat), 0.225, 1.0);\n"
+    "return result;\n"
+"}\n";
+
+static const char* rgb_vert_src =
 DEFINE(NUM_TAPS)
 DEFINE(IDX_W)
 DEFINE(IDX_H)
@@ -31,8 +55,6 @@ DEFINE(NOISE_H)
     "gl_Position = a_0;\n"
 "}\n";
 static const char* rgb_frag_src =
-"precision highp float;\n"
-DBG_PROLOG()
 DEFINE(NUM_SUBPS)
 DEFINE(NUM_TAPS)
 DEFINE(LOOKUP_W)
@@ -99,8 +121,6 @@ DEFINE(CW2)
 
 static const char* stretch_vert_src =
     DEFINE(IDX_H)
-    "precision highp float;\n"
-DBG_PROLOG()
     "attribute vec4 a_0;\n"
     "attribute vec2 a_2;\n"
     "varying vec2 v_uv[2];\n"
@@ -111,10 +131,7 @@ DBG_PROLOG()
     "gl_Position = a_0;\n"
     "}\n";
 static const char* stretch_frag_src =
-    "precision highp float;\n"
-DBG_PROLOG()
     DEFINE(IDX_H)
-    DEFINE(M_PI)
     "uniform float u_scanlines;\n"
     "uniform sampler2D u_rgbTex;\n"
     "varying vec2 v_uv[2];\n"
@@ -134,13 +151,10 @@ DBG_PROLOG()
     "}\n";
 
 static const char* screen_vert_src =
-    "precision highp float;\n"
-DBG_PROLOG()
     DEFINE(RGB_W)
     DEFINE(SCREEN_H)
     DEFINE(NOISE_W)
     DEFINE(NOISE_H)
-    DEFINE(M_PI)
     "attribute vec4 a_0;\n"
     "attribute vec3 a_1;\n"
     "attribute vec2 a_2;\n"
@@ -148,7 +162,6 @@ DBG_PROLOG()
     "uniform mat4 u_mvp;\n"
     "uniform vec2 u_uvScale;\n"
     "varying vec2 v_uv[5];\n"
-    "varying vec3 v_shade;\n"
     "varying vec3 v_norm;\n"
     "varying vec3 v_pos;\n"
     "varying vec2 v_noiseUV;\n"
@@ -170,16 +183,12 @@ DBG_PROLOG()
     "v_noiseUV = vec2(RGB_W, SCREEN_H) * vwc / vec2(NOISE_W, NOISE_H);\n"
     "}\n";
 static const char* screen_frag_src =
-"precision highp float;\n"
-DBG_PROLOG()
-DEFINE(M_PI)
 "uniform sampler2D u_stretchTex;\n"
 "uniform sampler2D u_noiseTex;\n"
 // TODO: tsone: for debug
 "uniform float u_convergence;\n"
 "uniform vec3 u_sharpenKernel[5];\n"
 "varying vec2 v_uv[5];\n"
-"varying vec3 v_shade;\n"
 "varying vec3 v_norm;\n"
 "varying vec3 v_pos;\n"
 "varying vec2 v_noiseUV;\n"
@@ -199,32 +208,13 @@ DEFINE(M_PI)
 //    "vec2 uvd = max(abs(v_uv[2] - 0.5) - (0.4 + 0.1*u_mouse.xy / vec2(256.0, 224.0)), 0.0);\n"
     "vec2 uvd = max(abs(v_uv[2] - 0.5) - (0.4 + 0.1*vec2(90.0, 76.0) / vec2(256.0, 224.0)), 0.0);\n"
 //    "color *= max(1.0 - 3000.0 * dot(uvd, uvd), 0.0);\n"
-    "color *= clamp(3.0 - 3.0*3000.0 * dot(uvd, uvd), 0.0, 1.0);\n"
+    "float border = clamp(3.0 - 3.0*3000.0 * dot(uvd, uvd), 0.0, 1.0);\n"
+    "color *= border;\n"
 //    "const float LIME = 1.0/3000.0;\n"
 //    "color *= max(1.0 - max(2.0*dot(uvd, uvd) / LIME - 1.0, 0.0), 0.0);\n"
 
-// TODO: tsone: lighting from ceiling lamp, duplicated code
-// Using python oneliners:
-// from math import *
-// def rot(a,b): return [sin(a)*sin(b), -sin(a)*cos(b), -cos(a)]
-// def rad(d): return pi*d/180
-// rot(rad(90-65),rad(15))
-        "const float cdiff = 0.001;\n"
-        "const float cspec = 0.064;\n"
-        "const float m = 40.0;\n"
-        "const float fr0 = 0.04;\n"
-        "const float frm = 5.0;\n"
-        "const vec3 light_dir = -vec3(0.109381654946615, -0.40821789367673483, -0.9063077870366499);\n"
-        "const vec3 view_pos = vec3(0.0, 0.0, 2.5);\n"
-// TODO: calculate in vertex shader?
-        "vec3 v = normalize(view_pos - v_pos);\n"
-        "vec3 l = light_dir;\n"
-        "vec3 h = normalize(l + v);\n"
-// TODO: max() may not be needed (if dot products are always non-negative)
-        "float ndotl = max(dot(n, l), 0.0);\n"
-        "float ndoth = max(dot(n, h), 0.0);\n"
-        "float fr = fr0 + (1.0-fr0) * pow(1.0-ndotl, frm);\n"
-        "vec3 shade = vec3(mix(cdiff/M_PI, (cspec * (m+8.0) / (8.0*M_PI)) * pow(ndoth, m), fr) * ndotl);\n"
+    "float shade = shadeBlinn(v_pos, n);\n"
+    "shade *= 0.638*border + 0.362;\n"
 
     // CRT emitter radiance attenuation from the curvature
 //    "color *= pow(dot(n, v), 16.0*(u_mouse.x/256.0));\n"
@@ -239,13 +229,10 @@ DEFINE(M_PI)
 "}\n";
 
 static const char* tv_vert_src =
-    "precision highp float;\n"
 DEFINE(RGB_W)
 DEFINE(SCREEN_H)
 DEFINE(NOISE_W)
 DEFINE(NOISE_H)
-DEFINE(M_PI)
-DBG_PROLOG()
     "attribute vec4 a_0;\n"
     "attribute vec3 a_1;\n"
     "attribute vec3 a_2;\n"
@@ -257,7 +244,6 @@ DBG_PROLOG()
     "varying vec3 v_pos;\n"
     "varying vec3 v_norm;\n"
     "varying float v_blend;\n"
-    "varying vec3 v_shade;\n"
 
     "void main() {\n"
         "vec4 p = a_0;\n"
@@ -297,17 +283,10 @@ DBG_PROLOG()
         "v_blend = min(0.28*70.0 * andy, 1.0);\n"
     "}\n";
 static const char* tv_frag_src =
-    "precision highp float;\n"
-DBG_PROLOG()
-    DEFINE(M_PI)
     "uniform sampler2D u_downsample1Tex;\n"
     "uniform sampler2D u_downsample3Tex;\n"
     "uniform sampler2D u_downsample5Tex;\n"
     "uniform sampler2D u_noiseTex;\n"
-    "uniform vec3 u_lightDir;\n"
-    "uniform vec3 u_viewPos;\n"
-    "uniform vec4 u_material;\n"
-    "uniform vec3 u_fresnel;\n"
     "varying vec3 v_radiance;\n"
     "varying vec2 v_noiseUVs[2];\n"
     "varying vec3 v_pos;\n"
@@ -339,18 +318,9 @@ DBG_PROLOG()
     "float graininess = 0.15625 * v_blend + 0.14578;\n"
     "color *= 1.0 - graininess * sqrt(abs(2.0*noiseLF - 1.0));\n"
 
-        "vec3 n = normalize(v_norm);\n"
-        "vec3 v = normalize(u_viewPos - v_pos);\n"
-        "vec3 h = normalize(u_lightDir + v);\n"
-        "float ndotl = dot(n, u_lightDir);\n"
-        "float shade;\n"
-        "if (ndotl > 0.0) {"
-        "float ndoth = max(dot(n, h), 0.0);\n"
-        "float fr = u_fresnel[0] + u_fresnel[1] * pow(1.0-ndotl, u_fresnel[2]);\n"
-        "shade = mix(u_material[0], u_material[1] * pow(ndoth, u_material[2]), fr) * ndotl;\n"
-        "} else {\n"
-        "shade = -u_material[3] * ndotl;\n"
-        "}\n"
+// TODO: tsone: As a matter of fact, this is the proper shading calculation...
+    "vec3 n = normalize(v_norm);\n"
+    "float shade = shadeBlinn(v_pos, n);\n"
 
 // TODO: tsone: tone-mapping?
 
@@ -367,8 +337,6 @@ DBG_PROLOG()
 
 // Downsample shader.
 static const char* downsample_vert_src =
-    "precision highp float;\n"
-DBG_PROLOG()
     "uniform vec2 u_offsets[8];\n"
     "attribute vec4 a_0;\n"
     "attribute vec2 a_2;\n"
@@ -381,8 +349,6 @@ DBG_PROLOG()
     "}\n"
     "}\n";
 static const char* downsample_frag_src =
-    "precision highp float;\n"
-DBG_PROLOG()
     "uniform sampler2D u_downsampleTex;\n"
     "uniform float u_weights[8];\n"
     "varying vec2 v_uv[8];\n"
@@ -398,8 +364,6 @@ DBG_PROLOG()
 
 // Combine shader.
 static const char* combine_vert_src =
-    "precision highp float;\n"
-DBG_PROLOG()
 DEFINE(NOISE_W)
 DEFINE(NOISE_H)
 // TODO: tsone: these are wrong, proper size must be from a uniform
@@ -415,8 +379,6 @@ DEFINE(SCREEN_H)
         "v_noiseUV = (vec2(RGB_W, SCREEN_H) / vec2(NOISE_W, NOISE_H)) * a_2;\n"
     "}\n";
 static const char* combine_frag_src =
-    "precision highp float;\n"
-DBG_PROLOG()
     "uniform sampler2D u_tvTex;\n"
     "uniform sampler2D u_downsample3Tex;\n"
     "uniform sampler2D u_downsample5Tex;\n"

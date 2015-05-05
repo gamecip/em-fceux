@@ -41,7 +41,7 @@ void mat4Trans(GLfloat *p, GLfloat *trans);
 void mat4Mul(GLfloat *p, const GLfloat *a, const GLfloat *b);
 GLuint compileShader(GLenum type, const char *src);
 GLuint linkShader(GLuint vert_shader, GLuint frag_shader);
-GLuint buildShader(const char *vert_src, const char *frag_src);
+GLuint buildShader(const char *vert_src, const char *frag_src, const char *prepend_src);
 void deleteShader(GLuint *prog);
 void createBuffer(GLuint *buf, GLenum binding, GLsizei size, const void *data);
 void deleteBuffer(GLuint *buf);
