@@ -72,11 +72,19 @@ static int StateShow;
 //tells the save system innards that we're loading the old format
 bool FCEU_state_loading_old_format;
 
+#ifndef EMSCRIPTEN
 char lastSavestateMade[2048]; //Stores the filename of the last savestate made (needed for UndoSavestate)
+#else
+char *lastSavestateMade = 0; //Stores the filename of the last savestate made (needed for UndoSavestate)
+#endif
 bool undoSS = false;		  //This will be true if there is lastSavestateMade, it was made since ROM was loaded, a backup state for lastSavestateMade exists
 bool redoSS = false;		  //This will be true if UndoSaveState is run, will turn false when a new savestate is made
 
+#ifndef EMSCRIPTEN
 char lastLoadstateMade[2048]; //Stores the filename of the last state loaded (needed for Undo/Redo loadstate)
+#else
+char *lastLoadstateMade = 0; //Stores the filename of the last state loaded (needed for Undo/Redo loadstate)
+#endif
 bool undoLS = false;		  //This will be true if a backupstate was made and it was made since ROM was loaded
 bool redoLS = false;		  //This will be true if a backupstate was loaded, meaning redoLoadState can be run
 
@@ -491,6 +499,7 @@ void FCEUSS_Save(const char *fname, bool display_message)
 		if (CheckFileExists(fn) && backupSavestates)	//adelikat:  If the files exists and we are allowed to make backup savestates
 		{
 			CreateBackupSaveState(fn);		//Make a backup of previous savestate before overwriting it
+			FCEU_ARRAY_EM(lastSavestateMade, char, 2048);
 			strcpy(lastSavestateMade,fn);	//Remember what the last savestate filename was (for undoing later)
 			undoSS = true;					//Backup was created so undo is possible
 		}
@@ -749,6 +758,7 @@ bool FCEUSS_Load(const char *fname, bool display_message)
 	{
 		strcpy(fn, FCEU_MakeFName(FCEUMKF_STATE,CurrentState,fname).c_str());
 		st=FCEUD_UTF8_fstream(fn,"rb");
+		FCEU_ARRAY_EM(lastLoadstateMade, char, 2048);
         strcpy(lastLoadstateMade,fn);
 	}
 
@@ -1066,7 +1076,11 @@ void SwapSaveState()
 	//Both files must exist
 	//--------------------------------------------------------------------------------------------
 
+#ifndef EMSCRIPTEN
 	if (!lastSavestateMade)
+#else
+	if (!lastSavestateMade || !lastSavestateMade[0])
+#endif
 	{
 		FCEUI_DispMessage("Can't Undo",0);
 		FCEUI_printf("Undo savestate was attempted but unsuccessful because there was not a recently used savestate.\n");
@@ -1171,7 +1185,11 @@ void LoadBackup()
 void RedoLoadState()
 {
 	if (!redoLS) return;
+#ifndef EMSCRIPTEN
 	if (lastLoadstateMade && redoLS)
+#else
+	if (lastLoadstateMade && lastLoadstateMade[0] && redoLS)
+#endif
 	{
 		FCEUSS_Load(lastLoadstateMade);
 		FCEUI_printf("Redoing %s\n",lastLoadstateMade);

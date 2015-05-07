@@ -1179,7 +1179,11 @@ static void UndoRedoSavestate(void)
 	// FIXME this will always evaluate to true, should this be
 	// if (*lastSavestateMade...) to check if it holds a string or just
 	// a '\0'?
+#ifndef EMSCRIPTEN
 	if (lastSavestateMade && (undoSS || redoSS))
+#else
+	if (lastSavestateMade && lastSavestateMade[0] && (undoSS || redoSS))
+#endif
 		SwapSaveState();
 }
 

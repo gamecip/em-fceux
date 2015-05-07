@@ -199,10 +199,22 @@ static void FCEU_CloseGame(void)
 #endif
 
 		//Reset flags for Undo/Redo/Auto Savestating //adelikat: TODO: maybe this stuff would be cleaner as a struct or class
+#ifndef EMSCRIPTEN
 		lastSavestateMade[0] = 0;
+#else
+		if (lastSavestateMade) {
+			lastSavestateMade[0] = 0;
+		}
+#endif
 		undoSS = false;
 		redoSS = false;
+#ifndef EMSCRIPTEN
 		lastLoadstateMade[0] = 0;
+#else
+		if (lastLoadstateMade) {
+			lastLoadstateMade[0] = 0;
+		}
+#endif
 		undoLS = false;
 		redoLS = false;
 		AutoSS = false;
