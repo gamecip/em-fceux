@@ -35,7 +35,14 @@
 #include <fstream>
 
 
+// Number of frames to skip per regular frame when frameskipping.
 #define TURBO_FRAMESKIPS 3
+// Set to 1 to set mainloop call at higher rate than requestAnimationFrame.
+// Recommended behavior is to use requestAnimationFrame, i.e. set to 0.
+#define SUPER_RATE 0
+// Number of audio samples per frame. Actually NTSC divisor is 60.0988, but since this is used as divisor
+// to find out number of frames to skip, higher value will avoid audio buffer overflow.
+#define FRAME_SAMPLES (SOUND_RATE / 60)
 
 void FCEUD_Update(uint8 *XBuf, int32 *Buffer, int Count);
 
@@ -121,8 +128,9 @@ int CloseGame()
 	return(1);
 }
 
-static void DoFrame()
+static int DoFrame()
 {
+#if SUPER_RATE
 	uint8 *gfx = 0;
 	int32 *sound;
 	int32 ssize;
@@ -136,14 +144,18 @@ static void DoFrame()
 	}
 
 // TODO: tsone: assumes NTSC 60Hz
-	if (GetSoundBufferCount() > SOUND_BUF_MAX - (SOUND_RATE/60)) {
+	if (GetSoundBufferCount() > SOUND_BUF_MAX - FRAME_SAMPLES) {
 		// Audio buffer has no capacity, i.e. update cycle is ahead of time -> skip the cycle.
-		return;
+		return 0;
 	}
+
+	FCEUD_UpdateInput();
 
 	// In case of lag, try to fill audio buffer to critical minimum by skipping frames.
 // TODO: tsone: assumes NTSC 60Hz
-	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / (SOUND_RATE/60);
+	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
+//	int frameskips = (SOUND_BUF_MAX - FRAME_SAMPLES - GetSoundBufferCount()) / FRAME_SAMPLES;
+//	int frameskips = (SOUND_HW_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
 	while (frameskips > 0) {
 		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
 		FCEUD_Update(gfx, sound, ssize);
@@ -152,8 +164,6 @@ static void DoFrame()
 
 	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
 	FCEUD_Update(gfx, sound, ssize);
-	
-	FCEUD_UpdateInput();
 
 	if (gfx && (inited & 4)) {
 		BlitScreen(gfx);
@@ -163,6 +173,47 @@ static void DoFrame()
 		opause=FCEUI_EmulationPaused();
 		SilenceSound(opause);
 	}
+
+	return 1;
+#else
+	uint8 *gfx = 0;
+	int32 *sound;
+	int32 ssize;
+	static int opause = 0;
+
+	if (NoWaiting) {
+		for (int i = 0; i < TURBO_FRAMESKIPS; ++i) {
+			FCEUI_Emulate(&gfx, &sound, &ssize, 2);
+			FCEUD_Update(gfx, sound, ssize);
+		}
+	}
+
+
+	// In case of lag, try to fill audio buffer to critical minimum by skipping frames.
+// TODO: tsone: assumes NTSC 60Hz
+//	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
+	int frameskips = (SOUND_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
+//	int frameskips = (SOUND_HW_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
+	while (frameskips > 1) {
+		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
+		FCEUD_Update(gfx, sound, ssize);
+		--frameskips;
+	}
+
+	FCEUD_UpdateInput();
+	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
+	FCEUD_Update(gfx, sound, ssize);
+
+	if (gfx && (inited & 4)) {
+		BlitScreen(gfx);
+	}
+
+	if(opause!=FCEUI_EmulationPaused()) {
+		opause=FCEUI_EmulationPaused();
+		SilenceSound(opause);
+	}
+	return 1;
+#endif
 }
 
 static void ReloadROM(void*)
@@ -174,16 +225,15 @@ static void ReloadROM(void*)
 
 static void MainLoop()
 {
+    if (GameInfo && !DoFrame()) {
+	return; // If frame was not processed, skip rest of this callback.
+    }
+// FIXME: tsone: sould be probably using exports
 // NOTE: tsone: simple way to communicate with mainloop without "exporting" functions
     int reload = EM_ASM_INT_V({ return Module.romReload||0; });
-    if (reload)
-    {
+    if (reload) {
         emscripten_push_main_loop_blocker(ReloadROM, 0);
         EM_ASM({ Module.romReload = 0; });
-    }
-    else if (GameInfo)
-    {
-	DoFrame();
     }
 }
 
@@ -316,8 +366,13 @@ int main(int argc, char *argv[])
 			newppu = 1;
 	}
 
+#if SUPER_RATE
 // NOTE: tsone: set higher frame rate to ensure emulation stays ahead
-	emscripten_set_main_loop(MainLoop, 100, true);
+//	emscripten_set_main_loop(MainLoop, 100, 1);
+	emscripten_set_main_loop(MainLoop, 2 * (SOUND_RATE + SOUND_HW_BUF_MAX-1) / SOUND_HW_BUF_MAX, 1);
+#else
+	emscripten_set_main_loop(MainLoop, 0, 1);
+#endif
 
 	return 0;
 }
