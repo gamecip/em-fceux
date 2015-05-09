@@ -17,34 +17,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-#include "main.h"
-#include "throttle.h"
-#include "config.h"
-#include "../common/cheat.h"
-#include "../../fceu.h"
-#include "../../movie.h"
-#include "../../version.h"
-#include "input.h"
 #include "em.h"
-#include "em-video.h"
-#include <SDL.h>
-#include "../common/configSys.h"
-#include "../../oldmovie.h"
-#include "../../types.h"
+#include "../../fceu.h"
+#include "../../version.h"
 #include <emscripten.h>
-#include <unistd.h>
-#include <csignal>
-#include <cstring>
-#include <cerrno>
-#include <cstdio>
-#include <cstdlib>
-#include <climits>
-#include <cmath>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <iostream>
-#include <fstream>
 
 
 // Number of frames to skip per regular frame when frameskipping.

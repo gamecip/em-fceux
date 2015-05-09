@@ -6,9 +6,7 @@ source_list = Split(
     input.cpp
     config.cpp
     em.cpp
-    em-joystick.cpp
     em-sound.cpp
-    em-throttle.cpp
     em-video.cpp
     em-es2.cpp
     es2n.cpp

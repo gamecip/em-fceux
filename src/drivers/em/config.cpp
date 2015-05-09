@@ -17,22 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-#include "main.h"
-#include "throttle.h"
-#include "config.h"
-#include "../common/cheat.h"
-#include "input.h"
 #include "em.h"
-#include "em-video.h"
-#include <unistd.h>
-#include <csignal>
-#include <cstring>
-#include <cerrno>
-#include <cstdio>
-#include <cstdlib>
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 
 /**

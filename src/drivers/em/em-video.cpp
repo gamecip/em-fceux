@@ -19,16 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "em.h"
-#include "em-es2.h"
 #include "../../fceu.h"
-#include "../../version.h"
 #include "../../video.h"
 #include "../../utils/memory.h"
-#include "../common/configSys.h"
-#include "em-video.h"
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
