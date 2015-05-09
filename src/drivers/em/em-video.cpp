@@ -18,31 +18,21 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-
-/// \file
-/// \brief Handles the graphical game display for the SDL implementation.
-
 #include "em.h"
 #include "em-es2.h"
 #include "../../fceu.h"
 #include "../../version.h"
 #include "../../video.h"
-
 #include "../../utils/memory.h"
-
-#include "dface.h"
-
 #include "../common/configSys.h"
 #include "em-video.h"
-
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
-
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-// GLOBALS
+
 extern Config *g_config;
 
 static int s_curbpp;

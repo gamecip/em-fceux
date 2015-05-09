@@ -1,25 +1,37 @@
+/* FCE Ultra - NES/Famicom Emulator
+ *
+ * Copyright notice for this file:
+ *  Copyright (C) 2015 Valtteri "tsone" Heikkila
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
 #include "main.h"
 #include "throttle.h"
 #include "config.h"
-
 #include "../common/cheat.h"
 #include "../../fceu.h"
 #include "../../movie.h"
 #include "../../version.h"
-
 #include "input.h"
-#include "dface.h"
-
 #include "em.h"
 #include "em-video.h"
 #include <SDL.h>
-
 #include "../common/configSys.h"
 #include "../../oldmovie.h"
 #include "../../types.h"
-
 #include <emscripten.h>
-
 #include <unistd.h>
 #include <csignal>
 #include <cstring>
@@ -40,9 +52,6 @@
 // Set to 1 to set mainloop call at higher rate than requestAnimationFrame.
 // Recommended behavior is to use requestAnimationFrame, i.e. set to 0.
 #define SUPER_RATE 0
-// Number of audio samples per frame. Actually NTSC divisor is 60.0988, but since this is used as divisor
-// to find out number of frames to skip, higher value will avoid audio buffer overflow.
-#define FRAME_SAMPLES (SOUND_RATE / 60)
 
 void FCEUD_Update(uint8 *XBuf, int32 *Buffer, int Count);
 
@@ -144,7 +153,7 @@ static int DoFrame()
 	}
 
 // TODO: tsone: assumes NTSC 60Hz
-	if (GetSoundBufferCount() > SOUND_BUF_MAX - FRAME_SAMPLES) {
+	if (GetSoundBufferCount() > SOUND_BUF_MAX - em_sound_frame_samples) {
 		// Audio buffer has no capacity, i.e. update cycle is ahead of time -> skip the cycle.
 		return 0;
 	}
@@ -153,9 +162,9 @@ static int DoFrame()
 
 	// In case of lag, try to fill audio buffer to critical minimum by skipping frames.
 // TODO: tsone: assumes NTSC 60Hz
-	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
-//	int frameskips = (SOUND_BUF_MAX - FRAME_SAMPLES - GetSoundBufferCount()) / FRAME_SAMPLES;
-//	int frameskips = (SOUND_HW_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
+	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
+//	int frameskips = (SOUND_BUF_MAX - em_sound_frame_samples - GetSoundBufferCount()) / em_sound_frame_samples;
+//	int frameskips = (SOUND_HW_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
 	while (frameskips > 0) {
 		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
 		FCEUD_Update(gfx, sound, ssize);
@@ -188,13 +197,13 @@ static int DoFrame()
 		}
 	}
 
-
 	// In case of lag, try to fill audio buffer to critical minimum by skipping frames.
 // TODO: tsone: assumes NTSC 60Hz
-//	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
-	int frameskips = (SOUND_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
-//	int frameskips = (SOUND_HW_BUF_MAX - GetSoundBufferCount()) / FRAME_SAMPLES;
-	while (frameskips > 1) {
+//	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
+	int frameskips = (SOUND_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
+//	int frameskips = (SOUND_HW_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
+	// Only produce audio for skipped frames. One frame worth of samples is left free for the next frame.
+	while (frameskips > 2) {
 		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
 		FCEUD_Update(gfx, sound, ssize);
 		--frameskips;
@@ -369,7 +378,7 @@ int main(int argc, char *argv[])
 #if SUPER_RATE
 // NOTE: tsone: set higher frame rate to ensure emulation stays ahead
 //	emscripten_set_main_loop(MainLoop, 100, 1);
-	emscripten_set_main_loop(MainLoop, 2 * (SOUND_RATE + SOUND_HW_BUF_MAX-1) / SOUND_HW_BUF_MAX, 1);
+	emscripten_set_main_loop(MainLoop, 2 * (em_sound_rate + SOUND_HW_BUF_MAX-1) / SOUND_HW_BUF_MAX, 1);
 #else
 	emscripten_set_main_loop(MainLoop, 0, 1);
 #endif
@@ -390,26 +399,11 @@ uint64 FCEUD_GetTimeFreq(void)
 	return 1000;
 }
 
-/**
-* Prints a textual message without adding a newline at the end.
-*
-* @param text The text of the message.
-*
-* TODO: This function should have a better name.
-**/
 void FCEUD_Message(const char *text)
 {
 	fputs(text, stdout);
 }
 
-/**
-* Shows an error message in a message box.
-* (For now: prints to stderr.)
-* 
-* If running in GTK mode, display a dialog message box of the error.
-*
-* @param errormsg Text of the error message.
-**/
 void FCEUD_PrintError(const char *errormsg)
 {
 	fprintf(stderr, "%s\n", errormsg);

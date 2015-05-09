@@ -191,6 +191,13 @@
         toggleElem : null,
         showStack : function(show) {
           FCEM.toggleElem.checked = show;
+// TODO: tsone: remove, hides stack and tab
+/*
+          var container = document.getElementById("stackTab");
+          container.hidden = !show;
+          container = document.getElementById("stackToggle");
+          container.hidden = !show;
+*/
         },
         onInitialSyncFromIDB : function(er) {
           console.log("!!!! initial sync, from IDB");
@@ -314,10 +321,13 @@
         preRun: [function() {
           console.log("!!!! preRun");
           resetControls();
+// TODO: tsone: remove, hides stack and tab
+/*
           // Disable unnecessary SDL surface features.
           SDL.defaults.copyOnLock = false;
           SDL.defaults.discardOnLock = true;
           SDL.defaults.opaqueFrontBuffer = false;
+*/
           // Mount IndexedDB file system (IDBFS) to /fceux.
           FS.mkdir('/fceux');
           FS.mount(IDBFS, {}, '/fceux');

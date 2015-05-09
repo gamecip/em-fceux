@@ -1,17 +1,30 @@
+/* FCE Ultra - NES/Famicom Emulator
+ *
+ * Copyright notice for this file:
+ *  Copyright (C) 2015 Valtteri "tsone" Heikkila
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
 #include "main.h"
 #include "throttle.h"
 #include "config.h"
-
 #include "../common/cheat.h"
-
 #include "input.h"
-#include "dface.h"
-
 #include "em.h"
 #include "em-video.h"
-
 #include <unistd.h>
-
 #include <csignal>
 #include <cstring>
 #include <cerrno>
@@ -21,34 +34,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-/**
- * Read a custom pallete from a file and load it into the core.
- */
-int
-LoadCPalette(const std::string &file)
-{
-	uint8 tmpp[192];
-	FILE *fp;
-
-	if(!(fp = FCEUD_UTF8fopen(file.c_str(), "rb"))) {
-		char errorMsg[256];
-		strcpy(errorMsg, "Error loading custom palette from file: ");
-		strcat(errorMsg, file.c_str());
-		FCEUD_PrintError(errorMsg);
-		return 0;
-	}
-	size_t result = fread(tmpp, 1, 192, fp);
-	if(result != 192) {
-		char errorMsg[256];
-		strcpy(errorMsg, "Error loading custom palette from file: ");
-		strcat(errorMsg, file.c_str());
-		FCEUD_PrintError(errorMsg);
-		return 0;
-	}
-	FCEUI_SetPaletteArray(tmpp);
-	fclose(fp);
-	return 1;
-}
 
 /**
  * Creates the subdirectories used for saving snapshots, movies, game

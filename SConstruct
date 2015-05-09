@@ -220,6 +220,7 @@ else:
     common += ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
     common += ' -s DISABLE_EXCEPTION_CATCHING=1'
     common += ' -s ASSERTIONS=0'
+    common += ' -s USE_SDL=2'
     env.Append(CCFLAGS = '-O3' + common)
     env.Append(LINKFLAGS = '-O3' + common)
   else:

@@ -29,10 +29,25 @@
 #define TEST_SINE_AT_FILL	0
 #define TEST_SINE_AT_WRITE	0
 
-static int *s_Buffer = 0;
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+typedef float buf_t;
+typedef float mix_t;
+#else
+typedef int buf_t;
+typedef int16 mix_t;
+#endif
+
+int em_sound_rate = SOUND_RATE;
+int em_sound_frame_samples = SOUND_RATE / 60;
+
+static buf_t *s_Buffer = 0;
 static int s_BufferRead = 0;
 static int s_BufferWrite = 0;
 static int s_BufferCount = 0;
+
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+static int s_initialized = 0;
+#endif
 
 // Sound is NOT muted if this is 0, otherwise it is muted.
 static int s_soundvolumestore = 0;
@@ -50,10 +65,14 @@ static void fillaudio(void *udata, uint8 *stream, int len)
 #if TEST_SINE_AT_FILL
 
 	// Sine wave test outputs a 440Hz tone.
-	len >>= 1;
-	int16* str = (int16*) stream;
+	len = len / sizeof(mix_t);
+	mix_t* str = (mix_t*) stream;
 	for (int i = 0; i < len; ++i) {
-		str[i] = 0xFFF * sin(testSinePhase * (2.0*M_PI * 440.0/SOUND_RATE));
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+		str[i] = 0.5 * sin(testSinePhase * (2.0*M_PI * 440.0/em_sound_rate));
+#else
+		str[i] = 0xFFF * sin(testSinePhase * (2.0*M_PI * 440.0/em_sound_rate));
+#endif
 		++testSinePhase;
 	}
 	s_BufferCount -= len;
@@ -61,9 +80,11 @@ static void fillaudio(void *udata, uint8 *stream, int len)
 #else
 
 #if 1
-// NOTE: tsone: optimized version of the below
-	int16* str = (int16*) stream;
-	len >>= 1;
+
+// NOTE: tsone: this is an optimized version of the below filler loop
+	mix_t* str = (mix_t*) stream;
+	len = len / sizeof(mix_t);
+
 	int i = -1;
 	int j = s_BufferRead - 1;
 	int d = (s_BufferCount > len) ? len : s_BufferCount;
@@ -113,7 +134,16 @@ static void fillaudio(void *udata, uint8 *stream, int len)
 
 int InitSound()
 {
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	if (s_initialized) {
+		return 1;
+	}
+#endif
+
 	SDL_AudioSpec spec;
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	SDL_AudioSpec obtained;
+#endif
 
 	memset(&spec, 0, sizeof(spec));
 	if(SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
@@ -121,11 +151,20 @@ int InitSound()
 		KillSound();
 		return 0;
 	}
+
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	const char *driverName = SDL_GetAudioDriver(0);
+#else
 	char driverName[8];
 	SDL_AudioDriverName(driverName, 8);
-	printf("Loading SDL sound with %s driver...\n", driverName);
+#endif
+	printf("Loading SDL audio driver %s...\n", driverName);
 
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	spec.format = AUDIO_F32;
+#else
 	spec.format = AUDIO_S16SYS;
+#endif
 	spec.channels = 1;
 	spec.freq = SOUND_RATE;
 	spec.samples = SOUND_HW_BUF_MAX;
@@ -134,27 +173,46 @@ int InitSound()
 
 //	printf("Sound buffersize: %d, HW: %d)\n", SOUND_BUF_MAX, spec.samples);
 
-	s_Buffer = (int *)FCEU_dmalloc(sizeof(int) * SOUND_BUF_MAX);
-	if (!s_Buffer) {
-		return 0;
-	}
-	s_BufferRead = s_BufferWrite = s_BufferCount = 0;
-
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	if(SDL_OpenAudio(&spec, &obtained)) {
+#else
 	if(SDL_OpenAudio(&spec, 0)) {
+#endif
 		puts(SDL_GetError());
 		KillSound();
 		return 0;
 	}
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	printf("SDL open audio requested: format:%d freq:%d channels:%d samples:%d\n", spec.format,
+		spec.freq, spec.channels, spec.samples);
+	printf("SDL open audio obtained: format:%d freq:%d channels:%d samples:%d\n", obtained.format,
+		obtained.freq, obtained.channels, obtained.samples);
+#endif
+	em_sound_rate = obtained.freq;
+// TODO: tsone: should use 60.0988 divisor instead?
+	em_sound_frame_samples = em_sound_rate / 60;
+
+	s_Buffer = (buf_t*) FCEU_dmalloc(sizeof(buf_t) * SOUND_BUF_MAX);
+	if (!s_Buffer) {
+		KillSound();
+		return 0;
+	}
+	s_BufferRead = s_BufferWrite = s_BufferCount = 0;
+
 	SDL_PauseAudio(0);
 
 	FCEUI_SetSoundVolume(150);
 	FCEUI_SetSoundQuality(SOUND_QUALITY);
-	FCEUI_Sound(SOUND_RATE);
+	FCEUI_Sound(em_sound_rate);
 	FCEUI_SetTriangleVolume(256);
 	FCEUI_SetSquare1Volume(256);
 	FCEUI_SetSquare2Volume(256);
 	FCEUI_SetNoiseVolume(256);
 	FCEUI_SetPCMVolume(256);
+
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	s_initialized = 1;
+#endif
 	return 1;
 }
 
@@ -185,12 +243,18 @@ void WriteSound(int32 *buf, int Count)
 	s_BufferCount += Count;
 	++Count;
 	while (--Count) {
-		s_Buffer[s_BufferWrite] = 0xFFF * sin(testSinePhase * (2.0*M_PI * 440.0/SOUND_RATE));
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+		s_Buffer[s_BufferWrite] = 0.5 * sin(testSinePhase * (2.0*M_PI * 440.0/em_sound_rate));
+#else
+		s_Buffer[s_BufferWrite] = 0xFFF * sin(testSinePhase * (2.0*M_PI * 440.0/em_sound_rate));
+#endif
 		s_BufferWrite = (s_BufferWrite + 1) & SOUND_BUF_MASK;
 		++testSinePhase;
 	}
 
-#elif 1
+#else
+
+#if 1
 // NOTE: tsone: optimized version of below
 	int i = s_BufferWrite - 1;
 	int j = -1;
@@ -206,11 +270,19 @@ void WriteSound(int32 *buf, int Count)
 	++m;
 
 	while (--m) {
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+		s_Buffer[++i] = buf[++j] / 32768.0;
+#else
 		s_Buffer[++i] = buf[++j];
+#endif
 	}
 	i = -1;
 	while (--Count) {
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+		s_Buffer[++i] = buf[++j] / 32768.0;
+#else
 		s_Buffer[++i] = buf[++j];
+#endif
 	}
 
 #else
@@ -222,6 +294,8 @@ void WriteSound(int32 *buf, int Count)
 
 	s_BufferCount += Count;
 
+#endif
+
 #endif // TEST_SINE_AT_WRITE
 }
 
@@ -232,13 +306,17 @@ void SilenceSound(int n)
 
 int KillSound(void)
 {
+#if SDL_VERSION_ATLEAST(2, 0, 0)
+	// Don't close audio with SDL2.
+#else
 	FCEUI_Sound(0);
 	SDL_CloseAudio();
 	SDL_QuitSubSystem(SDL_INIT_AUDIO);
 	if(s_Buffer) {
-		free((void *)s_Buffer);
+		free(s_Buffer);
 		s_Buffer = 0;
 	}
+#endif
 	return 0;
 }
 

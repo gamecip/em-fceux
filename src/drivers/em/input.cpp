@@ -2,6 +2,7 @@
  *
  * Copyright notice for this file:
  *  Copyright (C) 2002 Xodnizel
+ *  Copyright (C) 2015 Valtteri "tsone" Heikkila
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,29 +18,23 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-
 #include "main.h"
-#include "dface.h"
 #include "input.h"
 #include "config.h"
 #include <SDL.h>
-
 #include "em-video.h"
 #include "em.h"
 #include "throttle.h"
-
 #include "../common/cheat.h"
 #include "../../movie.h"
 #include "../../fceu.h"
 #include "../../driver.h"
 #include "../../utils/xstring.h"
-
 #include <html5.h>
-
 #include <cstring>
 #include <cstdio>
 
-/** GLOBALS **/
+
 int NoWaiting = 1;
 extern Config *g_config;
 extern bool frameAdvanceLagSkip, lagCounterDisplay;
