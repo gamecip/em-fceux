@@ -109,7 +109,6 @@ int CloseGame()
 	isloaded = 0;
 	GameInfo = 0;
 
-	InputUserActiveFix();
 	return(1);
 }
 
@@ -335,11 +334,10 @@ int main(int argc, char *argv[])
 	if(s.size() != 0)
 	{
 	InitVideo(GameInfo);
-	InputCfg(s);
 	}
 
     // update the input devices
-	UpdateInput(g_config);
+//	UpdateInput(g_config);
 
 	// update the emu core
 	UpdateEMUCore(g_config);

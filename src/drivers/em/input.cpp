@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "em.h"
+#include "../../utils/memory.h"
 #include <html5.h>
 
 
@@ -106,6 +107,10 @@ static int DIPS = 0;
 static uint8 keyonce[MKK_COUNT];
 #define KEY(__a) g_keyState[MKK(__a)]
 
+// Boolean flags for each gamepad button (and turbo).
+static char s_gamepad_buttons[FCEM_GAMEPAD_COUNT];
+static FCEM_Input* s_key_map = 0;
+
 static int
 _keyonly (int a)
 {
@@ -182,22 +187,6 @@ static void KeyboardCommands ()
 			return;
 		}
 	}
-#endif
-
-// TODO: tsone: shift and alt are not working
-#ifndef EMSCRIPTEN
-	int is_shift, is_alt;
-
-	if (g_keyState[SDLK_LSHIFT] || g_keyState[SDLK_RSHIFT])
-	is_shift = 1;
-  else
-	is_shift = 0;
-	if (g_keyState[SDLK_LALT] || g_keyState[SDLK_RALT])
-	{
-		is_alt = 1;
-	}
-	else
-		is_alt = 0;
 #endif
 
 // TODO: tsone: not yet implemented
@@ -521,7 +510,7 @@ ButtConfig GamePadConfig[4][10] = {
 
 // TODO: tsone: this was added as new way to test buttons
 // idx 0..9 matches: a, b, select, start, up, down, left, right, turbo a, turbo b
-static int EmscriptenTestButton(const EmscriptenGamepadEvent *p, int idx)
+static int FCEM_TestGamepadButton(const EmscriptenGamepadEvent *p, int idx)
 {
     if (!p->connected) {
         return 0;
@@ -583,7 +572,7 @@ UpdateGamepad(void)
 		// a, b, select, start, up, down, left, right
 		for (x = 0; x < 8; x++)
 		{
-			if (DTestButton(&GamePadConfig[wg][x]) || EmscriptenTestButton(&gamepads[wg], x)) {
+			if (DTestButton(&GamePadConfig[wg][x]) || FCEM_TestGamepadButton(&gamepads[wg], x) || s_gamepad_buttons[x]) {
 				if(opposite_dirs == 0)
 				{
 					// test for left+right and up+down
@@ -619,7 +608,7 @@ UpdateGamepad(void)
 		{
 			for (x = 0; x < 2; x++)
 			{
-    			if (DTestButton(&GamePadConfig[wg][8+x]) || EmscriptenTestButton(&gamepads[wg], 8+x)) {
+    			if (DTestButton(&GamePadConfig[wg][8+x]) || FCEM_TestGamepadButton(&gamepads[wg], 8+x) || s_gamepad_buttons[8+x]) {
 					JS |= (1 << x) << (wg << 3);
 				}
 			}
@@ -800,6 +789,51 @@ static EM_BOOL FCEM_MouseCallback(int type, const EmscriptenMouseEvent *event, v
 	return 1;
 }
 
+static int getKeyMapIdx(const EmscriptenKeyboardEvent *event)
+{
+	if (event->keyCode >= 256) {
+		return -1;
+	}
+	return (event->ctrlKey << 8) | (event->shiftKey << 9)
+		| (event->altKey << 10) | (event->metaKey << 11)
+		| event->keyCode;
+}
+
+static FCEM_Input getInput(const EmscriptenKeyboardEvent *event)
+{
+	int idx = getKeyMapIdx(event);
+	if (idx == -1) {
+		return FCEM_NULL;
+	}
+	return s_key_map[idx];
+}
+
+static EM_BOOL FCEM_KeyDownCallback(int eventType, const EmscriptenKeyboardEvent *event, void*)
+{
+	FCEM_Input input = getInput(event);
+	switch (input & FCEM_INPUT_TYPE_MASK) {
+	case FCEM_SYSTEM:
+		break;
+	case FCEM_GAMEPAD:
+		s_gamepad_buttons[input & FCEM_INPUT_KEY_MASK] = 1;
+		break;
+	}
+	return 1;
+}
+
+static EM_BOOL FCEM_KeyUpCallback(int eventType, const EmscriptenKeyboardEvent *event, void*)
+{
+	FCEM_Input input = getInput(event);
+	switch (input & FCEM_INPUT_TYPE_MASK) {
+	case FCEM_SYSTEM:
+		break;
+	case FCEM_GAMEPAD:
+		s_gamepad_buttons[input & FCEM_INPUT_KEY_MASK] = 0;
+		break;
+	}
+	return 1;
+}
+
 /**
  * Initialize the input device interface between the emulation and the driver.
  */
@@ -892,6 +926,23 @@ void InitInputInterface ()
 	emscripten_set_mousedown_callback(elem, 0, 0, FCEM_MouseCallback);
 	emscripten_set_mouseup_callback(elem, 0, 0, FCEM_MouseCallback);
 	emscripten_set_click_callback(elem, 0, 0, FCEM_MouseCallback);
+
+	elem = "#window";
+	emscripten_set_keydown_callback(elem, 0, 0, FCEM_KeyDownCallback);
+	emscripten_set_keyup_callback(elem, 0, 0, FCEM_KeyUpCallback);
+
+	// Init key map.
+	FCEU_ARRAY_EM(s_key_map, FCEM_Input, FCEM_KEY_MAP_SIZE);
+	// Default key map for gamepad 1 (other gamepads have no mapping)
+// idx 0..9 matches: a, b, select, start, up, down, left, right, turbo a, turbo b
+	s_key_map[0x046] = FCEM_GAMEPAD_A;	// F key
+	s_key_map[0x044] = FCEM_GAMEPAD_B;	// D key
+	s_key_map[0x053] = FCEM_GAMEPAD_SELECT;	// S key
+	s_key_map[0x00D] = FCEM_GAMEPAD_START;	// Enter key
+	s_key_map[0x026] = FCEM_GAMEPAD_UP;	// Up arrow
+	s_key_map[0x028] = FCEM_GAMEPAD_DOWN;	// Down arrow
+	s_key_map[0x025] = FCEM_GAMEPAD_LEFT;	// Left arrow
+	s_key_map[0x027] = FCEM_GAMEPAD_RIGHT;	// Right arrow
 }
 
 

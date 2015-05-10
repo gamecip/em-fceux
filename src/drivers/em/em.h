@@ -80,6 +80,48 @@
 
 #define DTestButtonJoy(a_) 0
 
+// NOTE: tsone: new emscripten input options
+// Key code map size (including ctrl, shift, alt, meta key bits at 8,9,10,11)
+#define FCEM_KEY_MAP_SIZE (16*256)
+// Bitmask for FCEM_Input type and key.
+#define FCEM_INPUT_TYPE_MASK 0xF00
+#define FCEM_INPUT_KEY_MASK 0x0FF
+
+// Available inputs
+enum FCEM_Input {
+	FCEM_NULL = 0x000,
+
+	// System inputs
+	FCEM_SYSTEM = 0x100,
+	FCEM_SYSTEM_RESET = FCEM_SYSTEM,
+	FCEM_SYSTEM_THROTTLE,
+	FCEM_SYSTEM_PAUSE,
+	FCEM_SYSTEM_FRAME_ADVANCE,
+	FCEM_SYSTEM_STATE_SAVE,
+	FCEM_SYSTEM_STATE_LOAD,
+	FCEM_SYSTEM_STATE_SELECT_0,
+	FCEM_SYSTEM_STATE_SELECT_9 = FCEM_SYSTEM_STATE_SELECT_0+9,
+	FCEM_SYSTEM_LAST = FCEM_SYSTEM_STATE_SELECT_9,
+	FCEM_SYSTEM_COUNT = FCEM_SYSTEM_LAST - FCEM_SYSTEM,
+
+	// Gamepad inputs 
+	FCEM_GAMEPAD = 0x200,
+	FCEM_GAMEPAD_A = FCEM_GAMEPAD,
+	FCEM_GAMEPAD_B,
+	FCEM_GAMEPAD_SELECT,
+	FCEM_GAMEPAD_START,
+	FCEM_GAMEPAD_UP,
+	FCEM_GAMEPAD_DOWN,
+	FCEM_GAMEPAD_LEFT,
+	FCEM_GAMEPAD_RIGHT,
+	FCEM_GAMEPAD_TURBO_A,
+	FCEM_GAMEPAD_TURBO_B,
+	FCEM_GAMEPAD_LAST = FCEM_GAMEPAD + 4*10, // Repeat for 4 gamepads
+	FCEM_GAMEPAD_COUNT = FCEM_GAMEPAD_LAST - FCEM_GAMEPAD,
+
+	FCEM_INPUT_COUNT
+};
+
 // Audio options
 // NOTE: tsone: both SOUND_BUF_MAX and SOUND_HW_BUF_MAX must be power of two!
 #if 1
@@ -104,20 +146,6 @@
 #define SOUND_BUF_MASK		(SOUND_BUF_MAX-1)
 
 
-#define MAXBUTTCONFIG   4
-typedef struct {
-	uint8  ButtType[MAXBUTTCONFIG];
-	uint8  DeviceNum[MAXBUTTCONFIG];
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	uint32 ButtonNum[MAXBUTTCONFIG];
-#else
-	uint16 ButtonNum[MAXBUTTCONFIG];
-#endif
-	uint32 NumC;
-	//uint64 DeviceID[MAXBUTTCONFIG];	/* TODO */
-} ButtConfig;
-
-
 const int INVALID_STATE = 99;
 
 extern CFGSTRUCT DriverConfig[];
@@ -138,14 +166,10 @@ extern CFGSTRUCT InputConfig[];
 extern ARGPSTRUCT InputArgs[];
 
 extern bool replaceP2StartWithMicrophone;
-extern ButtConfig GamePadConfig[4][10];
-//extern ButtConfig powerpadsc[2][12];
-//extern ButtConfig QuizKingButtons[6];
-//extern ButtConfig FTrainerButtons[12];
 
-extern const char *GamePadNames[GAMEPAD_NUM_BUTTONS];
-extern const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES];
-extern const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS];
+//extern const char *GamePadNames[GAMEPAD_NUM_BUTTONS];
+//extern const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES];
+//extern const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS];
 
 #if PERI
 extern const char *PowerPadNames[POWERPAD_NUM_BUTTONS];
@@ -217,17 +241,11 @@ Config *InitConfig(void);
 void UpdateEMUCore(Config *);
 
 void InitInputInterface(void);
-void InputUserActiveFix(void);
 void ParseGIInput(FCEUGI *GI);
 int ButtonConfigBegin();
 void ButtonConfigEnd();
-void ConfigButton(char *text, ButtConfig *bc);
-int DWaitButton(const uint8 *text, ButtConfig *bc, int wb);
 
 void FCEUD_UpdateInput(void);
-
-void UpdateInput(Config *config);
-void InputCfg(const std::string &);
 
 
 #endif // _EM_H_

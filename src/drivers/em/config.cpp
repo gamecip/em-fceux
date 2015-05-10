@@ -101,19 +101,6 @@ InitConfig()
     // quit when a+b+select+start is pressed
     config->addOption("4buttonexit", "SDL.ABStartSelectExit", 0);
 
-	// GamePad 0 - 3
-	for(unsigned int i = 0; i < GAMEPAD_NUM_DEVICES; i++) {
-		char buf[64];
-		snprintf(buf, 20, "SDL.Input.GamePad.%d.", i);
-		prefix = buf;
-
-		config->addOption(prefix + "DeviceType", DefaultGamePadDevice[i]);
-		config->addOption(prefix + "DeviceNum",  0);
-		for(unsigned int j = 0; j < GAMEPAD_NUM_BUTTONS; j++) {
-			config->addOption(prefix + GamePadNames[j], DefaultGamePad[i][j]);
-		}
-	}
-    
 #if PERI
 	// PowerPad 0 - 1
 	for(unsigned int i = 0; i < POWERPAD_NUM_DEVICES; i++) {
