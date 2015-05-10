@@ -103,7 +103,6 @@ static void UpdateSystem()
 				FCEUI_DispMessage ("Family Keyboard %sabled.", 0,
 				g_fkbEnabled ? "en" : "dis");
 			}
-		SDL_WM_GrabInput (g_fkbEnabled ? SDL_GRAB_ON : SDL_GRAB_OFF);
 		if (g_fkbEnabled)
 		{
 			return;

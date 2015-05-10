@@ -159,6 +159,7 @@ void FCEUI_SaveSnapshotAs(void)
 	dosnapsave=2;
 }
 
+#ifndef EMSCRIPTEN
 static void ReallySnap(void)
 {
 	int x=SaveSnapshot();
@@ -167,9 +168,11 @@ static void ReallySnap(void)
 	else
 		FCEU_DispMessage("Screen snapshot %d saved.",0,x-1);
 }
+#endif
 
 void FCEU_PutImage(void)
 {
+#ifndef EMSCRIPTEN
 	if(dosnapsave==2)	//Save screenshot as, currently only flagged & run by the Win32 build. //TODO SDL: implement this?
 	{
 		char nameo[512];
@@ -181,16 +184,20 @@ void FCEU_PutImage(void)
 		}
 		dosnapsave=0;
 	}
+#endif
+
 	if(GameInfo->type==GIT_NSF)
 	{
 		DrawNSF(XBuf);
 
+#ifndef EMSCRIPTEN
 		//Save snapshot after NSF screen is drawn.  Why would we want to do it before?
 		if(dosnapsave==1)
 		{
 			ReallySnap();
 			dosnapsave=0;
 		}
+#endif //EMSCRIPTEN
 	}
 	else
 	{
@@ -201,6 +208,7 @@ void FCEU_PutImage(void)
 		//Some messages need to be displayed before the avi is dumped
 		DrawMessage(true);
 
+#ifndef EMSCRIPTEN
 #ifdef _S9XLUA_H
 		// Lua gui should draw before the avi is dumped.
 		FCEU_LuaGui(XBuf);
@@ -214,6 +222,7 @@ void FCEU_PutImage(void)
 		}
 
 		if (!FCEUI_AviEnableHUDrecording()) snapAVI();
+#endif //EMSCRIPTEN
 
 		if(GameInfo->type==GIT_VSUNI)
 			FCEU_VSUniDraw(XBuf);
@@ -233,8 +242,6 @@ void FCEU_PutImage(void)
 	//Fancy input display code
 	if(input_display)
 	{
-// tsone: unused var, remove
-//		extern uint32 JSAutoHeld;
 		uint32 held;
 
 		int controller, c, ci, color;
@@ -410,7 +417,6 @@ void FCEU_PutImage(void)
 			}
 		}
 	}
-#endif
 
 	if (FCEUI_AviEnableHUDrecording())
 	{
@@ -424,7 +430,9 @@ void FCEU_PutImage(void)
 			snapAVI();
 		}
 	} else DrawMessage(false);
-
+#else
+	DrawMessage(false);
+#endif //EMSCRIPTEN
 }
 void snapAVI()
 {

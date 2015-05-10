@@ -31,9 +31,7 @@ static es2n s_es2n;
 extern uint8 deempScan[240];
 extern uint8 PALRAM[0x20];
 
-void SetOpenGLPalette(uint8*)
-{
-}
+void SetOpenGLPalette(uint8*) {}
 
 void BlitScreen(uint8 *buf)
 {
@@ -54,7 +52,6 @@ void BlitScreen(uint8 *buf)
     s_es2n.controls.noise = EM_ASM_DOUBLE_V({ return Module.noiseControl||0; });
 
     es2nRender(&s_es2n, buf, deempScan, PALRAM[0]);
-//	SDL_GL_SwapBuffers();
 }
 
 void KillOpenGL(void)
@@ -67,21 +64,8 @@ int InitOpenGL(int left,
 		int top,
 		int bottom,
 		double xscale,
-		double yscale,
-		int stretchx,
-		int stretchy)
+		double yscale)
 {
-// TODO: tsone: erhrm, what?
-/*
-	if(screen->flags & SDL_FULLSCREEN)
-	{
-		xscale=(double)screen->w / (double)(right-left);
-		yscale=(double)screen->h / (double)(bottom-top);
-		if(xscale<yscale) yscale = xscale;
-		if(yscale<xscale) xscale = yscale;
-	}
-*/
-
 	{
 		int rw=(int)((right-left)*xscale);
 		int rh=(int)((bottom-top)*yscale);
@@ -94,12 +78,8 @@ int InitOpenGL(int left,
 		glViewport(0, 0, rw, rh);
 	}
 
-    es2nInit(&s_es2n, left, right, top, bottom);
+	es2nInit(&s_es2n, left, right, top, bottom);
 
-//	glClear(GL_COLOR_BUFFER_BIT);
-//	SDL_GL_SwapBuffers();
-//	glClear(GL_COLOR_BUFFER_BIT);
-//	SDL_GL_SwapBuffers();
 	return 1;
 }
 

@@ -258,7 +258,7 @@ void BlitScreen(uint8 *XBuf);
 void SetOpenGLPalette(uint8 *data);
 void BlitOpenGL(uint8 *buf);
 void KillOpenGL(void);
-int InitOpenGL(int l, int r, int t, int b, double xscale,double yscale, int stretchx, int stretchy);
+int InitOpenGL(int l, int r, int t, int b, double xscale, double yscale);
 
 int FCEUD_NetworkConnect(void);
 
