@@ -58,9 +58,10 @@ static void UpdateTopRider (void);
 
 static uint32 JSreturn = 0;
 
-// Boolean flags for each gamepad button (and turbo).
-static char s_gamepad_buttons[FCEM_GAMEPAD_COUNT];
+// Mapping from an html5 key code to an input.
 static unsigned int* s_key_map = 0;
+// Input buttons state. Set to 1 if mapped keyboard key is down, otherwise 0.
+static bool* s_input_state = 0;
 
 #if PERI
 static int g_fkbEnabled = 0;
@@ -77,7 +78,18 @@ unsigned int *GetKeyboard()
 	return s_key_map;
 }
 
-#if 0
+static bool IsInput(unsigned int input)
+{
+	return s_input_state[input];
+}
+
+static bool IsInputOnce(unsigned int input)
+{
+	bool result = s_input_state[input];
+	s_input_state[input] = false;
+	return result;
+}
+
 static void UpdateSystem()
 {
 // TODO: tsone: family keyboard toggle not working
@@ -130,21 +142,18 @@ static void UpdateSystem()
 	}
 #endif
 
-	// if not NES Sound Format
-	if (gametype != GIT_NSF)
-	{
-		if (_keyonly (SDLK_F5))
-		{
+	if (gametype != GIT_NSF) {
+		if (IsInputOnce(FCEM_SYSTEM_STATE_SAVE)) {
 			FCEUI_SaveState(NULL);
 		}
-		if (_keyonly (SDLK_F7))
-		{
+		if (IsInputOnce(FCEM_SYSTEM_STATE_LOAD)) {
 			FCEUI_LoadState(NULL);
 		}
 	}
 
-	if (_keyonly (SDLK_EQUALS))
-	{
+// TODO: tsone: not implemented
+#ifndef EMSCRIPTEN
+	if (_keyonly (SDLK_EQUALS)) {
 		DecreaseEmulationSpeed ();
 	}
 
@@ -152,6 +161,7 @@ static void UpdateSystem()
 	{
 		IncreaseEmulationSpeed ();
 	}
+#endif
 
 // TODO: tsone: allow input displaying?
 #ifndef EMSCRIPTEN
@@ -161,42 +171,31 @@ static void UpdateSystem()
 	}
 #endif
 
-	if (_keyonly (SDLK_p))
-	{
-		//FCEUI_ToggleEmulationPause(); 
-		// use the wrapper function instead of the fceui function directly
-		// so we can handle cursor grabbage
-	FCEUI_ToggleEmulationPause ();
+	if (IsInputOnce(FCEM_SYSTEM_PAUSE)) {
+		FCEUI_ToggleEmulationPause();
 	}
 
-	// Toggle throttling
+// TODO: tsone: is this the right way to clear here?
 	NoWaiting &= ~1;
-	if (g_keyState[SDLK_TAB])
-	{
+	if (IsInput(FCEM_SYSTEM_THROTTLE)) {
 		NoWaiting |= 1;
 	}
 
 	static bool frameAdvancing = false;
-	if (g_keyState[SDLK_BACKSLASH])
-	{
-		if (frameAdvancing == false)
-		{
+	if (IsInput(FCEM_SYSTEM_FRAME_ADVANCE)) {
+		if (frameAdvancing == false) {
 			FCEUI_FrameAdvance ();
 			frameAdvancing = true;
 		}
-	}
-	else
-	{
-		if (frameAdvancing)
-		{
+	} else {
+		if (frameAdvancing) {
 			FCEUI_FrameAdvanceEnd ();
 			frameAdvancing = false;
 		}
 	}
 
-	if (_keyonly (SDLK_r))
-	{
-		FCEUI_ResetNES ();
+	if (IsInputOnce(FCEM_SYSTEM_RESET)) {
+		FCEUI_ResetNES();
 	}
 
 // TODO: tsone: power off by some key or UI?
@@ -211,23 +210,19 @@ static void UpdateSystem()
 	else
 #endif
 
-	const int statekeys[] = {
-		SDLK_0, SDLK_1, SDLK_2, SDLK_3, SDLK_4, SDLK_5,
-		SDLK_6, SDLK_7, SDLK_8, SDLK_9
-        };
-	for (int i = 0; i < 10; i++)
-		if (_keyonly (statekeys[i]))
-		{
+	for (int i = 0; i < 10; ++i) {
+		if (IsInputOnce(FCEM_SYSTEM_STATE_SELECT_0 + i)) {
 			FCEUI_SelectState (i, 1);
 		}
+	}
 
-	if (_keyonly (SDLK_PAGEUP))
-	{
+// TODO: tsone: not implemented
+#ifndef EMSCRIPTEN
+	if (_keyonly (SDLK_PAGEUP)) {
 		FCEUI_SelectStateNext (1);
 	}
 
-	if (_keyonly (SDLK_PAGEDOWN))
-	{
+	if (_keyonly (SDLK_PAGEDOWN)) {
 		FCEUI_SelectStateNext (-1);
 	}
 
@@ -279,8 +274,8 @@ static void UpdateSystem()
 			keyonly(i);
 		}
 	}
-}
 #endif
+}
 
 // TODO: tsone: test buttons for connected gamepad devices (in browser)
 // idx 0..9 matches: a, b, select, start, up, down, left, right, turbo a, turbo b
@@ -337,7 +332,7 @@ static void UpdateGamepad(void)
 		bool left = false;
 		bool up = false;
 		for (x = 0; x < 8; ++x) {
-			if (FCEM_TestGamepadButton(&gamepads[i], x) || s_gamepad_buttons[x]) {
+			if (FCEM_TestGamepadButton(&gamepads[i], x) || IsInput(FCEM_GAMEPAD + x)) {
 				if (opposite_dirs == 0) {
 					// test for left+right and up+down
 					if(x == 4) {
@@ -373,7 +368,7 @@ static void UpdateGamepad(void)
 		// rapid-fire a, rapid-fire b
 		if (rapid) {
 			for (x = 0; x < 2; ++x) {
-   				if (FCEM_TestGamepadButton(&gamepads[i], 8+x) || s_gamepad_buttons[8+x]) {
+   				if (FCEM_TestGamepadButton(&gamepads[i], 8+x) || IsInput(FCEM_GAMEPAD+8+x)) {
 					JS |= (1 << x) << (i << 3);
 				}
 			}
@@ -385,23 +380,9 @@ static void UpdateGamepad(void)
 
 void FCEUD_UpdateInput ()
 {
-// TODO: tsone: reset throttling, right place to do this?
-	NoWaiting &= ~1;
+	UpdateSystem();
 // TODO: tsone: add zapper etc.?
 	UpdateGamepad();
-}
-
-void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1, ESIFC fcexp)
-{
-	eoptions &= ~EO_FOURSCORE;
-	if (fourscore)
-	{				// Four Score emulation, only support gamepads, nothing else
-		eoptions |= EO_FOURSCORE;
-	}
-
-	replaceP2StartWithMicrophone = microphone;
-
-	InitInputInterface();
 }
 
 static EM_BOOL FCEM_MouseCallback(int type, const EmscriptenMouseEvent *event, void *)
@@ -440,43 +421,61 @@ static unsigned int getInput(const EmscriptenKeyboardEvent *event)
 	return s_key_map[idx];
 }
 
-static EM_BOOL FCEM_KeyDownCallback(int eventType, const EmscriptenKeyboardEvent *event, void*)
+static EM_BOOL FCEM_KeyCallback(int eventType, const EmscriptenKeyboardEvent *event, void*)
 {
 	unsigned int input = getInput(event);
-	switch (input & FCEM_INPUT_TYPE_MASK) {
-	case FCEM_SYSTEM:
-		break;
-	case FCEM_GAMEPAD:
-		s_gamepad_buttons[input & FCEM_INPUT_KEY_MASK] = 1;
-		break;
-	}
+	s_input_state[input] = (eventType == EMSCRIPTEN_EVENT_KEYDOWN);
+	s_input_state[FCEM_NULL] = false; // Disable NULL input.
 	return 1;
 }
 
-static EM_BOOL FCEM_KeyUpCallback(int eventType, const EmscriptenKeyboardEvent *event, void*)
+void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1, ESIFC fcexp)
 {
-	unsigned int input = getInput(event);
-	switch (input & FCEM_INPUT_TYPE_MASK) {
-	case FCEM_SYSTEM:
-		break;
-	case FCEM_GAMEPAD:
-		s_gamepad_buttons[input & FCEM_INPUT_KEY_MASK] = 0;
-		break;
+	eoptions &= ~EO_FOURSCORE;
+	if (fourscore) {
+		// Four Score emulation, only support gamepads, nothing else
+		eoptions |= EO_FOURSCORE;
 	}
-	return 1;
-}
 
-void InitInputInterface ()
-{
+	replaceP2StartWithMicrophone = microphone;
+
+	// Init input state array. Fills it with zeroes.
+	FCEU_ARRAY_EM(s_input_state, bool, FCEM_INPUT_COUNT);
+
+	// Init key map. Fills it with zeroes.
+	FCEU_ARRAY_EM(s_key_map, unsigned int, FCEM_KEY_MAP_SIZE);
+
+	// Default mapping for 1st gamepad inputs.
+// TODO: tsone: mappings for 2nd gamepad?
+	// The key codes are from:
+	// https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/keyCode
+	s_key_map[0x046] = FCEM_GAMEPAD0_A;		// F key
+	s_key_map[0x044] = FCEM_GAMEPAD0_B;		// D key
+	s_key_map[0x053] = FCEM_GAMEPAD0_SELECT;	// S key
+	s_key_map[0x00D] = FCEM_GAMEPAD0_START;		// Enter key
+	s_key_map[0x026] = FCEM_GAMEPAD0_UP;		// Up arrow
+	s_key_map[0x028] = FCEM_GAMEPAD0_DOWN;		// Down arrow
+	s_key_map[0x025] = FCEM_GAMEPAD0_LEFT;		// Left arrow
+	s_key_map[0x027] = FCEM_GAMEPAD0_RIGHT;		// Right arrow
+
+	// Default mappings for system inputs.
+	s_key_map[0x152] = FCEM_SYSTEM_RESET;		// Ctrl+R key
+	s_key_map[0x009] = FCEM_SYSTEM_THROTTLE;	// Tab key
+	s_key_map[0x050] = FCEM_SYSTEM_PAUSE;		// P key
+	s_key_map[0x0DC] = FCEM_SYSTEM_FRAME_ADVANCE;	// Backslash key
+	s_key_map[0x074] = FCEM_SYSTEM_STATE_SAVE;	// F5 key
+	s_key_map[0x076] = FCEM_SYSTEM_STATE_LOAD;	// F7 key
+	for (int i = 0; i < 10; ++i) {
+		s_key_map[0x030 + i] = FCEM_SYSTEM_STATE_SELECT_0 + i;	// 0..9 keys
+	}
+
 // TODO: tsone: more inputs, now just gamepad at port 0
 // TODO: tsone: zapper would get attrib 1
-//	FCEUI_SetInput(x, (ESI) y, InputDPtr, attrib);
-	FCEUI_SetInput(0, SI_GAMEPAD, &JSreturn, 0);
-	FCEUI_SetInput(1, SI_NONE, 0, 0);
+	FCEUI_SetInput(0, port0, &JSreturn, 0);
+	FCEUI_SetInput(1, port1, 0, 0);
 
 // TODO: tsone: support FC expansion port?
-//	FCEUI_SetInputFC((ESIFC) y, InputDPtr, attrib);
-	FCEUI_SetInputFC(SIFC_NONE, 0, 0);
+	FCEUI_SetInputFC(fcexp, 0, 0);
 
 // TODO: tsone: support fourscore? really?
 //	FCEUI_SetInputFourscore((eoptions & EO_FOURSCORE) != 0);
@@ -488,31 +487,7 @@ void InitInputInterface ()
 	emscripten_set_click_callback(elem, 0, 0, FCEM_MouseCallback);
 
 	elem = "#window";
-	emscripten_set_keydown_callback(elem, 0, 0, FCEM_KeyDownCallback);
-	emscripten_set_keyup_callback(elem, 0, 0, FCEM_KeyUpCallback);
-
-	// Init key map.
-	FCEU_ARRAY_EM(s_key_map, unsigned int, FCEM_KEY_MAP_SIZE);
-	// Default key map for gamepad 1 (other gamepads have no mapping)
-	// Codes from: https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/keyCode
-	s_key_map[0x046] = FCEM_GAMEPAD_A;	// F key
-	s_key_map[0x044] = FCEM_GAMEPAD_B;	// D key
-	s_key_map[0x053] = FCEM_GAMEPAD_SELECT;	// S key
-	s_key_map[0x00D] = FCEM_GAMEPAD_START;	// Enter key
-	s_key_map[0x026] = FCEM_GAMEPAD_UP;	// Up arrow
-	s_key_map[0x028] = FCEM_GAMEPAD_DOWN;	// Down arrow
-	s_key_map[0x025] = FCEM_GAMEPAD_LEFT;	// Left arrow
-	s_key_map[0x027] = FCEM_GAMEPAD_RIGHT;	// Right arrow
-
-	// Default key map for system.
-	s_key_map[0x152] = FCEM_SYSTEM_RESET;	// Ctrl+R key
-	s_key_map[0x009] = FCEM_SYSTEM_THROTTLE;	// Tab key
-	s_key_map[0x050] = FCEM_SYSTEM_PAUSE;	// P key
-	s_key_map[0x050] = FCEM_SYSTEM_FRAME_ADVANCE;	//  key
-	s_key_map[0x074] = FCEM_SYSTEM_STATE_SAVE;	// F5 key
-	s_key_map[0x076] = FCEM_SYSTEM_STATE_LOAD;	// F7 key
-	for (int i = 0; i < 10; ++i) {
-		s_key_map[0x030 + i] = FCEM_SYSTEM_STATE_SELECT_0 + i;	// 0..9 keys
-	}
+	emscripten_set_keydown_callback(elem, 0, 0, FCEM_KeyCallback);
+	emscripten_set_keyup_callback(elem, 0, 0, FCEM_KeyCallback);
 }
 

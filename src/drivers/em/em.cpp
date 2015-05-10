@@ -235,13 +235,10 @@ static int DriverInitialize(FCEUGI *gi)
 	if(InitJoysticks())
 		inited|=2;
 
-	int fourscore=0;
+	int fourscore = 0;
 	g_config->getOption("SDL.FourScore", &fourscore);
-	eoptions &= ~EO_FOURSCORE;
-	if(fourscore)
-		eoptions |= EO_FOURSCORE;
+	FCEUD_SetInput(fourscore, false, SI_GAMEPAD, SI_NONE, SIFC_NONE);
 
-	InitInputInterface();
 	return 1;
 }
 
