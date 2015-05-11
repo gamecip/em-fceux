@@ -173,15 +173,12 @@ static int DoFrame()
 	}
 
 	// In case of lag, try to fill audio buffer to critical minimum by skipping frames.
-// TODO: tsone: assumes NTSC 60Hz
-//	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
-	int frameskips = (SOUND_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
-//	int frameskips = (SOUND_HW_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
-	// Only produce audio for skipped frames. One frame worth of samples is left free for the next frame.
-	while (frameskips > 2) {
+	int frames = (SOUND_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
+	// Produce audio only for skipped frames (no video). Leave two free frames for next frame.
+	while (frames > 3) {
 		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
 		FCEUD_Update(gfx, sound, ssize);
-		--frameskips;
+		--frames;
 	}
 
 	FCEUD_UpdateInput();

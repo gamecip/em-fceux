@@ -106,7 +106,7 @@ InitVideo(FCEUGI *gi)
 
 	s_inited = 1;
 
-	FCEUI_SetShowFPS(0);
+	FCEUI_SetShowFPS(1);
     
 	FCEU_printf("Initializing WebGL.\n");
 
