@@ -5,3 +5,4 @@
 /bin/
 /config.log
 /deployment/fceux.js
+/src/drivers/em/gitversion.c

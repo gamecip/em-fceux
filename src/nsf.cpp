@@ -478,6 +478,17 @@ uint8 FCEU_GetJoyJoy(void);
 
 static int special=0;
 
+
+#ifndef EMSCRIPTEN
+#define COLOR_BG	0
+#define COLOR_STROBE	3
+#define COLOR_TEXT	6
+#else
+#define COLOR_BG	0x1D1D1D1D
+#define COLOR_STROBE	0x20
+#define COLOR_TEXT	0x20
+#endif
+
 void DrawNSF(uint8 *XBuf)
 {
 	char snbuf[16];
@@ -485,8 +496,7 @@ void DrawNSF(uint8 *XBuf)
 
 	if(vismode==0) return;
 
-	memset(XBuf,0,256*240);
-
+	memset(XBuf, COLOR_BG, 256*240);
 
 	{
 		int32 *Bufpl;
@@ -504,7 +514,7 @@ void DrawNSF(uint8 *XBuf)
 				uint32 y;
 				y=142+((Bufpl[(x*l)>>8]*mul)>>14);
 				if(y<240)
-					XBuf[x+y*256]=3;
+					XBuf[x+y*256] = COLOR_STROBE;
 			}
 		}
 		else if(special==1)
@@ -521,7 +531,7 @@ void DrawNSF(uint8 *XBuf)
 				yp=120+r*sin(x*M_PI*2/256);
 				xp&=255;
 				yp%=240;
-				XBuf[xp+yp*256]=3;
+				XBuf[xp+yp*256] = COLOR_STROBE;
 			}
 		}
 		else if(special==2)
@@ -545,7 +555,7 @@ void DrawNSF(uint8 *XBuf)
 				n=120+r*sin(t);
 
 				if(m<256 && n<240)
-					XBuf[m+n*256]=3;
+					XBuf[m+n*256] = COLOR_STROBE;
 
 			}
 			for(x=128;x<256;x++)
@@ -564,21 +574,21 @@ void DrawNSF(uint8 *XBuf)
 				n=120+r*sin(t);
 
 				if(m<256 && n<240)
-					XBuf[m+n*256]=3;
+					XBuf[m+n*256] = COLOR_STROBE;
 
 			}
 			theta+=(double)M_PI/256;
 		}
 	}
 
-	DrawTextTrans(ClipSidesOffset+XBuf+10*256+4+(((31-strlen((char*)NSFHeader.SongName))<<2)), 256, NSFHeader.SongName, 6);
-	DrawTextTrans(ClipSidesOffset+XBuf+26*256+4+(((31-strlen((char*)NSFHeader.Artist))<<2)), 256,NSFHeader.Artist, 6);
-	DrawTextTrans(ClipSidesOffset+XBuf+42*256+4+(((31-strlen((char*)NSFHeader.Copyright))<<2)), 256,NSFHeader.Copyright, 6);
+	DrawTextTrans(ClipSidesOffset+XBuf+10*256+4+(((31-strlen((char*)NSFHeader.SongName))<<2)), 256, NSFHeader.SongName, COLOR_TEXT);
+	DrawTextTrans(ClipSidesOffset+XBuf+26*256+4+(((31-strlen((char*)NSFHeader.Artist))<<2)), 256,NSFHeader.Artist, COLOR_TEXT);
+	DrawTextTrans(ClipSidesOffset+XBuf+42*256+4+(((31-strlen((char*)NSFHeader.Copyright))<<2)), 256,NSFHeader.Copyright, COLOR_TEXT);
 
-	DrawTextTrans(ClipSidesOffset+XBuf+70*256+4+(((31-strlen("Song:"))<<2)), 256, (uint8*)"Song:", 6);
-	// tsone: sprintf here slows down emscripten rendering quite a lot!
+	DrawTextTrans(ClipSidesOffset+XBuf+70*256+4+(((31-strlen("Song:"))<<2)), 256, (uint8*)"Song:", COLOR_TEXT);
+// TODO: tsone: sprintf here slows down emscripten rendering quite a lot!
 	sprintf(snbuf,"<%d/%d>",CurrentSong,NSFHeader.TotalSongs);
-	DrawTextTrans(XBuf+82*256+4+(((31-strlen(snbuf))<<2)), 256, (uint8*)snbuf, 6);
+	DrawTextTrans(XBuf+82*256+4+(((31-strlen(snbuf))<<2)), 256, (uint8*)snbuf, COLOR_TEXT);
 
 	{
 		static uint8 last=0;

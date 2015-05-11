@@ -205,10 +205,10 @@ void FCEU_PutImage(void)
 		if(!FCEUI_EmulationPaused())
 			memcpy(XBackBuf, XBuf, 256*256);
 
+#ifndef EMSCRIPTEN
 		//Some messages need to be displayed before the avi is dumped
 		DrawMessage(true);
 
-#ifndef EMSCRIPTEN
 #ifdef _S9XLUA_H
 		// Lua gui should draw before the avi is dumped.
 		FCEU_LuaGui(XBuf);
@@ -778,6 +778,12 @@ void FCEUI_ToggleShowFPS()
 static uint64 boop[60];
 static int boopcount = 0;
 
+#ifndef EMSCRIPTEN
+#define COLOR_FPS 0xA0
+#else
+#define COLOR_FPS 0x20
+#endif
+
 void ShowFPS(void)
 {
 	if(Show_FPS == false)
@@ -788,7 +794,7 @@ void ShowFPS(void)
 	boop[boopcount] = FCEUD_GetTime();
 
 	sprintf(fpsmsg, "%.1f", (double)booplimit / ((double)da / FCEUD_GetTimeFreq()));
-	DrawTextTrans(XBuf + ((256 - ClipSidesOffset) - 40) + (FSettings.FirstSLine + 4) * 256, 256, (uint8*)fpsmsg, 0xA0);
+	DrawTextTrans(XBuf + ((256 - ClipSidesOffset) - 40) + (FSettings.FirstSLine + 4) * 256, 256, (uint8*)fpsmsg, COLOR_FPS);
 	// It's not averaging FPS over exactly 1 second, but it's close enough.
 	boopcount = (boopcount + 1) % booplimit;
 }
