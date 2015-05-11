@@ -536,8 +536,10 @@ static void initUniformsStretch(es2n *p)
 //static GLfloat s_lightDir[] = { -0.109381654946615, 0.40821789367673483, 0.9063077870366499 }; // 90-65, 15
 //static GLfloat s_lightDir[] = { -0.1830127018922193, 0.6830127018922193, 0.7071067811865476 }; // 90-45, 15
 //static GLfloat s_lightDir[] = { -0.22414386804201336, 0.8365163037378078, 0.5000000000000001 }; // 90-30, 15
-static GLfloat s_lightDir[] = { 0.0, 0.866025, 0.5 }; // 90-30, 0
-static GLfloat s_viewPos[] = { 0, 0, 2.5 };
+static const GLfloat s_lightDir[] = { 0.0, 0.866025, 0.5 }; // 90-30, 0
+static const GLfloat s_viewPos[] = { 0, 0, 2.5 };
+static const GLfloat s_xAxis[] = { 1, 0, 0 };
+static const GLfloat s_shadowPoint[] = { 0, 0.7737, 0.048 };
 
 static void initShading(GLuint prog, float intensity, float diff, float fill, float spec, float m, float fr0, float frexp)
 {
@@ -549,6 +551,14 @@ static void initShading(GLuint prog, float intensity, float diff, float fill, fl
     glUniform4f(k, intensity*diff / M_PI, intensity*spec * (m+8.0) / (8.0*M_PI), m, intensity*fill / M_PI);
     k = glGetUniformLocation(prog, "u_fresnel");
     glUniform3f(k, fr0, 1-fr0, frexp);
+
+    GLfloat shadowPlane[4];
+    vec3Cross(shadowPlane, s_xAxis, s_lightDir);
+    vec3Normalize(shadowPlane, shadowPlane);
+    shadowPlane[3] = vec3Dot(shadowPlane, s_shadowPoint);
+    k = glGetUniformLocation(prog, "u_shadowPlane");
+//    printf("!!!! shadowPlane: %f,%f,%f,%f\n", shadowPlane[0], shadowPlane[1], shadowPlane[2], shadowPlane[3]);
+    glUniform4fv(k, 1, shadowPlane);
 }
 
 static void initUniformsScreen(es2n *p)

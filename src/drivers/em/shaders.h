@@ -9,6 +9,7 @@ DEFINE(M_PI)
 "uniform vec3 u_viewPos;\n"
 "uniform vec4 u_material;\n"
 "uniform vec3 u_fresnel;\n"
+"uniform vec4 u_shadowPlane;\n"
 "\n"
 "float shadeBlinn(const vec3 p, const vec3 n)\n"
 "{\n"
@@ -17,16 +18,22 @@ DEFINE(M_PI)
     "float ndotl = dot(n, u_lightDir);\n"
     "float result;\n"
     "if (ndotl > 0.0) {"
+        // Front light.
         "float ndoth = max(dot(n, h), 0.0);\n"
         "float fr = u_fresnel[0] + u_fresnel[1] * pow(1.0-ndotl, u_fresnel[2]);\n"
         "result = mix(u_material[0], u_material[1] * pow(ndoth, u_material[2]), fr) * ndotl;\n"
     "} else {\n"
+        // Back light (bi-directional lighting).
         "result = -ndotl * u_material[3];\n"
     "}\n"
-//    "float ddiag = -1.8*u_mouse.y/256.0 + 0.9 + dot(vec3(0.0, -0.90630778703665, 0.42261826174069933), p);\n"//-0.7071, 0.7071), p);\n"
-    "float ddiag = -1.8*u_mouse.y/256.0 + 0.9 + dot(normalize(cross(vec3(1.0, 0.0, 0.0), u_lightDir)), p);\n"
-    "float dflat = 0.2*u_mouse.x/224.0 - 0.1 + p.z;\n"
-    "result *= clamp(52.0 * max(ddiag, dflat), 0.225, 1.0);\n"
+//    "float ddiag = -0.9*u_mouse.y/256.0 + 0.9 + dot(normalize(cross(vec3(1.0, 0.0, 0.0), u_lightDir)), p);\n"
+//    "float dflat = 0.2*u_mouse.x/224.0 - 0.1 + p.z;\n"
+//    "float ddiag = -0.9*155.0/256.0 + 0.9 + dot(normalize(cross(vec3(1.0, 0.0, 0.0), u_lightDir)), p);\n"
+//    "float dflat = 0.2*88.0/224.0 - 0.1 + p.z;\n"
+    // Calculate (fake) shadow using two planes
+    "float ddiag = dot(u_shadowPlane.xyz, p) - u_shadowPlane.w;\n"
+    "float dflat = p.z - 0.023;\n"
+    "result *= 0.21 + 0.79*clamp(38.0 * max(ddiag, dflat), 0.0, 1.0);\n"
     "return result;\n"
 "}\n";
 
