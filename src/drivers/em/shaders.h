@@ -172,6 +172,7 @@ static const char* stretch_vert_src =
     "gl_Position = a_0;\n"
     "}\n";
 static const char* stretch_frag_src =
+    DEFINE(IDX_W)
     DEFINE(IDX_H)
     "uniform float u_scanlines;\n"
     "uniform sampler2D u_sharpenTex;\n"
@@ -183,6 +184,10 @@ static const char* stretch_frag_src =
 // TODO: test encode gamma
     "vec3 color = c0*c0 + c1*c1;\n"
 //    "vec3 color = c0 + c1;\n"
+    // Set black if outside the border.
+    "vec2 uvd = max(abs(v_uv[0] - 0.5) - vec2(128.0-6.5, 112.0-3.5) / vec2(IDX_W, IDX_H), 0.0);\n"
+    "float border = clamp(3.0 - 3.0*3000.0 * dot(uvd, uvd), 0.0, 1.0);\n"
+    "color *= border;\n"
     // Use oscillator as scanline modulator.
     "float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*IDX_H * v_uv[0].y - M_PI*0.125)));\n"
     // This formula dims dark colors, but keeps brights. Output is linear.
@@ -237,13 +242,7 @@ DEFINE(IDX_H)
     "color += 0.018 * tmp*tmp;\n"
 //    "color += 0.018 * texture2D(u_stretchTex, v_uv - 0.021*n.xy).rgb;\n"
 
-    // Set black if outside the border
-    "vec2 uvd = max(abs(v_uv - 0.5) - vec2(128.0-6.5, 112.0-3.5) / vec2(IDX_W, IDX_H), 0.0);\n"
-    "float border = clamp(3.0 - 3.0*3000.0 * dot(uvd, uvd), 0.0, 1.0);\n"
-    "color *= border;\n"
-
     "float shade = shadeBlinn(v_pos, n);\n"
-    "shade *= 0.638*border + 0.362;\n"
 
     // CRT emitter radiance attenuation from the curvature
 //    "color *= pow(dot(n, v), 16.0*(u_mouse.x/256.0));\n"

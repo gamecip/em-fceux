@@ -19,23 +19,34 @@ typedef struct t_es2n_controls
     GLfloat convergence; // CRT red-blue convergence.
     GLfloat noise;      // CRT noise control.
 
-    // Uniform locations.
-    GLint _brightness_loc;
-    GLint _contrast_loc;
-    GLint _color_loc;
-    GLint _gamma_loc;
-    GLint _noiseAmp_loc;
-    GLint _noiseRnd_loc;
-    GLint _screen_uvScale_loc;
-    GLint _screen_mvp_loc;
-    GLint _rgbppu_loc;
-    GLint _convergence_loc;
-    GLint _sharpen_kernel_loc;
-    GLint _scanlines_loc;
-
-    GLint _combine_glow_loc;
-
 } es2n_controls;
+
+// Uniform locations.
+typedef struct t_es2n_uniforms
+{
+	GLint _rgb_brightness_loc;
+	GLint _rgb_contrast_loc;
+	GLint _rgb_color_loc;
+	GLint _rgb_rgbppu_loc;
+	GLint _rgb_gamma_loc;
+	GLint _rgb_noiseAmp_loc;
+	GLint _rgb_noiseRnd_loc;
+
+	GLint _downsample_weights_loc;
+	GLint _downsample_offsets_loc;
+	GLint _downsample_downsampleTex_loc;
+
+	GLint _sharpen_kernel_loc;
+	GLint _sharpen_convergence_loc;
+
+	GLint _stretch_scanlines_loc;
+
+	GLint _screen_uvScale_loc;
+	GLint _screen_mvp_loc;
+
+	GLint _combine_glow_loc;
+
+} es2n_uniforms;
 
 typedef struct t_es2n
 {
@@ -83,12 +94,6 @@ typedef struct t_es2n
     GLfloat yiq_mins[3];
     GLfloat yiq_maxs[3];
 
-    es2n_controls controls;
-
-    // Uniform locations.
-    GLint _downsample_weights_loc;
-    GLint _downsample_offsets_loc;
-    GLint _downsample_downsampleTex_loc;
 } es2n;
 
 void es2nInit(int left, int right, int top, int bottom);

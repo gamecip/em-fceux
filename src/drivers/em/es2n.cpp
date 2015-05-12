@@ -94,6 +94,8 @@
 #include "shaders.h"
 
 static es2n s_p;
+static es2n_controls s_c;
+static es2n_uniforms s_u;
 
 static const GLint mesh_quad_vert_num = 4;
 static const GLint mesh_quad_face_num = 2;
@@ -148,58 +150,57 @@ static const int s_downsample_heights[] = {  960, 960, 240, 240, 60, 60, 15 };
 extern "C" {
 void FCEM_setBrightness(double v)
 {
-//		printf("!!!! brightness: %f\n", v);
-	s_p.controls.brightness = v;
+	s_c.brightness = v;
 }
 
 void FCEM_setContrast(double v)
 {
-	s_p.controls.contrast = v;
+	s_c.contrast = v;
 }
 
 void FCEM_setColor(double v)
 {
-	s_p.controls.color = v;
+	s_c.color = v;
 }
 
 void FCEM_setGamma(double v)
 {
-	s_p.controls.gamma = v;
+	s_c.gamma = v;
 }
 
 void FCEM_setGlow(double v)
 {
-	s_p.controls.glow = v;
+	s_c.glow = v;
 }
 
 void FCEM_setSharpness(double v)
 {
-	s_p.controls.sharpness = v;
+	s_c.sharpness = v;
 }
 
 void FCEM_setRGBPPU(double v)
 {
-	s_p.controls.rgbppu = v;
+	s_c.rgbppu = v;
 }
 
 void FCEM_setCRTEnabled(int v)
 {
-	s_p.controls.crt_enabled = v;
+	s_c.crt_enabled = v;
 }
 
 void FCEM_setScanlines(double v)
 {
-	s_p.controls.scanlines = v;
+	s_c.scanlines = v;
 }
 
 void FCEM_setConvergence(double v)
 {
-	s_p.controls.convergence = v;
+	s_c.convergence = v;
 }
 
 void FCEM_setNoise(double v)
 {
-	s_p.controls.noise = v;
+	s_c.noise = v;
 }
 }
 
@@ -430,33 +431,32 @@ static void updateUniformsDebug()
 }
 #endif
 
-static void updateUniformsRGB(const es2n_controls *c)
+static void updateUniformsRGB()
 {
 	DBG(updateUniformsDebug())
 	double v;
-	v = 0.15 * c->brightness;
-	glUniform1f(c->_brightness_loc, v);
-	v = 1.0 + 0.4*c->contrast;
-	glUniform1f(c->_contrast_loc, v);
-	v = 1.0 + c->color;
-	glUniform1f(c->_color_loc, v);
-	v = c->rgbppu;
-	glUniform1f(c->_rgbppu_loc, v);
-	v = 2.4/2.2 + 0.3*c->gamma;
-	glUniform1f(c->_gamma_loc, v);
-	v = c->crt_enabled * 0.08 * c->noise*c->noise;
-	glUniform1f(c->_noiseAmp_loc, v);
-	glUniform2f(c->_noiseRnd_loc, rand01(), rand01());
+	v = 0.15 * s_c.brightness;
+	glUniform1f(s_u._rgb_brightness_loc, v);
+	v = 1.0 + 0.4*s_c.contrast;
+	glUniform1f(s_u._rgb_contrast_loc, v);
+	v = 1.0 + s_c.color;
+	glUniform1f(s_u._rgb_color_loc, v);
+	v = s_c.rgbppu;
+	glUniform1f(s_u._rgb_rgbppu_loc, v);
+	v = 2.4/2.2 + 0.3*s_c.gamma;
+	glUniform1f(s_u._rgb_gamma_loc, v);
+	v = s_c.crt_enabled * 0.08 * s_c.noise*s_c.noise;
+	glUniform1f(s_u._rgb_noiseAmp_loc, v);
+	glUniform2f(s_u._rgb_noiseRnd_loc, rand01(), rand01());
 }
 
 static void updateUniformsSharpen()
 {
 	DBG(updateUniformsDebug())
-	const es2n_controls *c = &s_p.controls;
-	double v = c->crt_enabled * 2.0 * c->convergence;
-	glUniform1f(c->_convergence_loc, v);
+	double v = s_c.crt_enabled * 2.0 * s_c.convergence;
+	glUniform1f(s_u._sharpen_convergence_loc, v);
 
-	v = (1.0-c->rgbppu) * 0.4 * (c->sharpness+0.5);
+	v = (1.0-s_c.rgbppu) * 0.4 * (s_c.sharpness+0.5);
 	GLfloat sharpen_kernel[] = {
 		-v, -v, -v,
 		1, 0, 0, 
@@ -465,28 +465,27 @@ static void updateUniformsSharpen()
 		-v, -v, -v
 	};
 
-	glUniform3fv(c->_sharpen_kernel_loc, 5, sharpen_kernel);
+	glUniform3fv(s_u._sharpen_kernel_loc, 5, sharpen_kernel);
 }
 
-static void updateUniformsStretch(const es2n_controls *c)
+static void updateUniformsStretch()
 {
 	DBG(updateUniformsDebug())
 	double v;
-	v = c->crt_enabled * 0.45 * c->scanlines;
-	glUniform1f(c->_scanlines_loc, v);
+	v = s_c.crt_enabled * 0.45 * s_c.scanlines;
+	glUniform1f(s_u._stretch_scanlines_loc, v);
 }
 
 static void updateUniformsScreen(int final_pass)
 {
 	DBG(updateUniformsDebug())
-	const es2n_controls *c = &s_p.controls;
 
-	if (c->crt_enabled) {
-		glUniform2f(c->_screen_uvScale_loc, (IDX_W-3.0)/IDX_W, (IDX_H-4.0)/IDX_H);
-		glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, s_p.mvp_mat);
+	if (s_c.crt_enabled) {
+		glUniform2f(s_u._screen_uvScale_loc, (IDX_W-3.0)/IDX_W, (IDX_H-4.0)/IDX_H);
+		glUniformMatrix4fv(s_u._screen_mvp_loc, 1, GL_FALSE, s_p.mvp_mat);
 	} else {
-		glUniform2f(c->_screen_uvScale_loc, 260.0/IDX_W, 224.0/IDX_H);
-		glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, mat4_identity);
+		glUniform2f(s_u._screen_uvScale_loc, (IDX_W-27.0)/IDX_W, (IDX_H-15.0)/IDX_H);
+		glUniformMatrix4fv(s_u._screen_mvp_loc, 1, GL_FALSE, mat4_identity);
 	}
 }
 
@@ -505,9 +504,9 @@ static void updateUniformsDownsample(int w, int h, int texIdx, int isHorzPass)
 			offsets[2*i+1] = s_downsample_offs[i] / h;
 		}
 	}
-	glUniform2fv(s_p._downsample_offsets_loc, 8, offsets);
-	glUniform1fv(s_p._downsample_weights_loc, 8, s_downsample_ws);
-	glUniform1i(s_p._downsample_downsampleTex_loc, texIdx);
+	glUniform2fv(s_u._downsample_offsets_loc, 8, offsets);
+	glUniform1fv(s_u._downsample_weights_loc, 8, s_downsample_ws);
+	glUniform1i(s_u._downsample_downsampleTex_loc, texIdx);
 }
 
 // TODO: tsone: not necessary?
@@ -519,9 +518,8 @@ static void updateUniformsTV()
 static void updateUniformsCombine()
 {
 	DBG(updateUniformsDebug())
-	const es2n_controls *c = &s_p.controls;
-	double v = 0.1 * c->glow;
-	glUniform3f(c->_combine_glow_loc, v, v*v, v + v*v);
+	double v = 0.1 * s_c.glow;
+	glUniform3f(s_u._combine_glow_loc, v, v*v, v + v*v);
 }
 
 static void initUniformsRGB()
@@ -542,15 +540,14 @@ static void initUniformsRGB()
 	k = glGetUniformLocation(prog, "u_maxs");
 	glUniform3fv(k, 1, s_p.yiq_maxs);
 
-	es2n_controls *c = &s_p.controls;
-	c->_brightness_loc = glGetUniformLocation(prog, "u_brightness");
-	c->_contrast_loc = glGetUniformLocation(prog, "u_contrast");
-	c->_color_loc = glGetUniformLocation(prog, "u_color");
-	c->_rgbppu_loc = glGetUniformLocation(prog, "u_rgbppu");
-	c->_gamma_loc = glGetUniformLocation(prog, "u_gamma");
-	c->_noiseAmp_loc = glGetUniformLocation(prog, "u_noiseAmp");
-	c->_noiseRnd_loc = glGetUniformLocation(prog, "u_noiseRnd");
-	updateUniformsRGB(&s_p.controls);
+	s_u._rgb_brightness_loc = glGetUniformLocation(prog, "u_brightness");
+	s_u._rgb_contrast_loc = glGetUniformLocation(prog, "u_contrast");
+	s_u._rgb_color_loc = glGetUniformLocation(prog, "u_color");
+	s_u._rgb_rgbppu_loc = glGetUniformLocation(prog, "u_rgbppu");
+	s_u._rgb_gamma_loc = glGetUniformLocation(prog, "u_gamma");
+	s_u._rgb_noiseAmp_loc = glGetUniformLocation(prog, "u_noiseAmp");
+	s_u._rgb_noiseRnd_loc = glGetUniformLocation(prog, "u_noiseRnd");
+	updateUniformsRGB();
 }
 
 static void initUniformsSharpen()
@@ -561,9 +558,8 @@ static void initUniformsSharpen()
 	k = glGetUniformLocation(prog, "u_rgbTex");
 	glUniform1i(k, RGB_I);
 
-	es2n_controls *c = &s_p.controls;
-	c->_convergence_loc = glGetUniformLocation(prog, "u_convergence");
-	c->_sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
+	s_u._sharpen_convergence_loc = glGetUniformLocation(prog, "u_convergence");
+	s_u._sharpen_kernel_loc = glGetUniformLocation(prog, "u_sharpenKernel");
 	updateUniformsSharpen();
 }
 
@@ -575,9 +571,8 @@ static void initUniformsStretch()
 	k = glGetUniformLocation(prog, "u_sharpenTex");
 	glUniform1i(k, SHARPEN_I);
 
-	es2n_controls *c = &s_p.controls;
-	c->_scanlines_loc = glGetUniformLocation(prog, "u_scanlines");
-	updateUniformsStretch(&s_p.controls);
+	s_u._stretch_scanlines_loc = glGetUniformLocation(prog, "u_scanlines");
+	updateUniformsStretch();
 }
 
 // Generated with following python oneliners:
@@ -625,9 +620,8 @@ static void initUniformsScreen()
 
 	initShading(prog, 1.5, 0.001, 0.0, 0.065, 41, 0.04, 4);
 
-	es2n_controls *c = &s_p.controls;
-	c->_screen_uvScale_loc = glGetUniformLocation(prog, "u_uvScale");
-	c->_screen_mvp_loc = glGetUniformLocation(prog, "u_mvp");
+	s_u._screen_uvScale_loc = glGetUniformLocation(prog, "u_uvScale");
+	s_u._screen_mvp_loc = glGetUniformLocation(prog, "u_mvp");
 	updateUniformsScreen(1);
 }
 
@@ -657,9 +651,9 @@ static void initUniformsDownsample()
 {
 	GLuint prog = s_p.downsample_prog;
 
-	s_p._downsample_offsets_loc = glGetUniformLocation(prog, "u_offsets");
-	s_p._downsample_weights_loc = glGetUniformLocation(prog, "u_weights");
-	s_p._downsample_downsampleTex_loc = glGetUniformLocation(prog, "u_downsampleTex");
+	s_u._downsample_offsets_loc = glGetUniformLocation(prog, "u_offsets");
+	s_u._downsample_weights_loc = glGetUniformLocation(prog, "u_weights");
+	s_u._downsample_downsampleTex_loc = glGetUniformLocation(prog, "u_downsampleTex");
 	updateUniformsDownsample(280, 240, DOWNSAMPLE0_I, 1);
 }
 
@@ -677,8 +671,7 @@ static void initUniformsCombine()
 	k = glGetUniformLocation(prog, "u_noiseTex");
 	glUniform1i(k, NOISE_I);
 
-	es2n_controls *c = &s_p.controls;
-	c->_combine_glow_loc = glGetUniformLocation(prog, "u_glow");
+	s_u._combine_glow_loc = glGetUniformLocation(prog, "u_glow");
 }
 
 static void passRGB()
@@ -686,9 +679,9 @@ static void passRGB()
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.rgb_fb);
 	glViewport(0, 0, RGB_W, IDX_H);
 	glUseProgram(s_p.rgb_prog);
-	updateUniformsRGB(&s_p.controls);
+	updateUniformsRGB();
 
-	if (s_p.controls.crt_enabled) {
+	if (s_c.crt_enabled) {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
 	}
@@ -710,7 +703,7 @@ static void passStretch()
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.stretch_fb);
 	glViewport(0, 0, RGB_W, STRETCH_H);
 	glUseProgram(s_p.stretch_prog);
-	updateUniformsStretch(&s_p.controls);
+	updateUniformsStretch();
 	meshRender(&s_p.quad_mesh);
 }
 
@@ -733,7 +726,7 @@ static void passScreen()
 	glUseProgram(s_p.screen_prog);
 	updateUniformsScreen(1);
 
-	if (s_p.controls.crt_enabled) {
+	if (s_c.crt_enabled) {
 		meshRender(&s_p.screen_mesh);
 	} else {
 		meshRender(&s_p.quad_mesh);
@@ -742,13 +735,12 @@ static void passScreen()
 
 static void passTV()
 {
-	if (!s_p.controls.crt_enabled) {
+	if (!s_c.crt_enabled) {
 		return;
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.tv_fb);
 //	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, RGB_W, SCREEN_H);
-//	glClear(GL_COLOR_BUFFER_BIT);
 
 	glUseProgram(s_p.tv_prog);
 	updateUniformsTV();
@@ -761,10 +753,7 @@ static void passCombine()
 	glViewport(s_p.viewport[0], s_p.viewport[1], s_p.viewport[2], s_p.viewport[3]);
 	glUseProgram(s_p.combine_prog);
 	updateUniformsCombine();
-//	glEnable(GL_BLEND);
-//	glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE);
 	meshRender(&s_p.quad_mesh);
-//	glDisable(GL_BLEND);
 }
 
 // TODO: reformat inputs to something more meaningful
