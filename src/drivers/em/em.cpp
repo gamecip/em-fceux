@@ -66,7 +66,6 @@ int LoadGame(const char *path)
 	}
 
 	ParseGIInput(GameInfo);
-	RefreshThrottleFPS();
 
 	if(!DriverInitialize(GameInfo)) {
 		return(0);
@@ -229,9 +228,6 @@ static int DriverInitialize(FCEUGI *gi)
 	if(InitSound())
 		inited|=1;
 
-	if(InitJoysticks())
-		inited|=2;
-
 	int fourscore = 0;
 	g_config->getOption("SDL.FourScore", &fourscore);
 	FCEUD_SetInput(fourscore, false, SI_GAMEPAD, SI_NONE, SIFC_NONE);
@@ -247,8 +243,6 @@ static void DriverKill()
 	if (!noconfig)
 		g_config->save();
 
-	if(inited&2)
-		KillJoysticks();
 	if(inited&4)
 		KillVideo();
 	if(inited&1)

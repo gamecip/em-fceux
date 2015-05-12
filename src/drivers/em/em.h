@@ -27,15 +27,6 @@
 #include "../common/configSys.h"
 
 
-// Disabled functions
-// TODO: tsone: remove?
-#define RefreshThrottleFPS()
-#define SpeedThrottle() 0
-#define IncreaseEmulationSpeed()
-#define DecreaseEmulationSpeed()
-#define InitJoysticks() 1
-#define KillJoysticks() 0
-
 // eoptions variable flags
 #define EO_NO8LIM      1
 #define EO_SUBASE      2
@@ -77,8 +68,6 @@
 #define FCFGD_POWERPAD  2
 #define FCFGD_HYPERSHOT 3
 #define FCFGD_QUIZKING  4
-
-#define DTestButtonJoy(a_) 0
 
 // NOTE: tsone: new emscripten input options
 // Key code map size (including ctrl, shift, alt, meta key bits at 8,9,10,11)
@@ -162,7 +151,6 @@ enum FCEM_Input {
 
 // Audio options
 // NOTE: tsone: both SOUND_BUF_MAX and SOUND_HW_BUF_MAX must be power of two!
-#if 1
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 // NOTE: tsone: for 32-bit floating-point audio (SDL2 port)
 #define SOUND_RATE		48000
@@ -175,19 +163,7 @@ enum FCEM_Input {
 #define SOUND_HW_BUF_MAX	512
 #endif
 #define SOUND_QUALITY		0
-#else
-#define SOUND_RATE		44100
-#define SOUND_BUF_MAX		8192
-#define SOUND_HW_BUF_MAX	1024
-#define SOUND_QUALITY		1
-#endif
 #define SOUND_BUF_MASK		(SOUND_BUF_MAX-1)
-
-
-const int INVALID_STATE = 99;
-
-extern CFGSTRUCT DriverConfig[];
-extern ARGPSTRUCT DriverArgs[];
 
 
 extern int isloaded;
@@ -200,15 +176,10 @@ extern int em_sound_frame_samples;
 extern int eoptions;
 
 extern int NoWaiting;
-extern CFGSTRUCT InputConfig[];
-extern ARGPSTRUCT InputArgs[];
 
 extern bool replaceP2StartWithMicrophone;
 
-//extern const char *GamePadNames[GAMEPAD_NUM_BUTTONS];
-//extern const char *DefaultGamePadDevice[GAMEPAD_NUM_DEVICES];
-//extern const int DefaultGamePad[GAMEPAD_NUM_DEVICES][GAMEPAD_NUM_BUTTONS];
-
+// TODO: tsone: unsupported peripherals
 #if PERI
 extern const char *PowerPadNames[POWERPAD_NUM_BUTTONS];
 extern const char *DefaultPowerPadDevice[POWERPAD_NUM_DEVICES];
@@ -239,28 +210,16 @@ extern const char *DefaultFamilyKeyBoardDevice;
 extern const int DefaultFamilyKeyBoard[FAMILYKEYBOARD_NUM_BUTTONS];
 #endif //PERI
 
-void DoDriverArgs(void);
-
 int InitSound();
 void WriteSound(int32 *Buffer, int Count);
 int KillSound(void);
 int GetSoundBufferCount(void);
 
-// TODO: tsone: huh? remove?
 void SilenceSound(int s);
-
-uint32 *GetJSOr(void);
 
 int InitVideo(FCEUGI *gi);
 int KillVideo(void);
 void BlitScreen(uint8 *XBuf);
-
-void SetOpenGLPalette(uint8 *data);
-void BlitOpenGL(uint8 *buf);
-void KillOpenGL(void);
-int InitOpenGL(int l, int r, int t, int b, double xscale, double yscale);
-
-int FCEUD_NetworkConnect(void);
 
 int LoadGame(const char *path);
 int CloseGame(void);

@@ -52,7 +52,22 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['NOCHEAT'] = 1
   env.Tool('emscripten', toolpath=[os.environ['EMSCRIPTEN_TOOL_PATH']])
   env.Replace(PROGSUFFIX = [".js"])
-  exports = '-s EXPORTED_FUNCTIONS=\'["_main","_FCEM_onSaveGameInterval"]\''
+  exportsList = [
+    'main',
+    'FCEM_onSaveGameInterval',
+    'FCEM_setBrightness',
+    'FCEM_setContrast',
+    'FCEM_setColor',
+    'FCEM_setGamma',
+    'FCEM_setGlow',
+    'FCEM_setSharpness',
+    'FCEM_setRGBPPU',
+    'FCEM_setCRTEnabled',
+    'FCEM_setScanlines',
+    'FCEM_setConvergence',
+    'FCEM_setNoise',
+  ]
+  exports = '-s EXPORTED_FUNCTIONS=\'["_' + '","_'.join(exportsList) + '"]\''
   env.Append(LINKFLAGS = exports)
   env.Append(LINKFLAGS = '--preload-file deployment/default/@/default/')
 else:

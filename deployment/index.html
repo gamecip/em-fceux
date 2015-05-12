@@ -230,7 +230,6 @@
           FCEM.controlsToggleElem.checked = show;
         },
         onInitialSyncFromIDB : function(er) {
-          console.log("!!!! initial sync, from IDB");
           assert(!er);
           try {
             FS.mkdir('/fceux/sav');
@@ -240,24 +239,35 @@
             FS.mkdir('/fceux/rom');
           } catch (e) {
           }
-          var savs = findFiles('/default/'); 
-          savs.forEach(function(x) { console.log('!!!! sav: ' + x); });
+//          var savs = findFiles('/default/'); 
+//          savs.forEach(function(x) { console.log('!!!! sav: ' + x); });
           FCEM.updateGames();
           FCEM.updateStack();
           FCEM.showStack(true);
+          // Bind controls.
+          FCEM.setBrightness = Module.cwrap('FCEM_setBrightness', null, ['number']);
+          FCEM.setContrast = Module.cwrap('FCEM_setContrast', null, ['number']);
+          FCEM.setColor = Module.cwrap('FCEM_setColor', null, ['number']);
+          FCEM.setGamma = Module.cwrap('FCEM_setGamma', null, ['number']);
+          FCEM.setGlow = Module.cwrap('FCEM_setGlow', null, ['number']);
+          FCEM.setSharpness = Module.cwrap('FCEM_setSharpness', null, ['number']);
+          FCEM.setRGBPPU = Module.cwrap('FCEM_setRGBPPU', null, ['number']);
+          FCEM.setCRTEnabled = Module.cwrap('FCEM_setCRTEnabled', null, ['number']);
+          FCEM.setScanlines = Module.cwrap('FCEM_setScanlines', null, ['number']);
+          FCEM.setConvergence = Module.cwrap('FCEM_setConvergence', null, ['number']);
+          FCEM.setNoise = Module.cwrap('FCEM_setNoise', null, ['number']);
+          // Write savegame and synchronize IDBFS in intervals.
+          setInterval(Module.cwrap('FCEM_onSaveGameInterval'), 1000);
         },
         onDeleteGameSyncFromIDB : function(er) {
-          console.log("!!!! delete sync, from IDB");
           assert(!er);
           FCEM.updateGames();
           FCEM.updateStack();
         },
         onSyncToIDB : function(er) {
-//          console.log("!!!! generic sync, to IDB");
           assert(!er);
         },
         onDOMLoaded : function() {
-          console.log('!!!! DOM loaded');
           FCEM.stackToggleElem = document.getElementById('stackToggle');
           FCEM.controlsToggleElem = document.getElementById('controlsToggle');
           FCEM.showStack(false);
@@ -347,21 +357,10 @@
 
       var Module = {
         preRun: [function() {
-          console.log("!!!! preRun");
-          resetControls();
-// TODO: tsone: remove, hides stack and tab
-/*
-          // Disable unnecessary SDL surface features.
-          SDL.defaults.copyOnLock = false;
-          SDL.defaults.discardOnLock = true;
-          SDL.defaults.opaqueFrontBuffer = false;
-*/
           // Mount IndexedDB file system (IDBFS) to /fceux.
           FS.mkdir('/fceux');
           FS.mount(IDBFS, {}, '/fceux');
           FS.syncfs(true, FCEM.onInitialSyncFromIDB);
-          // Write savegame and synchronize IDBFS in intervals.
-          setInterval(Module.cwrap('FCEM_onSaveGameInterval'), 1000);
         }],
         postRun: [],
         print: function() {
@@ -416,20 +415,17 @@
         return function(ev) {
           ev.stopPropagation();
           ev.preventDefault();
-          console.log('!!!! drag:' + text);
         };
       }
       function dropHandler(ev) {
         ev.stopPropagation();
         ev.preventDefault();
-        console.log('!!!! drop');
         var f = ev.dataTransfer.files[0];
         if (f && confirm('want to add game: ' + f.name + '?')) {
           var r = new FileReader();
           r.onload = function(e) { 
             var opts = {encoding:'binary'};
             var path = PATH.join2('/fceux/rom/', f.name);
-            console.log('!!!! loadROMFile: ' + path);
             FS.writeFile(path, new Uint8Array(e.target.result), opts);
             FCEM.updateGames();
             FCEM.updateStack();
@@ -444,24 +440,6 @@
       document.addEventListener('drop', dropHandler, false);
     </script>
     <script type="text/javascript">
-      function changeControl(name, value) {
-        name += 'Control';
-        Module[name] = value;
-        console.log('!!!! changeControl: ' + name + ':' + Module[name]);
-      }
-      function resetControls() {
-        Module.brightnessControl = 0;
-        Module.contrastControl = 0;
-        Module.colorControl = 0;
-        Module.gammaControl = 0;
-        Module.glowControl = 0.2;
-        Module.sharpnessControl = 0.2;
-        Module.rgbppuControl = 0;
-        Module.crtControl = 1;
-        Module.scanlinesControl = 0.1;
-        Module.convergenceControl = 0.4;
-        Module.noiseControl = 0.3;
-      }
     </script>
 
     <input id="controlsToggle" type="checkbox" hidden="1" />
@@ -469,19 +447,19 @@
         <div id="controlsContainer">
           <div id="controlsSliders">
     <h3>Picture Controls</h3>
-    Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('brightness', this.value)" onchange="changeControl('brightness', this.value)"/><br/>
-    Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('contrast', this.value)" onchange="changeControl('contrast', this.value)"/><br/>
-    Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('color', this.value)" onchange="changeControl('color', this.value)"/><br/>
-    Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="changeControl('sharpness', this.value)" onchange="changeControl('sharpness', this.value)"/><br/>
-    Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
+    Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setBrightness(this.value)" onchange="FCEM.setBrightness(this.value)"/><br/>
+    Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setContrast(this.value)" onchange="FCEM.setContrast(this.value)"/><br/>
+    Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setColor(this.value)" onchange="FCEM.setColor(this.value)"/><br/>
+    Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="FCEM.setSharpness(this.value)" onchange="FCEM.setSharpness(this.value)"/><br/>
+    Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setGamma(this.value)" onchange="FCEM.setGamma(this.value)"/><br/>
     <h3>Emulation Controls</h3>
-    Glow <input type="range" min="0" max="1" value="0.2" step="0.1" oninput="changeControl('glow', this.value)" onchange="changeControl('glow', this.value)"/><br/>
-    RGB PPU <input type="range" min="0" max="1" value="0" step="0.1" oninput="changeControl('rgbppu', this.value)" onchange="changeControl('rgbppu', this.value)"/><br/>
+    Glow <input type="range" min="0" max="1" value="0.2" step="0.1" oninput="FCEM.setGlow(this.value)" onchange="FCEM.setGlow(this.value)"/><br/>
+    RGB PPU <input type="range" min="0" max="1" value="0" step="0.1" oninput="FCEM.setRGBPPU(this.value)" onchange="FCEM.setRGBPPU(this.value)"/><br/>
     <h3>CRT Emulation Controls</h3>
-    CRT Emulation <input type="checkbox" checked="1" oninput="changeControl('crt', this.checked)" onchange="changeControl('crt', this.checked)"/><br/>
-    CRT Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="changeControl('scanlines', this.value)" onchange="changeControl('scanlines', this.value)"/><br/>
-    CRT Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="changeControl('convergence', this.value)" onchange="changeControl('convergence', this.value)"/><br/>
-    CRT Noise <input type="range" min="0" max="1" value="0.3" step="0.1" oninput="changeControl('noise', this.value)" onchange="changeControl('noise', this.value)"/><br/>
+    CRT Emulation <input type="checkbox" checked="1" oninput="FCEM.setCRTEnabled(this.checked)" onchange="FCEM.setCRTEnabled(this.checked)"/><br/>
+    CRT Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="FCEM.setScanlines(this.value)" onchange="FCEM.setScanlines(this.value)"/><br/>
+    CRT Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="FCEM.setConvergence(this.value)" onchange="FCEM.setConvergence(this.value)"/><br/>
+    CRT Noise <input type="range" min="0" max="1" value="0.3" step="0.1" oninput="FCEM.setNoise(this.value)" onchange="FCEM.setNoise(this.value)"/><br/>
         </div>
     <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(false, false)"/>
 <!--    <input type="button" value="Reset" onclick="resetControls()"/>
@@ -532,7 +510,6 @@
         var idx = askConfirmGame(ev, el, 'want to delete');
         if (idx != -1) {
           var item = FCEM.games.slice(idx, idx+1)[0];
-          console.log("!!!! delete game:" + item.path);
           FS.unlink(item.path);
           FS.syncfs(FCEM.onDeleteGameSyncFromIDB);
         }

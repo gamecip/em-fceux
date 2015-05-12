@@ -5,7 +5,7 @@
 typedef struct t_es2n_controls
 {
     // All controls should be in range [-1,1]. Default is 0.
-    GLfloat brightness; // Brightness control.
+    double brightness; // Brightness control.
     GLfloat contrast;   // Contrast control.
     GLfloat color;      // Color control.
     GLfloat gamma;      // Gamma control.

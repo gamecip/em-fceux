@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "em.h"
+#include "es2n.h"
 #include "../../fceu.h"
 #include "../../video.h"
 #include "../../utils/memory.h"
@@ -29,6 +30,8 @@
 #define NWIDTH	(256 - (s_clipSides ? 16 : 0))
 #define NOFFSET	(s_clipSides ? 8 : 0)
 
+extern uint8 deempScan[240];
+extern uint8 PALRAM[0x20];
 extern Config *g_config;
 
 static int s_curbpp;
@@ -41,41 +44,55 @@ static int s_clipSides;
 static int s_nativeWidth = -1;
 static int s_nativeHeight = -1;
 
-//draw input aids if we are fullscreen
+static es2n s_es2n;
+
+
+// Functions only needed for linking.
+void SetOpenGLPalette(uint8*) {}
+void FCEUD_SetPalette(uint8, uint8, uint8, uint8) {}
+void FCEUD_GetPalette(uint8 index, uint8 *r, uint8 *g, uint8 *b)
+{
+	*r = *g = *b = 0;
+}
+
 bool FCEUD_ShouldDrawInputAids()
 {
 	return false;
 }
- 
-/**
- * Attempts to destroy the graphical video display.  Returns 0 on
- * success, -1 on failure.
- */
-int
-KillVideo()
+
+static int InitOpenGL(int left, int right, int top, int bottom, double xscale, double yscale)
 {
+	int rw=(int)((right-left)*xscale);
+	int rh=(int)((bottom-top)*yscale);
+//	int sx=(screen->w-rw)/2;    // Start x
+//	int sy=(screen->h-rh)/2;    // Start y
+
+//	if(stretchx) { sx=0; rw=screen->w; }
+//	if(stretchy) { sy=0; rh=screen->h; }
+//	glViewport(sx, sy, rw, rh);
+	glViewport(0, 0, rw, rh);
+
+	es2nInit(&s_es2n, left, right, top, bottom);
+
+	return 1;
+}
+ 
+// Returns 0 on success, -1 on failure.
+int KillVideo()
+{
+// TODO: tsone: never cleanup video?
+#if 0
 	// return failure if the video system was not initialized
 	if(s_inited == 0)
 		return -1;
-    
+
 	// if the rest of the system has been initialized, shut it down
 	// check for OpenGL and shut it down
-	KillOpenGL();
+	es2nDeinit(&s_es2n);
 
 	s_inited = 0;
+#endif
 	return 0;
-}
-
-/**
- * These functions determine an appropriate scale factor for fullscreen/
- */
-inline double GetXScale(int xres)
-{
-	return ((double)xres) / NWIDTH;
-}
-inline double GetYScale(int yres)
-{
-	return ((double)yres) / s_tlines;
 }
 
 void FCEUD_VideoChanged()
@@ -86,10 +103,18 @@ void FCEUD_VideoChanged()
 		PAL = 0;
 }
 
-// Return 0 on success, -1 on failure.
-int
-InitVideo(FCEUGI *gi)
+void BlitScreen(uint8 *buf)
 {
+    es2nRender(&s_es2n, buf, deempScan, PALRAM[0]);
+}
+
+// Return 0 on success, -1 on failure.
+int InitVideo(FCEUGI *gi)
+{
+	if (s_inited) {
+		return 0;
+	}
+
 	s_clipSides = 0; // Don't clip left side.
 
 	// check the starting, ending, and total scan lines
@@ -103,8 +128,6 @@ InitVideo(FCEUGI *gi)
 	int h = (int) (s_tlines * s_eys);
 	s_nativeWidth = w;
 	s_nativeHeight = h;
-
-	s_inited = 1;
 
 	FCEUI_SetShowFPS(1);
     
@@ -132,14 +155,9 @@ InitVideo(FCEUGI *gi)
 		return -1;
 	}
 
-	return 0;
-}
+	s_inited = 1;
 
-// TODO: tsone: may be removed if fceux doesn't really use these..
-void FCEUD_SetPalette(uint8, uint8, uint8, uint8) {}
-void FCEUD_GetPalette(uint8 index, uint8 *r, uint8 *g, uint8 *b)
-{
-	*r = *g = *b = 0;
+	return 0;
 }
 
 /**
@@ -156,3 +174,60 @@ void PtoV(int *x, int *y)
 	*y += s_srendline;
 }
 
+extern "C" {
+void FCEM_setBrightness(double v)
+{
+//        printf("!!!! brightness: %f\n", v);
+	s_es2n.controls.brightness = v;
+}
+
+void FCEM_setContrast(double v)
+{
+	s_es2n.controls.contrast = v;
+}
+
+void FCEM_setColor(double v)
+{
+	s_es2n.controls.color = v;
+}
+
+void FCEM_setGamma(double v)
+{
+	s_es2n.controls.gamma = v;
+}
+
+void FCEM_setGlow(double v)
+{
+	s_es2n.controls.glow = v;
+}
+
+void FCEM_setSharpness(double v)
+{
+	s_es2n.controls.sharpness = v;
+}
+
+void FCEM_setRGBPPU(double v)
+{
+	s_es2n.controls.rgbppu = v;
+}
+
+void FCEM_setCRTEnabled(int v)
+{
+	s_es2n.controls.crt_enabled = v;
+}
+
+void FCEM_setScanlines(double v)
+{
+	s_es2n.controls.scanlines = v;
+}
+
+void FCEM_setConvergence(double v)
+{
+	s_es2n.controls.convergence = v;
+}
+
+void FCEM_setNoise(double v)
+{
+	s_es2n.controls.noise = v;
+}
+}
