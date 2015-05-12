@@ -93,8 +93,24 @@
 
 #include "shaders.h"
 
+// NOTE: do not change order!
+enum {
+	BRIGHTNESS = 0,
+	CONTRAST,
+	COLOR,
+	GAMMA,
+	GLOW,
+	SHARPNESS,
+	RGBPPU,
+	CRT_ENABLED,
+	SCANLINES,
+	CONVERGENCE,
+	NOISE,
+	CONTROL_COUNT
+};
+
 static es2n s_p;
-static es2n_controls s_c;
+static GLfloat s_c[CONTROL_COUNT];
 static es2n_uniforms s_u;
 
 static const GLint mesh_quad_vert_num = 4;
@@ -148,59 +164,11 @@ static const int s_downsample_widths[]  = { 1120, 280, 280,  70, 70, 18, 18 };
 static const int s_downsample_heights[] = {  960, 960, 240, 240, 60, 60, 15 };
 
 extern "C" {
-void FCEM_setBrightness(double v)
+void FCEM_setControl(int idx, double v)
 {
-	s_c.brightness = v;
-}
-
-void FCEM_setContrast(double v)
-{
-	s_c.contrast = v;
-}
-
-void FCEM_setColor(double v)
-{
-	s_c.color = v;
-}
-
-void FCEM_setGamma(double v)
-{
-	s_c.gamma = v;
-}
-
-void FCEM_setGlow(double v)
-{
-	s_c.glow = v;
-}
-
-void FCEM_setSharpness(double v)
-{
-	s_c.sharpness = v;
-}
-
-void FCEM_setRGBPPU(double v)
-{
-	s_c.rgbppu = v;
-}
-
-void FCEM_setCRTEnabled(int v)
-{
-	s_c.crt_enabled = v;
-}
-
-void FCEM_setScanlines(double v)
-{
-	s_c.scanlines = v;
-}
-
-void FCEM_setConvergence(double v)
-{
-	s_c.convergence = v;
-}
-
-void FCEM_setNoise(double v)
-{
-	s_c.noise = v;
+	if (idx >= 0 && idx < CONTROL_COUNT) {
+		s_c[idx] = v;
+	}
 }
 }
 
@@ -435,17 +403,17 @@ static void updateUniformsRGB()
 {
 	DBG(updateUniformsDebug())
 	double v;
-	v = 0.15 * s_c.brightness;
+	v = 0.15 * s_c[BRIGHTNESS];
 	glUniform1f(s_u._rgb_brightness_loc, v);
-	v = 1.0 + 0.4*s_c.contrast;
+	v = 1.0 + 0.4*s_c[CONTRAST];
 	glUniform1f(s_u._rgb_contrast_loc, v);
-	v = 1.0 + s_c.color;
+	v = 1.0 + s_c[COLOR];
 	glUniform1f(s_u._rgb_color_loc, v);
-	v = s_c.rgbppu;
+	v = s_c[RGBPPU];
 	glUniform1f(s_u._rgb_rgbppu_loc, v);
-	v = 2.4/2.2 + 0.3*s_c.gamma;
+	v = 2.4/2.2 + 0.3*s_c[GAMMA];
 	glUniform1f(s_u._rgb_gamma_loc, v);
-	v = s_c.crt_enabled * 0.08 * s_c.noise*s_c.noise;
+	v = s_c[CRT_ENABLED] * 0.08 * s_c[NOISE]*s_c[NOISE];
 	glUniform1f(s_u._rgb_noiseAmp_loc, v);
 	glUniform2f(s_u._rgb_noiseRnd_loc, rand01(), rand01());
 }
@@ -453,10 +421,10 @@ static void updateUniformsRGB()
 static void updateUniformsSharpen()
 {
 	DBG(updateUniformsDebug())
-	double v = s_c.crt_enabled * 2.0 * s_c.convergence;
+	double v = s_c[CRT_ENABLED] * 2.0 * s_c[CONVERGENCE];
 	glUniform1f(s_u._sharpen_convergence_loc, v);
 
-	v = (1.0-s_c.rgbppu) * 0.4 * (s_c.sharpness+0.5);
+	v = (1.0-s_c[RGBPPU]) * 0.4 * (s_c[SHARPNESS]+0.5);
 	GLfloat sharpen_kernel[] = {
 		-v, -v, -v,
 		1, 0, 0, 
@@ -472,7 +440,7 @@ static void updateUniformsStretch()
 {
 	DBG(updateUniformsDebug())
 	double v;
-	v = s_c.crt_enabled * 0.45 * s_c.scanlines;
+	v = s_c[CRT_ENABLED] * 0.45 * s_c[SCANLINES];
 	glUniform1f(s_u._stretch_scanlines_loc, v);
 }
 
@@ -480,7 +448,7 @@ static void updateUniformsScreen(int final_pass)
 {
 	DBG(updateUniformsDebug())
 
-	if (s_c.crt_enabled) {
+	if (s_c[CRT_ENABLED]) {
 		glUniform2f(s_u._screen_uvScale_loc, (IDX_W-3.0)/IDX_W, (IDX_H-4.0)/IDX_H);
 		glUniformMatrix4fv(s_u._screen_mvp_loc, 1, GL_FALSE, s_p.mvp_mat);
 	} else {
@@ -518,7 +486,7 @@ static void updateUniformsTV()
 static void updateUniformsCombine()
 {
 	DBG(updateUniformsDebug())
-	double v = 0.1 * s_c.glow;
+	double v = 0.1 * s_c[GLOW];
 	glUniform3f(s_u._combine_glow_loc, v, v*v, v + v*v);
 }
 
@@ -681,7 +649,7 @@ static void passRGB()
 	glUseProgram(s_p.rgb_prog);
 	updateUniformsRGB();
 
-	if (s_c.crt_enabled) {
+	if (s_c[CRT_ENABLED]) {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
 	}
@@ -726,7 +694,7 @@ static void passScreen()
 	glUseProgram(s_p.screen_prog);
 	updateUniformsScreen(1);
 
-	if (s_c.crt_enabled) {
+	if (s_c[CRT_ENABLED]) {
 		meshRender(&s_p.screen_mesh);
 	} else {
 		meshRender(&s_p.quad_mesh);
@@ -735,7 +703,7 @@ static void passScreen()
 
 static void passTV()
 {
-	if (!s_c.crt_enabled) {
+	if (!s_c[CRT_ENABLED]) {
 		return;
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.tv_fb);
@@ -878,17 +846,17 @@ void es2nInit(int left, int right, int top, int bottom)
 
 	// Set controls to defaults.
 // TODO: tsone: think of better way to do this..?
-	FCEM_setBrightness(0);
-	FCEM_setContrast(0);
-	FCEM_setColor(0);
-	FCEM_setSharpness(0.2);
-	FCEM_setGamma(0);
-	FCEM_setGlow(0.2);
-	FCEM_setRGBPPU(0);
-	FCEM_setCRTEnabled(1);
-	FCEM_setScanlines(0.1);
-	FCEM_setConvergence(0.4);
-	FCEM_setNoise(0.3);
+	FCEM_setControl(BRIGHTNESS, 0);
+	FCEM_setControl(CONTRAST, 0);
+	FCEM_setControl(COLOR, 0);
+	FCEM_setControl(SHARPNESS, 0.2);
+	FCEM_setControl(GAMMA, 0);
+	FCEM_setControl(GLOW, 0.2);
+	FCEM_setControl(RGBPPU, 0);
+	FCEM_setControl(CRT_ENABLED, 1);
+	FCEM_setControl(SCANLINES, 0.1);
+	FCEM_setControl(CONVERGENCE, 0.4);
+	FCEM_setControl(NOISE, 0.3);
 }
 
 void es2nDeinit()

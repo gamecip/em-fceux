@@ -2,25 +2,6 @@
 #define _ES2N_H_
 #include "es2utils.h"
 
-typedef struct t_es2n_controls
-{
-    // All controls should be in range [-1,1]. Default is 0.
-    GLfloat brightness; // Brightness control.
-    GLfloat contrast;   // Contrast control.
-    GLfloat color;      // Color control.
-    GLfloat gamma;      // Gamma control.
-    GLfloat glow;       // Glow control.
-    GLfloat sharpness;  // Sharpness control.
-    GLfloat rgbppu;     // RGB PPU control.
-
-    // Controls for CRT emulation. If CRT emulation is disabled, these do nothing.
-    int crt_enabled;    // Set to zero to disable CRT emulation.
-    GLfloat scanlines;  // CRT scanlines strength.
-    GLfloat convergence; // CRT red-blue convergence.
-    GLfloat noise;      // CRT noise control.
-
-} es2n_controls;
-
 // Uniform locations.
 typedef struct t_es2n_uniforms
 {

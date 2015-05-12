@@ -55,17 +55,7 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   exportsList = [
     'main',
     'FCEM_onSaveGameInterval',
-    'FCEM_setBrightness',
-    'FCEM_setContrast',
-    'FCEM_setColor',
-    'FCEM_setGamma',
-    'FCEM_setGlow',
-    'FCEM_setSharpness',
-    'FCEM_setRGBPPU',
-    'FCEM_setCRTEnabled',
-    'FCEM_setScanlines',
-    'FCEM_setConvergence',
-    'FCEM_setNoise',
+    'FCEM_setControl'
   ]
   exports = '-s EXPORTED_FUNCTIONS=\'["_' + '","_'.join(exportsList) + '"]\''
   env.Append(LINKFLAGS = exports)
