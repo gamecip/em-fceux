@@ -863,6 +863,12 @@ void es2nDeinit(es2n *p)
 
 void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 {
+    // Update viewport size.
+    int width, height, fullscreen;
+    emscripten_get_canvas_size(&width, &height, &fullscreen);
+    p->viewport[2] = width;
+    p->viewport[3] = height;
+
     // Update input pixels.
     glActiveTexture(TEX(IDX_I));
     glBindTexture(GL_TEXTURE_2D, p->idx_tex);

@@ -5,7 +5,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>FCEUX</title>
     <style>
-      body {
+      html, body {
         margin: 0;
         border: 0px none;
         padding: none;
@@ -16,55 +16,42 @@
         font-weight: 900;
         color: #EEE;
         background-color: #111;
+        width: 100%;
+        height: 100%;
         overflow: hidden;
       }
       .emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
       div.emscripten { text-align: center; }      
-      #container {
+      canvas.emscripten {
+        position: relative;
+        border: 0px none;
+        width: 1120px;
+        height: 896px;
+        width: auto;
+        height: 100%;
+      }
+      #centerContainer {
         text-align: center;
         position: absolute;
         top: 50%;
         left: 50%;
         border: 0px none;
-        width: 640px;
-        height: 448px;
-        margin-left: -560px;
-        margin-top: -480px;
-        background-color: #111;
-      }
-      canvas.emscripten {
-        position: relative;
-        border: 0px none;
-      }
-      #visor {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        border: 0px none;
-        width: 998px;
-        height: 649px;
-        margin-left: -384px;
-        margin-top: -318px;
-        visibility: hidden;
-//        background-image: url('img/mock3.png');
+        width: 256px;
+        height: 256px;
+        margin-left: -128px;
+        margin-top: -128px;
       }
       #loader {
         position: absolute;
         top: 50%;
         left: 50%;
-        width: 640px;
+        width: 88px;
         height: 88px;
-        margin-left: -320px;
+        margin-left: -44px;
         margin-top: -44px;
         background-color: #111;
       }
-      #controls {
-        position: absolute;
-        width: 640px;
-        height: 448px;
-        background-color: #111;
-      }
-      #spinner {
+      #loaderSpinner {
         height: 36px;
         width: 36px;
         margin: 0;
@@ -98,6 +85,52 @@
       @keyframes rotation {
         from {transform: rotate(0deg);}
         to {transform: rotate(360deg);}
+      }
+      #controlsTab {
+        position: absolute;
+        top: 0;
+        left: -280px;
+        width: 300px;
+        height: 100%;
+        transition: left 500ms;
+      }
+      #controlsToggleLabel {
+        position: absolute;
+        top: 50%;
+        right: 0px;
+        margin-top: -64px;
+        margin-right: 0px;
+        border-style: solid;
+        border-color: transparent white transparent white;
+        opacity: 0.3;
+        border-width: 64px 0px 64px 16px;
+        width: 0px;
+        height: 0px;
+        -webkit-transform: scale(.9999); 
+        -moz-transform: scale(.9999); 
+        -o-transform: scale(.9999); 
+        transform: scale(.9999);
+      }
+      #controlsToggle:checked + #controlsTab #controlsToggleLabel {
+        border-width: 64px 16px 64px 0px;
+      }
+      #controlsToggle:checked ~ #controlsTab {
+        left: 0px;
+      }
+      #controlsContainer {
+        position: absolute;
+        text-align: right;
+        bottom: 0px;
+        left: 0px;
+        width: 280px;
+        height: 100%;
+        overflow: hidden;
+      }
+      #controlsSliders input {
+	margin: 0;
+	padding: 0;
+        right: 0px;
+        width: 150px;
       }
       #stackTab {
         position: absolute;
@@ -188,16 +221,13 @@
     <script type="text/javascript">
       var FCEM = {
         games : [],
-        toggleElem : null,
+        stackToggleElem : null,
+        controlsToggleElem : null,
         showStack : function(show) {
-          FCEM.toggleElem.checked = show;
-// TODO: tsone: remove, hides stack and tab
-/*
-          var container = document.getElementById("stackTab");
-          container.hidden = !show;
-          container = document.getElementById("stackToggle");
-          container.hidden = !show;
-*/
+          FCEM.stackToggleElem.checked = show;
+        },
+        showControls : function(show) {
+          FCEM.controlsToggleElem.checked = show;
         },
         onInitialSyncFromIDB : function(er) {
           console.log("!!!! initial sync, from IDB");
@@ -228,8 +258,10 @@
         },
         onDOMLoaded : function() {
           console.log('!!!! DOM loaded');
-          FCEM.toggleElem = document.getElementById('stackToggle');
+          FCEM.stackToggleElem = document.getElementById('stackToggle');
+          FCEM.controlsToggleElem = document.getElementById('controlsToggle');
           FCEM.showStack(false);
+          FCEM.showControls(false);
         },
         startGame : function(path) {
           Module.romName = path;
@@ -258,8 +290,8 @@
         },
         updateStack : function() {
           var games = FCEM.games;
-          var container = document.getElementById("stackContainer");
-          var scrollPos = container.scrollTop;
+          var stackContainer = document.getElementById("stackContainer");
+          var scrollPos = stackContainer.scrollTop;
           var list = document.getElementById("stack");
           var proto = document.getElementById("cartProto");
         
@@ -290,7 +322,7 @@
             }
           }
         
-          container.scrollTop = scrollPos;
+          stackContainer.scrollTop = scrollPos;
         }
       };
       window.onbeforeunload = function (ev) {
@@ -302,20 +334,16 @@
   </head>
   <body>
 
-    <div id="container">
-      <canvas class="emscripten" id="canvas" hidden="true" oncontextmenu="event.preventDefault()"></canvas>
+    <canvas class="emscripten" id="canvas" hidden="true" oncontextmenu="event.preventDefault()"></canvas>
+
+    <div id="centerContainer">
       <div id="loader">
-        <div id="spinner"></div>
-      </div>
-      <div id="controls" hidden="true">
+        <div id="loaderSpinner"></div>
       </div>
     </div>
 
-    <div id="visor"></div>
-
     <script type='text/javascript'>
-      var loaderElement = document.getElementById('loader');
-      var controlsElement = document.getElementById('controls');
+      var centerContainerElem = document.getElementById('centerContainer');
 
       var Module = {
         preRun: [function() {
@@ -362,12 +390,10 @@
           if (m && now - Date.now() < 30) return;
           if (m) {
             text = m[1];
-            //loaderElement.hidden = false;
           } else {
             if (!text) {
-              //controlsElement.hidden = false;
               Module.canvas.hidden = false;
-              loaderElement.hidden = true;
+              centerContainerElem.hidden = true;
             }
           }
         },
@@ -438,19 +464,32 @@
       }
     </script>
 
-    <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(false, false)"/><br/>
+    <input id="controlsToggle" type="checkbox" hidden="1" />
+    <div id="controlsTab">
+        <div id="controlsContainer">
+          <div id="controlsSliders">
+    <h3>Picture Controls</h3>
     Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('brightness', this.value)" onchange="changeControl('brightness', this.value)"/><br/>
     Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('contrast', this.value)" onchange="changeControl('contrast', this.value)"/><br/>
     Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('color', this.value)" onchange="changeControl('color', this.value)"/><br/>
-    Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
-    Glow <input type="range" min="0" max="1" value="0.2" step="0.1" oninput="changeControl('glow', this.value)" onchange="changeControl('glow', this.value)"/><br/>
     Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="changeControl('sharpness', this.value)" onchange="changeControl('sharpness', this.value)"/><br/>
+    Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="changeControl('gamma', this.value)" onchange="changeControl('gamma', this.value)"/><br/>
+    <h3>Emulation Controls</h3>
+    Glow <input type="range" min="0" max="1" value="0.2" step="0.1" oninput="changeControl('glow', this.value)" onchange="changeControl('glow', this.value)"/><br/>
     RGB PPU <input type="range" min="0" max="1" value="0" step="0.1" oninput="changeControl('rgbppu', this.value)" onchange="changeControl('rgbppu', this.value)"/><br/>
+    <h3>CRT Emulation Controls</h3>
     CRT Emulation <input type="checkbox" checked="1" oninput="changeControl('crt', this.checked)" onchange="changeControl('crt', this.checked)"/><br/>
     CRT Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="changeControl('scanlines', this.value)" onchange="changeControl('scanlines', this.value)"/><br/>
     CRT Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="changeControl('convergence', this.value)" onchange="changeControl('convergence', this.value)"/><br/>
     CRT Noise <input type="range" min="0" max="1" value="0.3" step="0.1" oninput="changeControl('noise', this.value)" onchange="changeControl('noise', this.value)"/><br/>
-    <input type="button" value="Reset" onclick="resetControls()"/><br/>
+        </div>
+    <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(false, false)"/>
+<!--    <input type="button" value="Reset" onclick="resetControls()"/>
+    <input type="button" value="Hide stack" onclick="FCEM.showStack(false)" />
+    <input type="button" value="dump FS" onclick="var f = findFiles('/'); f.forEach(function(x) { console.log('!!!! dump: ' + x); })" /> -->
+        </div>
+        <label id="controlsToggleLabel" for="controlsToggle"></label>
+    </div>
 
     <div hidden="1">
       <div class="cart" id="cartProto" onclick="return askSelectGame(event, this);"><div class="labelContainer"><div class="label"></div></div><div class="cartDelete" onclick="return askDeleteGame(event, this.parentNode);"></div></div>
@@ -460,8 +499,6 @@
         <label id="stackToggleLabel" for="stackToggle"></label>
         <div id="stackContainer"><div id="stack"><div></div></div></div>
     </div>
-    <input type="button" value="hide stack" onclick="FCEM.showStack(false)" />
-    <input type="button" value="dump FS" onclick="var f = findFiles('/'); f.forEach(function(x) { console.log('!!!! dump: ' + x); })" />
 
     <script type="text/javascript">
       var current = 0;
@@ -486,7 +523,7 @@
         var idx = askConfirmGame(ev, el, 'want to start');
         if (idx != -1) {
           FCEM.startGame(FCEM.games[idx].path);
-          setTimeout(function() { FCEM.showStack(false); }, 1000);
+          setTimeout(function() { FCEM.showStack(false); FCEM.showControls(false); }, 1000);
         }
         return false;
       }
