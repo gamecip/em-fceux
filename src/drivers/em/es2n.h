@@ -5,7 +5,7 @@
 typedef struct t_es2n_controls
 {
     // All controls should be in range [-1,1]. Default is 0.
-    double brightness; // Brightness control.
+    GLfloat brightness; // Brightness control.
     GLfloat contrast;   // Contrast control.
     GLfloat color;      // Color control.
     GLfloat gamma;      // Gamma control.
@@ -91,9 +91,9 @@ typedef struct t_es2n
     GLint _downsample_downsampleTex_loc;
 } es2n;
 
-void es2nInit(es2n *p, int left, int right, int top, int bottom);
-void es2nUpdateControls(es2n *p);
-void es2nDeinit(es2n *p);
-void es2nRender(es2n *p, GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color);
+void es2nInit(int left, int right, int top, int bottom);
+void es2nUpdateControls();
+void es2nDeinit();
+void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color);
 
 #endif

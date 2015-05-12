@@ -44,8 +44,6 @@ static int s_clipSides;
 static int s_nativeWidth = -1;
 static int s_nativeHeight = -1;
 
-static es2n s_es2n;
-
 
 // Functions only needed for linking.
 void SetOpenGLPalette(uint8*) {}
@@ -72,7 +70,7 @@ static int InitOpenGL(int left, int right, int top, int bottom, double xscale, d
 //	glViewport(sx, sy, rw, rh);
 	glViewport(0, 0, rw, rh);
 
-	es2nInit(&s_es2n, left, right, top, bottom);
+	es2nInit(left, right, top, bottom);
 
 	return 1;
 }
@@ -88,7 +86,7 @@ int KillVideo()
 
 	// if the rest of the system has been initialized, shut it down
 	// check for OpenGL and shut it down
-	es2nDeinit(&s_es2n);
+	es2nDeinit();
 
 	s_inited = 0;
 #endif
@@ -105,7 +103,7 @@ void FCEUD_VideoChanged()
 
 void BlitScreen(uint8 *buf)
 {
-    es2nRender(&s_es2n, buf, deempScan, PALRAM[0]);
+    es2nRender(buf, deempScan, PALRAM[0]);
 }
 
 // Return 0 on success, -1 on failure.
@@ -174,60 +172,3 @@ void PtoV(int *x, int *y)
 	*y += s_srendline;
 }
 
-extern "C" {
-void FCEM_setBrightness(double v)
-{
-//        printf("!!!! brightness: %f\n", v);
-	s_es2n.controls.brightness = v;
-}
-
-void FCEM_setContrast(double v)
-{
-	s_es2n.controls.contrast = v;
-}
-
-void FCEM_setColor(double v)
-{
-	s_es2n.controls.color = v;
-}
-
-void FCEM_setGamma(double v)
-{
-	s_es2n.controls.gamma = v;
-}
-
-void FCEM_setGlow(double v)
-{
-	s_es2n.controls.glow = v;
-}
-
-void FCEM_setSharpness(double v)
-{
-	s_es2n.controls.sharpness = v;
-}
-
-void FCEM_setRGBPPU(double v)
-{
-	s_es2n.controls.rgbppu = v;
-}
-
-void FCEM_setCRTEnabled(int v)
-{
-	s_es2n.controls.crt_enabled = v;
-}
-
-void FCEM_setScanlines(double v)
-{
-	s_es2n.controls.scanlines = v;
-}
-
-void FCEM_setConvergence(double v)
-{
-	s_es2n.controls.convergence = v;
-}
-
-void FCEM_setNoise(double v)
-{
-	s_es2n.controls.noise = v;
-}
-}
