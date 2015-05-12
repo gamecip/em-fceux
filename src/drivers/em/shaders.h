@@ -216,6 +216,8 @@ static const char* screen_vert_src =
     "v_noiseUV = vec2(RGB_W, SCREEN_H) * vwc / vec2(NOISE_W, NOISE_H);\n"
     "}\n";
 static const char* screen_frag_src =
+DEFINE(IDX_W)
+DEFINE(IDX_H)
 "uniform sampler2D u_stretchTex;\n"
 "uniform sampler2D u_noiseTex;\n"
 "varying vec2 v_uv;\n"
@@ -236,13 +238,9 @@ static const char* screen_frag_src =
 //    "color += 0.018 * texture2D(u_stretchTex, v_uv - 0.021*n.xy).rgb;\n"
 
     // Set black if outside the border
-//    "vec2 uvd = max(abs(v_uv[2] - 0.5) - (0.4 + 0.1*u_mouse.xy / vec2(256.0, 224.0)), 0.0);\n"
-    "vec2 uvd = max(abs(v_uv - 0.5) - (0.4 + 0.1*vec2(90.0, 76.0) / vec2(256.0, 224.0)), 0.0);\n"
-//    "color *= max(1.0 - 3000.0 * dot(uvd, uvd), 0.0);\n"
+    "vec2 uvd = max(abs(v_uv - 0.5) - vec2(128.0-6.5, 112.0-3.5) / vec2(IDX_W, IDX_H), 0.0);\n"
     "float border = clamp(3.0 - 3.0*3000.0 * dot(uvd, uvd), 0.0, 1.0);\n"
     "color *= border;\n"
-//    "const float LIME = 1.0/3000.0;\n"
-//    "color *= max(1.0 - max(2.0*dot(uvd, uvd) / LIME - 1.0, 0.0), 0.0);\n"
 
     "float shade = shadeBlinn(v_pos, n);\n"
     "shade *= 0.638*border + 0.362;\n"

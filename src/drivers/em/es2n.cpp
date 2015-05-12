@@ -430,7 +430,7 @@ static void updateUniformsScreen(const es2n *p, int final_pass)
     const es2n_controls *c = &p->controls;
 
     if (c->crt_enabled) {
-        glUniform2f(c->_screen_uvScale_loc, 278.0/IDX_W, 228.0/IDX_H);
+        glUniform2f(c->_screen_uvScale_loc, (IDX_W-3.0)/IDX_W, (IDX_H-4.0)/IDX_H);
         glUniformMatrix4fv(c->_screen_mvp_loc, 1, GL_FALSE, p->mvp_mat);
     } else {
         glUniform2f(c->_screen_uvScale_loc, 260.0/IDX_W, 224.0/IDX_H);
