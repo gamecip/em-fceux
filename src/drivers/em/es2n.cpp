@@ -163,11 +163,99 @@ static const GLfloat s_downsample_ws[] = { 0.045894f, 0.096038f, 0.157115f, 0.20
 static const int s_downsample_widths[]  = { 1120, 280, 280,  70, 70, 18, 18 };
 static const int s_downsample_heights[] = {  960, 960, 240, 240, 60, 60, 15 };
 
+static void updateSharpenKernel()
+{
+	glUseProgram(s_p.sharpen_prog);
+	double v = (1.0-s_c[RGBPPU]) * 0.4 * (s_c[SHARPNESS]+0.5);
+	GLfloat sharpen_kernel[] = {
+		-v, -v, -v,
+		1, 0, 0, 
+		2*v, 1+2*v, 2*v, 
+		0, 0, 1, 
+		-v, -v, -v
+	};
+	glUniform3fv(s_u._sharpen_kernel_loc, 5, sharpen_kernel);
+}
+
 extern "C" {
 void FCEM_setControl(int idx, double v)
 {
 	if (idx >= 0 && idx < CONTROL_COUNT) {
 		s_c[idx] = v;
+	}
+
+	switch (idx) {
+	// RGB pass controls
+	case BRIGHTNESS:
+		glUseProgram(s_p.rgb_prog);
+		v = 0.15 * v;
+		glUniform1f(s_u._rgb_brightness_loc, v);
+		break;
+	case CONTRAST:
+		glUseProgram(s_p.rgb_prog);
+		v = 1.0 + 0.4*s_c[CONTRAST];
+		glUniform1f(s_u._rgb_contrast_loc, v);
+		break;
+	case COLOR:
+		glUseProgram(s_p.rgb_prog);
+		v = 1.0 + s_c[COLOR];
+		glUniform1f(s_u._rgb_color_loc, v);
+		break;
+	case RGBPPU:
+		glUseProgram(s_p.rgb_prog);
+		v = s_c[RGBPPU];
+		glUniform1f(s_u._rgb_rgbppu_loc, v);
+		updateSharpenKernel();
+		break;
+	case GAMMA:
+		glUseProgram(s_p.rgb_prog);
+		v = 2.4/2.2 + 0.3*s_c[GAMMA];
+		glUniform1f(s_u._rgb_gamma_loc, v);
+		break;
+	case NOISE:
+		glUseProgram(s_p.rgb_prog);
+		v = s_c[CRT_ENABLED] * 0.08 * s_c[NOISE]*s_c[NOISE];
+		glUniform1f(s_u._rgb_noiseAmp_loc, v);
+		break;
+	// Sharpness pass controls
+	case CONVERGENCE:
+		glUseProgram(s_p.sharpen_prog);
+		v = s_c[CRT_ENABLED] * 2.0 * s_c[CONVERGENCE];
+		glUniform1f(s_u._sharpen_convergence_loc, v);
+		break;
+	case SHARPNESS:
+		updateSharpenKernel();
+		break;
+	// Stretch pass controls
+	case SCANLINES:
+		glUseProgram(s_p.stretch_prog);
+		v = s_c[CRT_ENABLED] * 0.45 * s_c[SCANLINES];
+		glUniform1f(s_u._stretch_scanlines_loc, v);
+		break;
+	// Screen pass controls
+	case CRT_ENABLED:
+		glUseProgram(s_p.screen_prog);
+		if (s_c[CRT_ENABLED]) {
+			glUniform2f(s_u._screen_uvScale_loc, (IDX_W-3.0)/IDX_W, (IDX_H-4.0)/IDX_H);
+			glUniformMatrix4fv(s_u._screen_mvp_loc, 1, GL_FALSE, s_p.mvp_mat);
+		} else {
+			glUniform2f(s_u._screen_uvScale_loc, (IDX_W-27.0)/IDX_W, (IDX_H-15.0)/IDX_H);
+			glUniformMatrix4fv(s_u._screen_mvp_loc, 1, GL_FALSE, mat4_identity);
+		}
+		// Reset the other dependent uniforms.
+		glUseProgram(s_p.rgb_prog);
+		glUniform1f(s_u._rgb_noiseAmp_loc, 0);
+		glUseProgram(s_p.sharpen_prog);
+		glUniform1f(s_u._sharpen_convergence_loc, 0);
+		glUseProgram(s_p.stretch_prog);
+		glUniform1f(s_u._stretch_scanlines_loc, 0);
+		break;
+	// Combine pass controls
+	case GLOW:
+		glUseProgram(s_p.combine_prog);
+		v = 0.1 * s_c[GLOW];
+		glUniform3f(s_u._combine_glow_loc, v, v*v, v + v*v);
+		break;
 	}
 }
 }
@@ -402,59 +490,22 @@ static void updateUniformsDebug()
 static void updateUniformsRGB()
 {
 	DBG(updateUniformsDebug())
-	double v;
-	v = 0.15 * s_c[BRIGHTNESS];
-	glUniform1f(s_u._rgb_brightness_loc, v);
-	v = 1.0 + 0.4*s_c[CONTRAST];
-	glUniform1f(s_u._rgb_contrast_loc, v);
-	v = 1.0 + s_c[COLOR];
-	glUniform1f(s_u._rgb_color_loc, v);
-	v = s_c[RGBPPU];
-	glUniform1f(s_u._rgb_rgbppu_loc, v);
-	v = 2.4/2.2 + 0.3*s_c[GAMMA];
-	glUniform1f(s_u._rgb_gamma_loc, v);
-	v = s_c[CRT_ENABLED] * 0.08 * s_c[NOISE]*s_c[NOISE];
-	glUniform1f(s_u._rgb_noiseAmp_loc, v);
 	glUniform2f(s_u._rgb_noiseRnd_loc, rand01(), rand01());
 }
 
 static void updateUniformsSharpen()
 {
 	DBG(updateUniformsDebug())
-	double v = s_c[CRT_ENABLED] * 2.0 * s_c[CONVERGENCE];
-	glUniform1f(s_u._sharpen_convergence_loc, v);
-
-	v = (1.0-s_c[RGBPPU]) * 0.4 * (s_c[SHARPNESS]+0.5);
-	GLfloat sharpen_kernel[] = {
-		-v, -v, -v,
-		1, 0, 0, 
-		2*v, 1+2*v, 2*v, 
-		0, 0, 1, 
-		-v, -v, -v
-	};
-
-	glUniform3fv(s_u._sharpen_kernel_loc, 5, sharpen_kernel);
 }
 
 static void updateUniformsStretch()
 {
 	DBG(updateUniformsDebug())
-	double v;
-	v = s_c[CRT_ENABLED] * 0.45 * s_c[SCANLINES];
-	glUniform1f(s_u._stretch_scanlines_loc, v);
 }
 
 static void updateUniformsScreen(int final_pass)
 {
 	DBG(updateUniformsDebug())
-
-	if (s_c[CRT_ENABLED]) {
-		glUniform2f(s_u._screen_uvScale_loc, (IDX_W-3.0)/IDX_W, (IDX_H-4.0)/IDX_H);
-		glUniformMatrix4fv(s_u._screen_mvp_loc, 1, GL_FALSE, s_p.mvp_mat);
-	} else {
-		glUniform2f(s_u._screen_uvScale_loc, (IDX_W-27.0)/IDX_W, (IDX_H-15.0)/IDX_H);
-		glUniformMatrix4fv(s_u._screen_mvp_loc, 1, GL_FALSE, mat4_identity);
-	}
 }
 
 static void updateUniformsDownsample(int w, int h, int texIdx, int isHorzPass)
@@ -486,8 +537,6 @@ static void updateUniformsTV()
 static void updateUniformsCombine()
 {
 	DBG(updateUniformsDebug())
-	double v = 0.1 * s_c[GLOW];
-	glUniform3f(s_u._combine_glow_loc, v, v*v, v + v*v);
 }
 
 static void initUniformsRGB()
