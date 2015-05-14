@@ -13,7 +13,6 @@ typedef struct t_es2n_uniforms
 	GLint _rgb_noiseAmp_loc;
 	GLint _rgb_noiseRnd_loc;
 
-	GLint _downsample_weights_loc;
 	GLint _downsample_offsets_loc;
 	GLint _downsample_downsampleTex_loc;
 
@@ -77,7 +76,7 @@ typedef struct t_es2n
 
 } es2n;
 
-void es2nInit(int left, int right, int top, int bottom);
+void es2nInit();
 void es2nUpdateControls();
 void es2nDeinit();
 void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color);

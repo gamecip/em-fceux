@@ -58,23 +58,6 @@ bool FCEUD_ShouldDrawInputAids()
 	return false;
 }
 
-static int InitOpenGL(int left, int right, int top, int bottom, double xscale, double yscale)
-{
-	int rw=(int)((right-left)*xscale);
-	int rh=(int)((bottom-top)*yscale);
-//	int sx=(screen->w-rw)/2;    // Start x
-//	int sy=(screen->h-rh)/2;    // Start y
-
-//	if(stretchx) { sx=0; rw=screen->w; }
-//	if(stretchy) { sy=0; rh=screen->h; }
-//	glViewport(sx, sy, rw, rh);
-	glViewport(0, 0, rw, rh);
-
-	es2nInit(left, right, top, bottom);
-
-	return 1;
-}
- 
 // Returns 0 on success, -1 on failure.
 int KillVideo()
 {
@@ -144,17 +127,9 @@ int InitVideo(FCEUGI *gi)
 
 	s_curbpp = 32;
 
-	if(!InitOpenGL(NOFFSET, 256 - (s_clipSides ? 8 : 0),
-				s_srendline, s_erendline + 1,
-				s_exs, s_eys)) 
-	{
-		FCEUD_PrintError("Error initializing OpenGL.");
-		KillVideo();
-		return -1;
-	}
+	es2nInit();
 
 	s_inited = 1;
-
 	return 0;
 }
 

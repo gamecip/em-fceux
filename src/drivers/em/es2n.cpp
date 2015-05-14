@@ -524,7 +524,6 @@ static void updateUniformsDownsample(int w, int h, int texIdx, int isHorzPass)
 		}
 	}
 	glUniform2fv(s_u._downsample_offsets_loc, 8, offsets);
-	glUniform1fv(s_u._downsample_weights_loc, 8, s_downsample_ws);
 	glUniform1i(s_u._downsample_downsampleTex_loc, texIdx);
 }
 
@@ -666,10 +665,13 @@ static void initUniformsTV()
 
 static void initUniformsDownsample()
 {
+	GLint k;
 	GLuint prog = s_p.downsample_prog;
 
+	k = glGetUniformLocation(prog, "u_weights");
+	glUniform1fv(k, 8, s_downsample_ws);
+
 	s_u._downsample_offsets_loc = glGetUniformLocation(prog, "u_offsets");
-	s_u._downsample_weights_loc = glGetUniformLocation(prog, "u_weights");
 	s_u._downsample_downsampleTex_loc = glGetUniformLocation(prog, "u_downsampleTex");
 	updateUniformsDownsample(280, 240, DOWNSAMPLE0_I, 1);
 }
@@ -773,11 +775,8 @@ static void passCombine()
 	meshRender(&s_p.quad_mesh);
 }
 
-// TODO: reformat inputs to something more meaningful
-void es2nInit(int left, int right, int top, int bottom)
+void es2nInit()
 {
-//	printf("left:%d right:%d top:%d bottom:%d\n", left, right, top, bottom);
-
 	// Build perspective MVP matrix.
 	GLfloat trans[3] = { 0, 0, -2.5 };
 	GLfloat proj[4*4];
