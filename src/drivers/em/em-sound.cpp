@@ -26,6 +26,10 @@
 #define TEST_SINE_AT_FILL	0
 #define TEST_SINE_AT_WRITE	0
 
+#if !SDL_VERSION_ATLEAST(2, 0, 0)
+#error "compile with emscripten -s USE_SDL=2 option"
+#endif
+
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 typedef float buf_t;
 typedef float mix_t;
@@ -138,9 +142,7 @@ int InitSound()
 #endif
 
 	SDL_AudioSpec spec;
-#if SDL_VERSION_ATLEAST(2, 0, 0)
 	SDL_AudioSpec obtained;
-#endif
 
 	memset(&spec, 0, sizeof(spec));
 	if(SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {

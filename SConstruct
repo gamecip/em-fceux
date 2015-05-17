@@ -60,6 +60,8 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   exports = '-s EXPORTED_FUNCTIONS=\'["_' + '","_'.join(exportsList) + '"]\''
   env.Append(LINKFLAGS = exports)
   env.Append(LINKFLAGS = '--preload-file deployment/default/@/default/')
+  env.Append(LINKFLAGS = '-s USE_SDL=2')
+  env.Append(CCFLAGS = '-s USE_SDL=2')
 else:
   env['EMSCRIPTEN'] = 0
 
@@ -225,7 +227,6 @@ else:
     common += ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
     common += ' -s DISABLE_EXCEPTION_CATCHING=1'
     common += ' -s ASSERTIONS=0'
-    common += ' -s USE_SDL=2'
     env.Append(CCFLAGS = '-O3' + common)
     env.Append(LINKFLAGS = '-O3' + common)
   else:
