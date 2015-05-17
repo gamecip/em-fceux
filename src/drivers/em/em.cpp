@@ -171,6 +171,8 @@ static int DoFrame()
 		}
 	}
 
+	FCEUD_UpdateInput();
+
 	// In case of lag, try to fill audio buffer to critical minimum by skipping frames.
 	int frames = (SOUND_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
 	// Produce audio only for skipped frames (no video). Leave two free frames for next frame.
@@ -180,7 +182,6 @@ static int DoFrame()
 		--frames;
 	}
 
-	FCEUD_UpdateInput();
 	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
 	FCEUD_Update(gfx, sound, ssize);
 
