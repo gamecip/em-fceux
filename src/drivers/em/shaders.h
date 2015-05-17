@@ -126,6 +126,9 @@ DEFINE(CW2)
 "}\n";
 
 static const char* sharpen_vert_src =
+DEFINE(OVERSCAN_W)
+DEFINE(INPUT_W)
+DEFINE(IDX_W)
     DEFINE(RGB_W)
     "attribute vec4 a_0;\n"
     "attribute vec2 a_2;\n"
@@ -134,6 +137,7 @@ static const char* sharpen_vert_src =
     "#define TAP(i_, o_) v_uv[i_] = uv + vec2((o_) / RGB_W, 0.0)\n"
     "void main() {\n"
     "vec2 uv = a_2;\n"
+    "uv.x = floor(INPUT_W*uv.x + OVERSCAN_W) / IDX_W;\n"
     "TAP(0,-4.0);\n"
     "TAP(1, u_convergence);\n"
     "TAP(2, 0.0);\n"
@@ -172,7 +176,6 @@ static const char* stretch_vert_src =
     "gl_Position = a_0;\n"
     "}\n";
 static const char* stretch_frag_src =
-    DEFINE(IDX_W)
     DEFINE(IDX_H)
     "uniform float u_scanlines;\n"
     "uniform sampler2D u_sharpenTex;\n"
@@ -184,10 +187,6 @@ static const char* stretch_frag_src =
 // TODO: test encode gamma
     "vec3 color = c0*c0 + c1*c1;\n"
 //    "vec3 color = c0 + c1;\n"
-    // Set black if outside the border.
-    "vec2 uvd = max(abs(v_uv[0] - 0.5) - vec2(128.0-6.5, 112.0-3.5) / vec2(IDX_W, IDX_H), 0.0);\n"
-    "float border = clamp(3.0 - 3.0*3000.0 * dot(uvd, uvd), 0.0, 1.0);\n"
-    "color *= border;\n"
     // Use oscillator as scanline modulator.
     "float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*IDX_H * v_uv[0].y - M_PI*0.125)));\n"
     // This formula dims dark colors, but keeps brights. Output is linear.
@@ -197,7 +196,7 @@ static const char* stretch_frag_src =
     "}\n";
 
 static const char* screen_vert_src =
-    DEFINE(RGB_W)
+    DEFINE(SCREEN_W)
     DEFINE(SCREEN_H)
     DEFINE(NOISE_W)
     DEFINE(NOISE_H)
@@ -218,9 +217,10 @@ static const char* screen_vert_src =
     "gl_Position = u_mvp * a_0;\n"
     "gl_Position = vec4(gl_Position.xy / gl_Position.w, 0.0, 1.0);\n"
     "vec2 vwc = gl_Position.xy * 0.5 + 0.5;\n"
-    "v_noiseUV = vec2(RGB_W, SCREEN_H) * vwc / vec2(NOISE_W, NOISE_H);\n"
+    "v_noiseUV = vec2(SCREEN_W, SCREEN_H) * vwc / vec2(NOISE_W, NOISE_H);\n"
     "}\n";
 static const char* screen_frag_src =
+DEFINE(INPUT_W)
 DEFINE(IDX_W)
 DEFINE(IDX_H)
 "uniform sampler2D u_stretchTex;\n"
@@ -242,7 +242,15 @@ DEFINE(IDX_H)
     "color += 0.018 * tmp*tmp;\n"
 //    "color += 0.018 * texture2D(u_stretchTex, v_uv - 0.021*n.xy).rgb;\n"
 
+    // Set black if outside the border
+//    "vec2 uvd = max(abs(v_uv - 0.5) - vec2(128.0-6.5, 112.0-3.5) / vec2(IDX_W, IDX_H), 0.0);\n"
+    "vec2 uvd = max(abs(v_uv - 0.5) - 0.5 * vec2(1.0 - 9.5/INPUT_W, 1.0 - 7.0/IDX_H), 0.0);\n"
+    "float border = clamp(3.0 - 3.0*3000.0 * dot(uvd, uvd), 0.0, 1.0);\n"
+    "color *= border;\n"
+
     "float shade = shadeBlinn(v_pos, n);\n"
+    // Shading affected by black screen border material.
+    "shade *= 0.638*border + 0.362;\n"
 
     // CRT emitter radiance attenuation from the curvature
 //    "color *= pow(dot(n, v), 16.0*(u_mouse.x/256.0));\n"
@@ -257,7 +265,7 @@ DEFINE(IDX_H)
 "}\n";
 
 static const char* tv_vert_src =
-DEFINE(RGB_W)
+DEFINE(SCREEN_W)
 DEFINE(SCREEN_H)
 DEFINE(NOISE_W)
 DEFINE(NOISE_H)
@@ -305,7 +313,7 @@ DEFINE(NOISE_H)
     "gl_Position = u_mvp * a_0;\n"
     "gl_Position = vec4(gl_Position.xy / gl_Position.w, 0.0, 1.0);\n"
     "vec2 vwc = gl_Position.xy * 0.5 + 0.5;\n"
-    "v_noiseUVs[0] = vec2(RGB_W, SCREEN_H) * vwc / vec2(NOISE_W, NOISE_H);\n"
+    "v_noiseUVs[0] = vec2(SCREEN_W, SCREEN_H) * vwc / vec2(NOISE_W, NOISE_H);\n"
         "v_noiseUVs[1] = 0.707*v_noiseUVs[0] + 0.5 / vec2(NOISE_W, NOISE_H);\n"
 
         "v_blend = min(0.28*70.0 * andy, 1.0);\n"
@@ -395,7 +403,7 @@ static const char* combine_vert_src =
 DEFINE(NOISE_W)
 DEFINE(NOISE_H)
 // TODO: tsone: these are wrong, proper size must be from a uniform
-DEFINE(RGB_W)
+DEFINE(SCREEN_W)
 DEFINE(SCREEN_H)
     "attribute vec4 a_0;\n"
     "attribute vec2 a_2;\n"
@@ -404,7 +412,7 @@ DEFINE(SCREEN_H)
     "void main() {\n"
         "gl_Position = a_0;\n"
         "v_uv = a_2;\n"
-        "v_noiseUV = (vec2(RGB_W, SCREEN_H) / vec2(NOISE_W, NOISE_H)) * a_2;\n"
+        "v_noiseUV = (vec2(SCREEN_W, SCREEN_H) / vec2(NOISE_W, NOISE_H)) * a_2;\n"
     "}\n";
 static const char* combine_frag_src =
     "uniform sampler2D u_tvTex;\n"

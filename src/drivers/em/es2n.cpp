@@ -77,13 +77,18 @@
 #define LOOKUP_W	64
 // Set overscan on left and right sides as 12px (total 24px).
 #define OVERSCAN_W	12
-#define IDX_W		(256 + 2*OVERSCAN_W)
-#define IDX_H		240
-#define NOISE_W		256 
-#define NOISE_H		256 
+#define INPUT_W		256 // Width of input PPU image by fceux (in px).
+#define INPUT_H		240 // Height of input PPU image by fceux (in px).
+// Row offset from input PPU image to idx image.
+// TODO: tsone: *Possibly* required to be multiple of 3 (for sawtooth artifact) but it seems to work without...?
+#define INPUT_ROW_OFFS	((INPUT_H-IDX_H) / 2)
+#define IDX_W		(INPUT_W + 2*OVERSCAN_W)
+#define IDX_H		224
+#define NOISE_W		256
+#define NOISE_H		256
 #define RGB_W		(NUM_SUBPS * IDX_W)
-#define STRETCH_H	(4 * 240)
-#define SCREEN_H	(4 * 224)
+#define SCREEN_W	(NUM_SUBPS * INPUT_W)
+#define SCREEN_H	(4 * IDX_H)
 // Half-width of Y and C box filter kernels.
 #define YW2	6.0
 #define CW2	12.0
@@ -153,15 +158,13 @@ static es2_varray mesh_rim_varrays[] = {
 	{ 3, GL_UNSIGNED_BYTE, 0, (const void*) mesh_rim_vcols }
 };
 
-static const GLfloat mat4_identity[] = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
-
 // Texture sample offsets and weights for gaussian w/ radius=8, sigma=4.
 // Eliminates aliasing and blurs for "faked" glossy reflections and AO.
 static const GLfloat s_downsample_offs[] = { -6.892337f, -4.922505f, -2.953262f, -0.98438f, 0.98438f, 2.953262f, 4.922505f, 6.892337f };
 static const GLfloat s_downsample_ws[] = { 0.045894f, 0.096038f, 0.157115f, 0.200954f, 0.200954f, 0.157115f, 0.096038f, 0.045894f };
 
-static const int s_downsample_widths[]  = { 1120, 280, 280,  70, 70, 18, 18 };
-static const int s_downsample_heights[] = {  960, 960, 240, 240, 60, 60, 15 };
+static const int s_downsample_widths[]  = { SCREEN_W, SCREEN_W/4, SCREEN_W/4,  SCREEN_W/16, SCREEN_W/16, SCREEN_W/64, SCREEN_W/64 };
+static const int s_downsample_heights[] = { SCREEN_H, SCREEN_H,   SCREEN_H/4,  SCREEN_H/4,  SCREEN_H/16, SCREEN_H/16, SCREEN_H/64 };
 
 static void updateSharpenKernel()
 {
@@ -232,29 +235,18 @@ void FCEM_setControl(int idx, double v)
 		v = s_c[CRT_ENABLED] * 0.45 * s_c[SCANLINES];
 		glUniform1f(s_u._stretch_scanlines_loc, v);
 		break;
-	// Screen pass controls
-	case CRT_ENABLED:
-		glUseProgram(s_p.screen_prog);
-		if (s_c[CRT_ENABLED]) {
-			glUniform2f(s_u._screen_uvScale_loc, (IDX_W-3.0)/IDX_W, (IDX_H-4.0)/IDX_H);
-			glUniformMatrix4fv(s_u._screen_mvp_loc, 1, GL_FALSE, s_p.mvp_mat);
-		} else {
-			glUniform2f(s_u._screen_uvScale_loc, (IDX_W-27.0)/IDX_W, (IDX_H-15.0)/IDX_H);
-			glUniformMatrix4fv(s_u._screen_mvp_loc, 1, GL_FALSE, mat4_identity);
-		}
-		// Reset the other dependent uniforms.
-		glUseProgram(s_p.rgb_prog);
-		glUniform1f(s_u._rgb_noiseAmp_loc, 0);
-		glUseProgram(s_p.sharpen_prog);
-		glUniform1f(s_u._sharpen_convergence_loc, 0);
-		glUseProgram(s_p.stretch_prog);
-		glUniform1f(s_u._stretch_scanlines_loc, 0);
-		break;
 	// Combine pass controls
 	case GLOW:
 		glUseProgram(s_p.combine_prog);
 		v = 0.1 * s_c[GLOW];
 		glUniform3f(s_u._combine_glow_loc, v, v*v, v + v*v);
+		break;
+	// Generic
+	case CRT_ENABLED:
+		// Update dependent uniforms. (Without modifying stored values in s_c.)
+		FCEM_setControl(NOISE, s_c[NOISE]);
+		FCEM_setControl(SCANLINES, s_c[SCANLINES]);
+		FCEM_setControl(CONVERGENCE, s_c[CONVERGENCE]);
 		break;
 	}
 }
@@ -503,7 +495,7 @@ static void updateUniformsStretch()
 	DBG(updateUniformsDebug())
 }
 
-static void updateUniformsScreen(int final_pass)
+static void updateUniformsScreen()
 {
 	DBG(updateUniformsDebug())
 }
@@ -633,12 +625,14 @@ static void initUniformsScreen()
 	glUniform1i(k, STRETCH_I);
 	k = glGetUniformLocation(prog, "u_noiseTex");
 	glUniform1i(k, NOISE_I);
+	k = glGetUniformLocation(prog, "u_uvScale");
+	glUniform2f(k, 1.0 + 25.0/INPUT_W, 1.0 + 15.0/IDX_H);
+	k = glGetUniformLocation(prog, "u_mvp");
+	glUniformMatrix4fv(k, 1, GL_FALSE, s_p.mvp_mat);
 
-	initShading(prog, 1.5, 0.001, 0.0, 0.065, 41, 0.04, 4);
+	initShading(prog, 2.5, 0.001, 0.0, 0.065, 41, 0.04, 4);
 
-	s_u._screen_uvScale_loc = glGetUniformLocation(prog, "u_uvScale");
-	s_u._screen_mvp_loc = glGetUniformLocation(prog, "u_mvp");
-	updateUniformsScreen(1);
+	updateUniformsScreen();
 }
 
 static void initUniformsTV()
@@ -658,7 +652,7 @@ static void initUniformsTV()
 	k = glGetUniformLocation(prog, "u_mvp");
 	glUniformMatrix4fv(k, 1, GL_FALSE, s_p.mvp_mat);
 
-	initShading(prog, 1.5, 0.004, 0.004, 0.039, 49, 0.03, 4);
+	initShading(prog, 2.5, 0.0038, 0.0035, 0.039, 49, 0.03, 4);
 
 	updateUniformsTV();
 }
@@ -711,7 +705,7 @@ static void passRGB()
 static void passSharpen()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.sharpen_fb);
-	glViewport(0, 0, RGB_W, IDX_H);
+	glViewport(0, 0, SCREEN_W, IDX_H);
 	glUseProgram(s_p.sharpen_prog);
 	updateUniformsSharpen();
 	meshRender(&s_p.quad_mesh);
@@ -719,8 +713,13 @@ static void passSharpen()
 
 static void passStretch()
 {
-	glBindFramebuffer(GL_FRAMEBUFFER, s_p.stretch_fb);
-	glViewport(0, 0, RGB_W, STRETCH_H);
+	if (s_c[CRT_ENABLED]) {
+		glBindFramebuffer(GL_FRAMEBUFFER, s_p.stretch_fb);
+		glViewport(0, 0, SCREEN_W, SCREEN_H);
+	} else {
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(s_p.viewport[0], s_p.viewport[1], s_p.viewport[2], s_p.viewport[3]);
+	}
 	glUseProgram(s_p.stretch_prog);
 	updateUniformsStretch();
 	meshRender(&s_p.quad_mesh);
@@ -741,9 +740,9 @@ static void passDownsample()
 static void passScreen()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.tv_fb);
-	glViewport(0, 0, RGB_W, SCREEN_H);
+	glViewport(0, 0, SCREEN_W, SCREEN_H);
 	glUseProgram(s_p.screen_prog);
-	updateUniformsScreen(1);
+	updateUniformsScreen();
 
 	if (s_c[CRT_ENABLED]) {
 		meshRender(&s_p.screen_mesh);
@@ -759,7 +758,7 @@ static void passTV()
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.tv_fb);
 //	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, RGB_W, SCREEN_H);
+	glViewport(0, 0, SCREEN_W, SCREEN_H);
 
 	glUseProgram(s_p.tv_prog);
 	updateUniformsTV();
@@ -785,7 +784,7 @@ void es2nInit()
 	mat4Trans(view, trans);
 	mat4Mul(s_p.mvp_mat, proj, view);
 
-	s_p.overscan_pixels = (GLubyte*) malloc(OVERSCAN_W*240);
+	s_p.overscan_pixels = (GLubyte*) malloc(OVERSCAN_W*IDX_H);
 	s_p.overscan_color = 0xFE; // Set bogus value to ensure overscan update.
 
 	glGetIntegerv(GL_VIEWPORT, s_p.viewport);
@@ -821,19 +820,19 @@ void es2nInit()
 
 	// Setup sharpen framebuffer.
 	glActiveTexture(TEX(SHARPEN_I));
-	createFBTex(&s_p.sharpen_tex, &s_p.sharpen_fb, RGB_W, IDX_H, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
+	createFBTex(&s_p.sharpen_tex, &s_p.sharpen_fb, SCREEN_W, IDX_H, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
 	s_p.sharpen_prog = buildShader(sharpen_vert_src, sharpen_frag_src, common_src);
 	initUniformsSharpen();
 
 	// Setup stretch framebuffer.
 	glActiveTexture(TEX(STRETCH_I));
-	createFBTex(&s_p.stretch_tex, &s_p.stretch_fb, RGB_W, STRETCH_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	createFBTex(&s_p.stretch_tex, &s_p.stretch_fb, SCREEN_W, SCREEN_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
 	s_p.stretch_prog = buildShader(stretch_vert_src, stretch_frag_src, common_src);
 	initUniformsStretch();
 
 	// Setup screen/TV framebuffer.
 	glActiveTexture(TEX(TV_I));
-	createFBTex(&s_p.tv_tex, &s_p.tv_fb, RGB_W, SCREEN_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
+	createFBTex(&s_p.tv_tex, &s_p.tv_fb, SCREEN_W, SCREEN_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
 	// Setup downsample framebuffers.
 	for (int i = 0; i < 6; ++i) {
@@ -944,7 +943,8 @@ void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 	// Update input pixels.
 	glActiveTexture(TEX(IDX_I));
 	glBindTexture(GL_TEXTURE_2D, s_p.idx_tex);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, OVERSCAN_W, 0, IDX_W-2*OVERSCAN_W, IDX_H, GL_LUMINANCE, GL_UNSIGNED_BYTE, pixels);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, OVERSCAN_W, 0, IDX_W-2*OVERSCAN_W, IDX_H, GL_LUMINANCE, GL_UNSIGNED_BYTE,
+			pixels + INPUT_W * INPUT_ROW_OFFS);
 	if (s_p.overscan_color != overscan_color) {
 		s_p.overscan_color = overscan_color;
 //		printf("overscan: %02X\n", overscan_color);
@@ -958,14 +958,17 @@ void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 	// Update input de-emphasis rows.
 	glActiveTexture(TEX(DEEMP_I));
 	glBindTexture(GL_TEXTURE_2D, s_p.deemp_tex);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, IDX_H, 1, GL_LUMINANCE, GL_UNSIGNED_BYTE, row_deemp);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, IDX_H, 1, GL_LUMINANCE, GL_UNSIGNED_BYTE,
+			row_deemp + INPUT_ROW_OFFS);
 
 	passRGB();
 	passSharpen();
 	passStretch();
-	passScreen();
-	passDownsample();
-	passTV();
-	passCombine();
+	if (s_c[CRT_ENABLED]) {
+		passScreen();
+		passDownsample();
+		passTV();
+		passCombine();
+	}
 }
 

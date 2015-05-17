@@ -21,9 +21,6 @@ typedef struct t_es2n_uniforms
 
 	GLint _stretch_scanlines_loc;
 
-	GLint _screen_uvScale_loc;
-	GLint _screen_mvp_loc;
-
 	GLint _combine_glow_loc;
 
 } es2n_uniforms;

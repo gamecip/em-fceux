@@ -25,7 +25,7 @@
       canvas.emscripten {
         position: relative;
         border: 0px none;
-        width: 1120px;
+        width: 1024px;
         height: 896px;
         width: auto;
         height: 100%;
@@ -451,16 +451,16 @@
     Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(BRIGHTNESS, this.value)" onchange="FCEM.setControl(BRIGHTNESS, this.value)"/><br/>
     Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(CONTRAST, this.value)" onchange="FCEM.setControl(CONTRAST, this.value)"/><br/>
     Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(COLOR, this.value)" onchange="FCEM.setControl(COLOR, this.value)"/><br/>
-    Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="FCEM.setControl(SHARPNESS, this.value)" onchange="FCEM.setControl(SHARPNESS, this.value)"/><br/>
     Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(GAMMA, this.value)" onchange="FCEM.setControl(GAMMA, this.value)"/><br/>
-    <h3>Emulation Controls</h3>
+    <h3>NTSC Emulation Controls</h3>
+    NTSC Emulation <input type="checkbox" checked oninput="FCEM.setControl(RGBPPU, !this.checked)" onchange="FCEM.setControl(RGBPPU, !this.checked)"/><br/>
+    Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="FCEM.setControl(SHARPNESS, this.value)" onchange="FCEM.setControl(SHARPNESS, this.value)"/><br/>
+    <h3>TV Emulation Controls</h3>
+    TV Emulation <input type="checkbox" checked oninput="FCEM.setControl(CRT_ENABLED, this.checked)" onchange="FCEM.setControl(CRT_ENABLED, this.checked)"/><br/>
+    Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="FCEM.setControl(SCANLINES, this.value)" onchange="FCEM.setControl(SCANLINES, this.value)"/><br/>
     Glow <input type="range" min="0" max="1" value="0.2" step="0.1" oninput="FCEM.setControl(GLOW, this.value)" onchange="FCEM.setControl(GLOW, this.value)"/><br/>
-    RGB PPU <input type="range" min="0" max="1" value="0" step="0.1" oninput="FCEM.setControl(RGBPPU, this.value)" onchange="FCEM.setControl(RGBPPU, this.value)"/><br/>
-    <h3>CRT Emulation Controls</h3>
-    CRT Emulation <input type="checkbox" checked="1" oninput="FCEM.setControl(CRT_ENABLED, this.checked)" onchange="FCEM.setControl(CRT_ENABLED, this.checked)"/><br/>
-    CRT Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="FCEM.setControl(SCANLINES, this.value)" onchange="FCEM.setControl(SCANLINES, this.value)"/><br/>
-    CRT Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="FCEM.setControl(CONVERGENCE, this.value)" onchange="FCEM.setControl(CONVERGENCE, this.value)"/><br/>
-    CRT Noise <input type="range" min="0" max="1" value="0.3" step="0.1" oninput="FCEM.setControl(NOISE, this.value)" onchange="FCEM.setControl(NOISE, this.value)"/><br/>
+    Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="FCEM.setControl(CONVERGENCE, this.value)" onchange="FCEM.setControl(CONVERGENCE, this.value)"/><br/>
+    Signal Noise <input type="range" min="0" max="1" value="0.3" step="0.1" oninput="FCEM.setControl(NOISE, this.value)" onchange="FCEM.setControl(NOISE, this.value)"/><br/>
         </div>
     <input type="button" value="Fullscreen" onclick="Module.requestFullScreen(false, false)"/>
 <!--    <input type="button" value="Reset" onclick="resetControls()"/>
