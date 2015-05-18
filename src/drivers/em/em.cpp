@@ -113,7 +113,6 @@ int CloseGame()
 
 static int DoFrame()
 {
-#if SUPER_RATE
 	uint8 *gfx = 0;
 	int32 *sound;
 	int32 ssize;
@@ -126,56 +125,19 @@ static int DoFrame()
 		}
 	}
 
-// TODO: tsone: assumes NTSC 60Hz
-	if (GetSoundBufferCount() > SOUND_BUF_MAX - em_sound_frame_samples) {
-		// Audio buffer has no capacity, i.e. update cycle is ahead of time -> skip the cycle.
-		return 0;
-	}
 
-	FCEUD_UpdateInput();
-
-	// In case of lag, try to fill audio buffer to critical minimum by skipping frames.
-// TODO: tsone: assumes NTSC 60Hz
-	int frameskips = (2*SOUND_HW_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
-//	int frameskips = (SOUND_BUF_MAX - em_sound_frame_samples - GetSoundBufferCount()) / em_sound_frame_samples;
-//	int frameskips = (SOUND_HW_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
-	while (frameskips > 0) {
-		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
-		FCEUD_Update(gfx, sound, ssize);
-		--frameskips;
-	}
-
-	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
-	FCEUD_Update(gfx, sound, ssize);
-
-	if (gfx && (inited & 4)) {
-		BlitScreen(gfx);
-	}
-
-	if(opause!=FCEUI_EmulationPaused()) {
-		opause=FCEUI_EmulationPaused();
-		SilenceSound(opause);
-	}
-
-	return 1;
-#else
-	uint8 *gfx = 0;
-	int32 *sound;
-	int32 ssize;
-	static int opause = 0;
-
-	if (NoWaiting) {
-		for (int i = 0; i < TURBO_FRAMESKIPS; ++i) {
-			FCEUI_Emulate(&gfx, &sound, &ssize, 2);
-			FCEUD_Update(gfx, sound, ssize);
-		}
-	}
-
-	FCEUD_UpdateInput();
-
-	// In case of lag, try to fill audio buffer to critical minimum by skipping frames.
+	// Get the number of frames to fill the audio buffer.
 	int frames = (SOUND_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
-	// Produce audio only for skipped frames (no video). Leave two free frames for next frame.
+
+    // On some systems audio can get ahead of visuals. If so, skip emulation for this requestAnimationFrame.
+// TODO: tsone: this is not a good solution as it may cause unnecessary skips of the requestAnimationFrame update
+    if (frames <= 0) {
+        return 0;
+    }
+
+	FCEUD_UpdateInput();
+
+	// Skip frames (video) to fill the audio buffer. Leave two frames free for next requestAnimationFrame in case they come too frequently.
 	while (frames > 3) {
 		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
 		FCEUD_Update(gfx, sound, ssize);
@@ -194,7 +156,6 @@ static int DoFrame()
 		SilenceSound(opause);
 	}
 	return 1;
-#endif
 }
 
 static void ReloadROM(void*)
