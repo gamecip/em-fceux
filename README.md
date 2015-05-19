@@ -9,15 +9,14 @@ More about FCEUX: http://www.fceux.com/
 
 ### OVERVIEW ###
 
-The goal of em-fceux is to enable efficient execution of FCEUX in
-the modern web browsers. This means real-time frame rates and
-interactivivity at 60 fps, high-quality fullscreen visuals,
-support for audio, battery-backed save RAM, save states and
-gamepads.
+The goal of em-fceux is to enable FCEUX in the modern web browsers.
+Primarily this means real-time frame rates and interactivivity at 60 fps,
+high-quality fullscreen visuals, support for audio, battery-backed
+save RAM, save states and gamepads.
 
 Additional goal is to emulate late 80's / early 90's console gaming
-experience by providing NTSC and CRT emulation and convenient
-in-browser storage for user's games, save data and save states.
+experience by providing NTSC and CRT emulation and a "game stack"
+in the client/browser.
 
 
 ### FEATURES ###
