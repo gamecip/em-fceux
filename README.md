@@ -52,7 +52,7 @@ Notable unsupported FCEUX features:
 * Cheats, TAS features and Lua scripting
 
 
-### BUILD INSTRUCTIONS ###
+### BUILD ###
 
 em-fceux is built under Linux or Unix. First install Emscripten 1.32.0
 (tested) by following instructions in: http://emscripten.org/
@@ -60,28 +60,29 @@ em-fceux is built under Linux or Unix. First install Emscripten 1.32.0
 You also need Python 2.7.x and the scons build tool. Their installation
 depends on the operating system.
 
-Build the source with script embuild.sh in the em-fceux directory root.
+Build the source with ./embuild.sh script in the em-fceux directory root.
 
 Release build: ./embuild.sh RELEASE=1
 
 Debug build: ./embuild.sh RELEASE=0
 
 
-### RUN / DEPLOYMENT INSTRUCTIONS ###
+### RUN / DEPLOY ###
 
-After successfull build, the deployment/ directory will contain the full
-deployable em-fceux "web app". To deploy, simply copy all the contents of
+After successfull build, the deployment/ directory will contain the
+complete em-fceux "web app". To deploy, simply copy all the contents of
 the deployment/ directory to a web server.
 
 To test em-fceux locally, run 'python -m SimpleHTTPServer' in the deployment/
 directory. Then navigate web browser to http://localhost:8000/
 
-Please refer to em-fceux help (the '?' icon) for usage and key mappings.
+Please refer to em-fceux help (the '?' icon) for the emulator usage,
+keyboard mappings and the like.
 
 
-### CONTACT INFORMATION ###
+### CONTACT ###
 
-Emscripten port is written by Valtteri "tsone" Heikkilä (tsone at bitbucket.org).
+em-fceux is written by Valtteri "tsone" Heikkilä (tsone at bitbucket.org).
 
 FCEUX 2.2.2 is written by the FCEUX project team: http://www.fceux.com/web/contact.html
 
@@ -95,13 +96,13 @@ are ever transmitted out from the client/browser.
 em-fceux implements NTSC emulation by modeling the composite YIQ signal
 output. The separation of luminance (Y) and chrominance (IQ/UV) is achieved
 with "1D comb filter" to reduce chroma fringing. The YIQ to RGB conversion
-is done in a shader. 
+is done in a shader.
 
 
-### LEGAL ###
+### LEGAL / OTHER ###
 
-FCEUX 2.2.2 and em-fceux are licensed under GNU GPL Version 2:
+FCEUX and em-fceux are licensed under GNU GPL Version 2:
 https://www.gnu.org/licenses/gpl-2.0.txt
 
-em-fceux is based on FCEUX 2.2.2 release:
+em-fceux is based on the source code release of FCEUX 2.2.2: 
 http://sourceforge.net/projects/fceultra/files/Source%20Code/2.2.2%20src/fceux-2.2.2.src.tar.gz/download
