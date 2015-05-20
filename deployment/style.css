@@ -1,0 +1,180 @@
+html, body {
+  margin: 0;
+  border: 0px none;
+  padding: none;
+  float: none;
+  font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 900;
+  color: #FCFCFC;
+  background-color: #0A0A0A;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.emscripten {
+  padding-right: 0;
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+}
+div.emscripten {
+  text-align: center;
+}
+canvas.emscripten {
+  position: relative;
+  border: 0px none;
+  width: 1024px;
+  height: 896px;
+  width: auto;
+  height: 100%;
+}
+
+#loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  margin-top: -16px;
+}
+#loaderSpinner {
+  display: inline-block;
+  margin: 0;
+  width: 0px;
+  height: 0px;
+  -webkit-animation: spinner 0.8s infinite step-start;
+  animation: spinner 0.8s infinite step-start;
+}
+@-webkit-keyframes spinner {
+  0%,75%,100% { box-shadow: -12px 0 0  6px #FCFCFC, 12px 0 0  6px #FCFCFC; }
+  25%         { box-shadow: -12px 0 0  6px #FCFCFC, 12px 0 0 12px #FCFCFC; }
+  50%         { box-shadow: -12px 0 0 12px #FCFCFC, 12px 0 0  6px #FCFCFC; }
+}
+@keyframes spinner {
+  0%,75%,100% { box-shadow: -12px 0 0  6px #FCFCFC, 12px 0 0  6px #FCFCFC; }
+  25%         { box-shadow: -12px 0 0  6px #FCFCFC, 12px 0 0 12px #FCFCFC; }
+  50%         { box-shadow: -12px 0 0 12px #FCFCFC, 12px 0 0  6px #FCFCFC; }
+}
+
+#controlsTab {
+  position: absolute;
+  top: 0;
+  left: -280px;
+  width: 300px;
+  height: 100%;
+  transition: left 500ms;
+}
+#controlsToggleLabel {
+  position: absolute;
+  top: 50%;
+  right: 0px;
+  width: 15px;
+  height: 114px;
+  margin-top: -57px;
+  margin-right: 0px;
+  background: url('img/right.gif') no-repeat;
+}
+#controlsToggle:checked + #controlsTab #controlsToggleLabel {
+  background: url('img/left.gif') no-repeat;
+}
+#controlsToggle:checked ~ #controlsTab {
+  left: 0px;
+}
+#controlsContainer {
+  position: absolute;
+  text-align: right;
+  bottom: 0px;
+  left: 0px;
+  width: 280px;
+  height: 100%;
+  overflow: hidden;
+}
+#controlsSliders input {
+  margin: 0;
+  padding: 0;
+  right: 0px;
+  width: 150px;
+}
+
+#stackTab {
+  position: absolute;
+  top: 0;
+  right: -414px;
+  width: 434px;
+  height: 100%;
+  transition: right 500ms;
+}
+#stackToggleLabel {
+  position: absolute;
+  top: 50%;
+  left: 0px;
+  width: 15px;
+  height: 114px;
+  margin-top: -57px;
+  margin-left: 0px;
+  background: url('img/left.gif') no-repeat;
+}
+#stackToggle:checked + #stackTab #stackToggleLabel {
+  background: url('img/right.gif') no-repeat;
+}
+#stackToggle:checked ~ #stackTab {
+  right: 0px;
+}
+#stackContainer {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 414px;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: scroll;
+}
+#stack {
+  display: table;
+  width: 414px;
+  height: 100%;
+  border-collapse: collapse;
+}
+
+.label {
+  position: relative;
+  text-align: center;
+  vertical-align: middle;
+  width: 172px;
+  height: 18px;
+  line-height: 17px;
+}
+.labelContainer {
+  position: relative;
+  overflow: hidden;
+  left: 64px;
+  top: 1px;
+  width: 172px;
+  height: 18px;
+  clip: rect(0px, 172px, 18px 0px);
+}
+.cartDelete {
+  position: relative;
+  width: 25px;
+  height: 25px;
+  top: -15px;
+  left: 372px;
+}
+.cart {
+  position: relative;
+  display: table-row;
+  width: 397px;
+  height: 55px;
+  vertical-align: bottom;
+  background-image: url('img/top4.png');
+  background-repeat: no-repeat;
+  background-position: 0px 0px;
+}
+
+#soundIcon {
+  background-image: url('img/sound_off.gif');
+  background-image: none;
+}
