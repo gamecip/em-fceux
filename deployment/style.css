@@ -4,11 +4,8 @@ html, body {
   padding: none;
   float: none;
   font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 12px;
-  font-style: italic;
-  font-weight: 900;
   color: #FCFCFC;
-  background-color: #0A0A0A;
+  background: #0A0A0A;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -140,6 +137,9 @@ canvas.emscripten {
 }
 
 .label {
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 600;
   position: relative;
   text-align: center;
   vertical-align: middle;
@@ -169,12 +169,58 @@ canvas.emscripten {
   width: 397px;
   height: 55px;
   vertical-align: bottom;
-  background-image: url('img/top4.png');
-  background-repeat: no-repeat;
-  background-position: 0px 0px;
+  background: url('img/top4.png') no-repeat;
 }
 
+#icons {
+  position: absolute;
+  right: 9px;
+  top: 0;
+  text-align: right;
+}
+// TODO: tsone: hack, preloads 'sound_off.gif'
 #soundIcon {
-  background-image: url('img/sound_off.gif');
-  background-image: none;
+  background: url('img/sound_off.gif') no-repeat;
+  background: none;
+}
+
+#help {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  overflow-y: scroll;
+  visibility: hidden;
+}
+#helpDimmer {
+  position: fixed;
+  opacity: 0.8;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #0A0A0A;
+  visibility: hidden;
+}
+table {
+  text-align: left;
+  margin-left: auto;
+  margin-right: auto;
+  border: solid #777777 0px;
+  border-spacing: 0;
+  border-collapse: collapse;
+}
+td {
+  padding: 8px;
+  border: solid #777777 1px;
+}
+a {
+  color: #FC0000;
+}
+#helpToggle:checked ~ #help {
+  visibility: visible;
+}
+#helpToggle:checked + #helpDimmer {
+  visibility: visible;
 }

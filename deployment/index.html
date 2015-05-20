@@ -8,7 +8,6 @@
   </head>
   <body>
 
-
     <canvas class="emscripten" id="canvas" hidden="true" oncontextmenu="event.preventDefault()"></canvas>
 
     <div id="loader">
@@ -48,10 +47,61 @@
         <div id="stackContainer"><div id="stack"><div></div></div></div>
     </div>
 
-    <div id="icons" style="position: absolute; right: 0; top: 0; text-align: right;">
+    <input id="helpToggle" type="checkbox" hidden="1" />
+<div id="helpDimmer"></div>
+    <div id="help">
+<h1>EM-FCEUX</h1>
+<p>em-fceux is an <a href="http://emscripten.org/">Emscripten</a> port of <a href="http://www.fceux.com/">FCEUX</a>.
+<p>Source code: <a href="https://bitbucket.org/tsone/em-fceux/">https://bitbucket.org/tsone/em-fceux/</a>
+
+<h2>HOW TO PLAY</h2>
+<p>To play a game, drag and drop it (the .nes file or similar) to this browser window.
+<p>Played games are added to the game stack on the right. You can click a game on the stack to play it.
+<p>To remove a game, click on the 'X' icon. (The built-in game '2048' cannot be removed.)
+<p>Supported file formats: .nes, .nsf, .zip
+
+<h2>SETTINGS TAB</h2>
+<p>Picture and emulation settings are on the settings tab on the left (click on the pixelated triangle).
+<p>The settings can for example toggle composite NTSC and TV emulation and adjust colors.
+<p>For maximum frame rate, disable the TV emulation and use full-screen mode.
+
+<h2>KEYS</h2>
+<p>Game controller:
+<table>
+<tr><td>Arrow keys<td>D-pad directions
+<tr><td>F<td>A button
+<tr><td>D<td>B button
+<tr><td>S<td>Select button
+<tr><td>Enter<td>Start button
+</table>
+
+<p>Other:
+<table>
+<tr><td>Ctrl-R<td>Reset system
+<tr><td>Esc<td>Exit full-screen mode
+<tr><td>Tab<td>Speed throttle
+<tr><td>0-9<td>Select save state
+<tr><td>F5<td>Save save state
+<tr><td>F7<td>Load save state
+<tr><td>P<td>Pause emulation
+<tr><td>\<td>Single frame step
+</table>
+
+<p>Only one game controller is supported. Keyboard input customization is not supported.
+
+<h2>TECHNICAL</h2>
+<p>Game and save data are stored locally in the user's web browser. This data is never transmitted out from the web browser.
+<p>Extracting game or save data from the local browser storage is not supported.
+<p>Please refer to the <a href="https://bitbucket.org/tsone/em-fceux/">source code project</a> page for more information.
+<p>em-fceux and FCEUX are licensed under <a href="http://www.gnu.org/licenses/gpl-2.0.txt">GNU GPL Version 2</a>.
+<br/>
+<br/>
+    </div>
+
+    <div id="icons">
       <img src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" />
       <img src="img/sound_on.gif" onclick="FCEM.toggleSound()" id="soundIcon" />
-      <img src="img/help.gif" />
+      <label for="helpToggle"><img src="img/help.gif" /></label>
     </div>
 
     <script src="pre.js"></script>
