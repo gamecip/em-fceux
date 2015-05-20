@@ -26,6 +26,9 @@
 #include "../common/config.h"
 #include "../common/configSys.h"
 
+#if !SDL_VERSION_ATLEAST(2, 0, 0)
+#error "compile with emscripten -s USE_SDL=2 option"
+#endif
 
 // eoptions variable flags
 #define EO_NO8LIM      1
@@ -214,8 +217,7 @@ int InitSound();
 void WriteSound(int32 *Buffer, int Count);
 int KillSound(void);
 int GetSoundBufferCount(void);
-
-void SilenceSound(int s);
+void SilenceSound(int option);
 
 int InitVideo(FCEUGI *gi);
 int KillVideo(void);

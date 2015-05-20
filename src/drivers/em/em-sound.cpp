@@ -26,10 +26,6 @@
 #define TEST_SINE_AT_FILL	0
 #define TEST_SINE_AT_WRITE	0
 
-#if !SDL_VERSION_ATLEAST(2, 0, 0)
-#error "compile with emscripten -s USE_SDL=2 option"
-#endif
-
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 typedef float buf_t;
 typedef float mix_t;
@@ -37,6 +33,8 @@ typedef float mix_t;
 typedef int buf_t;
 typedef int16 mix_t;
 #endif
+
+extern int EmulationPaused;
 
 int em_sound_rate = SOUND_RATE;
 int em_sound_frame_samples = SOUND_RATE / 60;
@@ -49,6 +47,7 @@ static int s_BufferCount = 0;
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 static int s_initialized = 0;
 #endif
+static int s_silenced = 0;
 
 // Sound is NOT muted if this is 0, otherwise it is muted.
 static int s_soundvolumestore = 0;
@@ -58,9 +57,45 @@ static int s_soundvolumestore = 0;
 static double testSinePhase = 0.0;
 #endif
 
-/**
- * Callback from the SDL to get and play audio data.
- */
+// Consumes samples from buffer. Modifies indexes and returns the number of samples available.
+static int consumeBuffer(int samples)
+{
+	const int available = (s_BufferCount > samples) ? samples : s_BufferCount;
+	s_BufferRead = (s_BufferRead + available) & SOUND_BUF_MASK;
+	s_BufferCount -= available;
+	return available;
+}
+
+// Copy audio samples to buffer. Fill zeros if there's not enough samples.
+static void copyAudio(mix_t *str, int samples)
+{
+	int j = s_BufferRead - 1;
+	int m = SOUND_BUF_MAX - s_BufferRead;
+	int available = consumeBuffer(samples);
+	if (m > available) {
+		m = available;
+	}
+
+	samples = samples - available + 1;
+	available = available - m + 1;
+	++m;
+
+	int i = -1;
+
+// TODO: tsone: could use memcpy and memset. not sure if it's faster though
+	while (--m) {
+		str[++i] = s_Buffer[++j];
+	}
+	j = -1;
+	while (--available) {
+		str[++i] = s_Buffer[++j];
+	}
+	while (--samples) {
+		str[++i] = 0;
+	}
+}
+
+// Callback from the SDL to get and play audio data.
 static void fillaudio(void *udata, uint8 *stream, int len)
 {
 #if TEST_SINE_AT_FILL
@@ -80,57 +115,24 @@ static void fillaudio(void *udata, uint8 *stream, int len)
 
 #else
 
-#if 1
+	const int samples = len / sizeof(mix_t);
 
-// NOTE: tsone: this is an optimized version of the below filler loop
-	mix_t* str = (mix_t*) stream;
-	len = len / sizeof(mix_t);
-
-	int i = -1;
-	int j = s_BufferRead - 1;
-	int d = (s_BufferCount > len) ? len : s_BufferCount;
-	int m = SOUND_BUF_MAX - s_BufferRead;
-	if (m > d) {
-		m = d;
+	if (!EmulationPaused && !s_silenced) {
+		copyAudio((mix_t*) stream, samples);
+	} else {
+		memset(stream, 0, len);
 	}
 
-	s_BufferRead = (s_BufferRead + d) & SOUND_BUF_MASK;
-	s_BufferCount -= d;
-
-	len = len - d + 1;
-	d = d - m + 1;
-	++m;
-
-	while (--m) {
-		str[++i] = s_Buffer[++j];
+	if (s_silenced) {
+		consumeBuffer(samples);
 	}
-	j = -1;
-	while (--d) {
-		str[++i] = s_Buffer[++j];
-	}
-	while (--len) {
-		str[++i] = 0;
-	}
-
-#else
-	int16* str = (int16*) stream;
-	len >>= 1;
-	int d = (s_BufferCount > len) ? len : s_BufferCount;
-	int i = 0;
-	if (s_BufferCount < len) {
-		printf("Sound buffer exhausted (has %d samples, needs %d).\n", s_BufferCount, len);
-	}
-	for (; i < d; ++i) {
-		str[i] = s_Buffer[s_BufferRead];
-		s_BufferRead = (s_BufferRead + 1) & SOUND_BUF_MASK;
-	}
-	for (; i < len; ++i) {
-		str[i] = 0;
-	}
-	s_BufferCount -= d;
-#endif
 
 #endif // TEST_SINE_AT_FILL
+}
+
+void SilenceSound(int option)
+{
+	s_silenced = option;
 }
 
 int InitSound()
@@ -222,7 +224,6 @@ int GetSoundBufferCount(void)
 
 void WriteSound(int32 *buf, int Count)
 {
-	extern int EmulationPaused;
 	if (EmulationPaused != 0) {
 		return;
 	}
@@ -296,11 +297,6 @@ void WriteSound(int32 *buf, int Count)
 #endif
 
 #endif // TEST_SINE_AT_WRITE
-}
-
-void SilenceSound(int n)
-{ 
-	SDL_PauseAudio(n);   
 }
 
 int KillSound(void)

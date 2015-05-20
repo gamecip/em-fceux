@@ -116,7 +116,6 @@ static int DoFrame()
 	uint8 *gfx = 0;
 	int32 *sound;
 	int32 ssize;
-	static int opause = 0;
 
 	if (NoWaiting) {
 		for (int i = 0; i < TURBO_FRAMESKIPS; ++i) {
@@ -151,10 +150,6 @@ static int DoFrame()
 		BlitScreen(gfx);
 	}
 
-	if(opause!=FCEUI_EmulationPaused()) {
-		opause=FCEUI_EmulationPaused();
-		SilenceSound(opause);
-	}
 	return 1;
 }
 

@@ -17,6 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
+#include "em.h"
 #include "es2n.h"
 #include <cstdlib>
 #include <cstring>
@@ -111,6 +112,7 @@ enum {
 	SCANLINES,
 	CONVERGENCE,
 	NOISE,
+	SOUND_ENABLED,
 	CONTROL_COUNT
 };
 
@@ -247,6 +249,10 @@ void FCEM_setControl(int idx, double v)
 		FCEM_setControl(NOISE, s_c[NOISE]);
 		FCEM_setControl(SCANLINES, s_c[SCANLINES]);
 		FCEM_setControl(CONVERGENCE, s_c[CONVERGENCE]);
+		break;
+	// Other controls
+	case SOUND_ENABLED:
+		SilenceSound(!v);
 		break;
 	}
 }
@@ -630,7 +636,7 @@ static void initUniformsScreen()
 	k = glGetUniformLocation(prog, "u_mvp");
 	glUniformMatrix4fv(k, 1, GL_FALSE, s_p.mvp_mat);
 
-	initShading(prog, 2.5, 0.001, 0.0, 0.065, 41, 0.04, 4);
+	initShading(prog, 4.0, 0.001, 0.0, 0.065, 41, 0.04, 4);
 
 	updateUniformsScreen();
 }
@@ -652,7 +658,7 @@ static void initUniformsTV()
 	k = glGetUniformLocation(prog, "u_mvp");
 	glUniformMatrix4fv(k, 1, GL_FALSE, s_p.mvp_mat);
 
-	initShading(prog, 2.5, 0.0038, 0.0035, 0.039, 49, 0.03, 4);
+	initShading(prog, 4.0, 0.0038, 0.0035, 0.039, 49, 0.03, 4);
 
 	updateUniformsTV();
 }
