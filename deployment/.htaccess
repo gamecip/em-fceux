@@ -1,0 +1,34 @@
+
+RewriteEngine on
+
+# If the browser accepts gzip and the requested file exists with
+# a .gz appended, then rewrite the request to the .gz file
+RewriteCond %{HTTP:Accept-Encoding} gzip
+RewriteCond %{REQUEST_FILENAME}.gz -f
+RewriteRule (.*\.(css|js|mem))$ $1\.gz [L]
+
+#Set content type to javaScript and the encoding to gzip
+<FilesMatch ".*\.js\.gz$">
+        ForceType application/x-javascript
+        Header set Content-Encoding gzip
+</FilesMatch>
+
+#Set content type to css and the encoding to gzip
+<FilesMatch ".*\.css\.gz$">
+        ForceType text/css
+        Header set Content-Encoding gzip
+</FilesMatch>
+
+#Set content type to javascript and the encoding to gzip
+<FilesMatch ".*\.mem\.gz$">
+        ForceType application/javascript
+        Header set Content-Encoding gzip
+</FilesMatch>
+
+# Tell caching proxy servers to cache the file based on both
+# browser type and encoding
+Header append Vary Accept-Encoding
+
+# Do this to set proper ETags for server clusters
+FileETag MTime Size
+

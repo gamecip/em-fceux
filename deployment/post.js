@@ -30,7 +30,7 @@ document.addEventListener('drop', dropHandler, false);
 var current = 0;
 
 function calcGameOffset() {
-  return (8 * Math.random()) |0;
+  return 3 * ((3*Math.random()) |0);
 }
 
 function askConfirmGame(ev, el, q) {

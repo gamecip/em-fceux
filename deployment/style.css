@@ -16,9 +16,6 @@ html, body {
   margin-right: auto;
   display: block;
 }
-div.emscripten {
-  text-align: center;
-}
 canvas.emscripten {
   position: relative;
   border: 0px none;
@@ -166,10 +163,10 @@ canvas.emscripten {
 .cart {
   position: relative;
   display: table-row;
-  width: 397px;
-  height: 55px;
+  width: 396px;
+  height: 54px;
   vertical-align: bottom;
-  background: url('img/top4.png') no-repeat;
+  background: url('img/cart.gif') no-repeat;
 }
 
 #icons {
