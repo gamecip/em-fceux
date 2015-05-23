@@ -39,13 +39,16 @@
     </div>
 
     <div hidden="1">
-      <div class="cart" id="cartProto" onclick="return askSelectGame(event, this);"><div class="labelContainer"><div class="label"></div></div><div class="cartDelete" onclick="return askDeleteGame(event, this.parentNode);"></div></div>
+      <div class="cartRow" id="cartProto"><div class="cart" onclick="return askSelectGame(event, this.parentNode);"><div class="labelContainer"><div class="label"></div></div><div class="cartDelete" onclick="return askDeleteGame(event, this.parentNode.parentNode);"></div></div></div>
     </div>
     <input id="stackToggle" type="checkbox" hidden="1" />
     <div id="stackTab">
         <label id="stackToggleLabel" for="stackToggle"></label>
         <div id="stackContainer"><div id="stack"><div></div></div></div>
     </div>
+
+    <img id="fullscreenIcon" width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" />
+    <img id="soundIcon" width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" />
 
     <input id="helpToggle" type="checkbox" hidden="1" />
 <div id="helpDimmer"></div>
@@ -54,19 +57,15 @@
 <p>em-fceux is an <a href="http://emscripten.org/">Emscripten</a> port of <a href="http://www.fceux.com/">FCEUX</a>.
 <p>Source code: <a href="https://bitbucket.org/tsone/em-fceux/">https://bitbucket.org/tsone/em-fceux/</a>
 
-<h2>HOW TO PLAY</h2>
-<p>To play a game, drag and drop it (the .nes file or similar) to this browser window.
-<p>Played games are added to the game stack on the right. You can click a game on the stack to play it.
-<p>To remove a game, click on the 'X' icon. (The built-in game '2048' cannot be removed.)
-<p>Supported file formats: .nes, .nsf, .zip
+<h2>INSTRUCTIONS</h2>
+<p>To play a game, drag and drop it (ROM file etc.) on this browser window.
+<p>The played games are added to the game stack on the right. Play the game again by clicking it on the stack.
+<p>To remove a game, click <img src="img/x.gif" width=14 height=14 />. This doesn't remove save data. Built-in game 2048 cannot be removed.
+<p>Supported (tested) file formats: <i>.nes, .nsf, .zip</i>
 
-<h2>SETTINGS TAB</h2>
-<p>Picture and emulation settings are on the settings tab on the left (click on the pixelated triangle).
-<p>The settings can for example toggle composite NTSC and TV emulation and adjust colors.
-<p>For maximum frame rate, disable the TV emulation and use full-screen mode.
-
-<h2>KEYS</h2>
-<p>Game controller:
+<h3>KEYS</h3>
+<p>Keyboard inputs are fixed (no customization is currently supported).
+<p>First gamepad keys:
 <table>
 <tr><td>Arrow keys<td>D-pad directions
 <tr><td>F<td>A button
@@ -75,7 +74,7 @@
 <tr><td>Enter<td>Start button
 </table>
 
-<p>Other:
+<p>Other keys:
 <table>
 <tr><td>Ctrl-R<td>Reset system
 <tr><td>Esc<td>Exit full-screen mode
@@ -87,22 +86,26 @@
 <tr><td>\<td>Single frame step
 </table>
 
-<p>Only one game controller is supported. Keyboard input customization is not supported.
 
-<h2>TECHNICAL</h2>
-<p>Game and save data are stored locally in the user's web browser. This data is never transmitted out from the web browser.
-<p>Extracting game or save data from the local browser storage is not supported.
-<p>Please refer to the <a href="https://bitbucket.org/tsone/em-fceux/">source code project</a> page for more information.
+<h3>SETTINGS TAB</h3>
+<p>The settings tab is revealed by clicking the (pixelated) triangle on the left.
+<p>The tab has controls for composite NTSC and TV emulation, gamma, sharpness, color etc.
+
+<h2>TROUBLESHOOTING</h2>
+<p>Use a recent web browser, such as Firefox, Chromium, Chrome, Safari or Opera. Internet Explorer will not work.
+<p>If input responsiveness is poor (frame rate is low), try disabling TV emulation or using the full-screen mode.
+
+<h2>NOTES</h2>
+<p>Games and save data are stored locally in the web browser and are never transmitted out of the browser.
+<p>Extracting the games and save data from the browser (for backups etc.) is not supported.
+<p>Please refer to <a href="https://bitbucket.org/tsone/em-fceux/">em-fceux repository</a> for more technical information.
 <p>em-fceux and FCEUX are licensed under <a href="http://www.gnu.org/licenses/gpl-2.0.txt">GNU GPL Version 2</a>.
+<p>0.1.0-alpha
 <br/>
 <br/>
     </div>
 
-    <div id="icons">
-      <img width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" />
-      <img width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" id="soundIcon" />
-      <label for="helpToggle"><img width="48" height="48" src="img/help.gif" /></label>
-    </div>
+    <label id="helpIcon" for="helpToggle"><img width="48" height="48" src="img/help.gif" /></label>
 
     <script src="pre.js"></script>
     <script async type="text/javascript" src="fceux.js"></script>

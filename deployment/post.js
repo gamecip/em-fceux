@@ -8,7 +8,7 @@ function dropHandler(ev) {
   ev.stopPropagation();
   ev.preventDefault();
   var f = ev.dataTransfer.files[0];
-  if (f && confirm('want to add game: ' + f.name + '?')) {
+  if (f && confirm('Do you want to run the game ' + f.name + ' and add it to stack?')) {
     var r = new FileReader();
     r.onload = function(e) { 
       var opts = {encoding:'binary'};
@@ -46,7 +46,7 @@ function askConfirmGame(ev, el, q) {
 }
 
 function askSelectGame(ev, el) {
-  var idx = askConfirmGame(ev, el, 'want to start');
+  var idx = askConfirmGame(ev, el, 'Do you want to play');
   if (idx != -1) {
     FCEM.startGame(FCEM.games[idx].path);
     setTimeout(function() { FCEM.showStack(false); FCEM.showControls(false); }, 1000);
@@ -55,11 +55,14 @@ function askSelectGame(ev, el) {
 }
 
 function askDeleteGame(ev, el) {
-  var idx = askConfirmGame(ev, el, 'want to delete');
+  var idx = askConfirmGame(ev, el, 'Do you want to delete');
   if (idx != -1) {
-    var item = FCEM.games.slice(idx, idx+1)[0];
-    FS.unlink(item.path);
-    FS.syncfs(FCEM.onDeleteGameSyncFromIDB);
+    idx = askConfirmGame(ev, el, 'ARE YOU REALLY SURE YOU WANT TO DELETE');
+    if (idx != -1) {
+      var item = FCEM.games.slice(idx, idx+1)[0];
+      FS.unlink(item.path);
+      FS.syncfs(FCEM.onDeleteGameSyncFromIDB);
+    }
   }
   return false;
 }

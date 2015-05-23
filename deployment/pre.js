@@ -103,11 +103,10 @@ var FCEM = {
       var el = proto.cloneNode(true);
   
       el.id = i;
-      el.className = 'cart';
       el.style.backgroundPosition = item.offset + 'px 0px';
       list.appendChild(el);
   
-      var label = el.firstChild.firstChild;
+      var label = el.firstChild.firstChild.firstChild;
       label.style.fontSize = '12px';
       label.style.lineHeight = '16px';
       label.innerHTML = item.label;
@@ -117,7 +116,7 @@ var FCEM = {
       }
 
       if (!item.deletable) {
-        el.lastChild.hidden = true;
+        el.firstChild.lastChild.hidden = true;
       }
     }
   
@@ -126,8 +125,8 @@ var FCEM = {
 };
 
 window.onbeforeunload = function (ev) {
-  var msg = 'Do you want to close the FCEUX emulator and the current game? Unsaved game data will be lost.';
-  (ev || window.event).returnValue = msg; 
+  var msg = 'ARE YOU SURE YOU WANT TO CLOSE EM-FCEUX? UNSAVED GAME DATA WILL BE LOST.';
+  (ev || window.event).returnValue = msg;
   return msg;
 };
 

@@ -1,7 +1,7 @@
 html, body {
   margin: 0;
   border: 0px none;
-  padding: none;
+  padding: 0;
   float: none;
   font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;
   color: #FCFCFC;
@@ -56,8 +56,8 @@ canvas.emscripten {
 #controlsTab {
   position: absolute;
   top: 0;
-  left: -280px;
-  width: 300px;
+  left: -292px;
+  width: 310px;
   height: 100%;
   transition: left 500ms;
 }
@@ -95,8 +95,8 @@ canvas.emscripten {
 
 #stackTab {
   position: absolute;
-  top: 0;
-  right: -414px;
+  top: 0px;
+  right: -416px;
   width: 434px;
   height: 100%;
   transition: right 500ms;
@@ -121,14 +121,14 @@ canvas.emscripten {
   position: absolute;
   bottom: 0px;
   right: 0px;
-  width: 414px;
+  width: 416px;
   height: 100%;
   overflow-x: hidden;
   overflow-y: scroll;
 }
 #stack {
   display: table;
-  width: 414px;
+  width: 416px;
   height: 100%;
   border-collapse: collapse;
 }
@@ -140,45 +140,57 @@ canvas.emscripten {
   position: relative;
   text-align: center;
   vertical-align: middle;
-  width: 172px;
+  width: 171px;
   height: 18px;
   line-height: 17px;
 }
 .labelContainer {
   position: relative;
   overflow: hidden;
-  left: 64px;
-  top: 1px;
-  width: 172px;
+  left: 63px;
+  top: 3px;
+  width: 171px;
   height: 18px;
-  clip: rect(0px, 172px, 18px 0px);
+  clip: rect(0px, 171px, 18px 0px);
 }
 .cartDelete {
   position: relative;
-  width: 25px;
-  height: 25px;
+  width: 21px;
+  height: 21px;
   top: -15px;
   left: 372px;
+  background: url('img/x.gif') no-repeat;
 }
-.cart {
-  position: relative;
+.cartRow {
   display: table-row;
   width: 396px;
   height: 54px;
   vertical-align: bottom;
   background: url('img/cart.gif') no-repeat;
 }
-
-#icons {
-  position: absolute;
-  right: 9px;
-  top: 0;
-  text-align: right;
+.cart {
+  display: table-cell;
+  width: 396px;
+  height: 54px;
 }
-// TODO: tsone: hack, preloads 'sound_off.gif'
+
+#fullscreenIcon {
+  position: fixed;
+  top: 0;
+  right: 105px;
+}
 #soundIcon {
+  position: fixed;
+  top: 0;
+  right: 57px;
   background: url('img/sound_off.gif') no-repeat;
   background: none;
+}
+#helpIcon {
+  position: fixed;
+  top: 0;
+  right: 9px;
+  z-index: 255;
 }
 
 #help {
