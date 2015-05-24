@@ -1,27 +1,38 @@
 
+ExpiresActive On
 RewriteEngine on
+
+# Set Expires and Cache-Control for 1 week expiration
+ExpiresDefault A604800
+Header set Cache-Control "max-age=604800"
 
 # If the browser accepts gzip and the requested file exists with
 # a .gz appended, then rewrite the request to the .gz file
 RewriteCond %{HTTP:Accept-Encoding} gzip
 RewriteCond %{REQUEST_FILENAME}.gz -f
-RewriteRule (.*\.(css|js|mem))$ $1\.gz [L]
+RewriteRule (.*\.(css|js|mem|data))$ $1\.gz [L]
 
-#Set content type to javaScript and the encoding to gzip
+#Set content type to javaScript and encoding to gzip
 <FilesMatch ".*\.js\.gz$">
         ForceType application/x-javascript
         Header set Content-Encoding gzip
 </FilesMatch>
 
-#Set content type to css and the encoding to gzip
+#Set content type to css and encoding to gzip
 <FilesMatch ".*\.css\.gz$">
         ForceType text/css
         Header set Content-Encoding gzip
 </FilesMatch>
 
-#Set content type to javascript and the encoding to gzip
+#Set content type to javascript and encoding to gzip
 <FilesMatch ".*\.mem\.gz$">
         ForceType application/javascript
+        Header set Content-Encoding gzip
+</FilesMatch>
+
+#Set data files encoding to gzip
+<FilesMatch ".*\.data\.gz$">
+        ForceType text/plain
         Header set Content-Encoding gzip
 </FilesMatch>
 

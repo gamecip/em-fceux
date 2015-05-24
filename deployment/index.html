@@ -1,20 +1,25 @@
 <!doctype html>
 <html lang="en-us">
   <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>em-fceux</title>
-    <link href="style.css" rel="stylesheet">
+
+    <link rel="icon" type="image/png" href="img/favicon-48.png" />
+    <link rel="apple-touch-icon" href="img/favicon-60.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="img/favicon-120.png" />
+
+    <link href="style.css" rel="stylesheet" />
   </head>
   <body>
 
-    <canvas class="emscripten" id="canvas" hidden="true" oncontextmenu="event.preventDefault()"></canvas>
+    <canvas class="emscripten" id="canvas" hidden oncontextmenu="event.preventDefault()"></canvas>
 
     <div id="loader">
       <span id="loaderSpinner"></span>
     </div>
 
-    <input id="controlsToggle" type="checkbox" hidden="1" />
+    <input id="controlsToggle" type="checkbox" hidden />
     <div id="controlsTab">
         <div id="controlsContainer">
           <div id="controlsSliders">
@@ -38,19 +43,19 @@
         <label id="controlsToggleLabel" for="controlsToggle"></label>
     </div>
 
-    <div hidden="1">
+    <div hidden>
       <div class="cartRow" id="cartProto"><div class="cart" onclick="return askSelectGame(event, this.parentNode);"><div class="labelContainer"><div class="label"></div></div><div class="cartDelete" onclick="return askDeleteGame(event, this.parentNode.parentNode);"></div></div></div>
     </div>
-    <input id="stackToggle" type="checkbox" hidden="1" />
+    <input id="stackToggle" type="checkbox" hidden />
     <div id="stackTab">
         <label id="stackToggleLabel" for="stackToggle"></label>
         <div id="stackContainer"><div id="stack"><div></div></div></div>
     </div>
 
-    <img id="fullscreenIcon" width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" />
-    <img id="soundIcon" width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" />
+    <img id="fullscreenIcon" width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" alt=""/>
+    <img id="soundIcon" width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" alt=""/>
 
-    <input id="helpToggle" type="checkbox" hidden="1" />
+    <input id="helpToggle" type="checkbox" hidden />
 <div id="helpDimmer"></div>
     <div id="help">
 <h1>EM-FCEUX</h1>
@@ -60,7 +65,7 @@
 <h2>INSTRUCTIONS</h2>
 <p>To play a game, drag and drop it (ROM file etc.) on this browser window.
 <p>The played games are added to the game stack on the right. Play the game again by clicking it on the stack.
-<p>To remove a game, click <img src="img/x.gif" width=14 height=14 />. This doesn't remove save data. Built-in game 2048 cannot be removed.
+<p>To remove a game, click <img src="img/x.gif" width=14 height=14 alt="the 'X' icon on it"/>. This doesn't remove save data. Built-in game 2048 cannot be removed.
 <p>Supported (tested) file formats: <i>.nes, .nsf, .zip</i>
 
 <h3>KEYS</h3>
@@ -105,7 +110,7 @@
 <br/>
     </div>
 
-    <label id="helpIcon" for="helpToggle"><img width="48" height="48" src="img/help.gif" /></label>
+    <label id="helpIcon" for="helpToggle"><img width="48" height="48" src="img/help.gif" alt=""/></label>
 
     <script src="pre.js"></script>
     <script async type="text/javascript" src="fceux.js"></script>
