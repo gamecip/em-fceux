@@ -22,6 +22,7 @@
 #include "../../utils/memory.h"
 #include <html5.h>
 
+#define GAMEPAD_THRESHOLD 0.1
 
 int NoWaiting = 1;
 
@@ -286,23 +287,23 @@ static int FCEM_TestGamepadButton(const EmscriptenGamepadEvent *p, int idx)
     if (idx >= 8) {
         // Turbo A, Turbo B.
         idx = idx - 4;
-        return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] > 0.5)));
+        return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] >= GAMEPAD_THRESHOLD)));
     } else if (idx >= 4) {
         // Up, down, left, right.
         const int positive_axis = idx & 1;
         idx = !((idx & 0x02) >> 1);
         if (idx < p->numAxes) {
             if (positive_axis) { 
-                return p->axis[idx] > 0.5;
+                return p->axis[idx] >= GAMEPAD_THRESHOLD;
             } else { 
-                return p->axis[idx] < -0.5;
+                return p->axis[idx] <= -GAMEPAD_THRESHOLD;
             }
         } else {
             return 0;
         }
     } else { 
         // A, B, Select, Start.
-        return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] > 0.5)));
+        return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] >= GAMEPAD_THRESHOLD)));
     }
 }
 
