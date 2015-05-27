@@ -4,6 +4,6 @@
 /.sconsign.dblite
 /bin/
 /config.log
-/deployment/fceux.js*
-/deployment/fceux.data
+/src/drivers/em/deployment/fceux.*
+/src/drivers/em/deployment/*.gz
 /src/drivers/em/gitversion.c

@@ -59,7 +59,7 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   ]
   exports = '-s EXPORTED_FUNCTIONS=\'["_' + '","_'.join(exportsList) + '"]\''
   env.Append(LINKFLAGS = exports)
-  env.Append(LINKFLAGS = '--preload-file deployment/default/@/default/')
+  env.Append(LINKFLAGS = '--preload-file src/drivers/em/assets/games/@/default/')
   env.Append(LINKFLAGS = '-s USE_SDL=2')
   env.Append(CCFLAGS = '-s USE_SDL=2')
 else:
@@ -240,7 +240,20 @@ else:
 
 Export('env')
 fceux = SConscript('src/SConscript')
-if not env['EMSCRIPTEN']:
+if env['EMSCRIPTEN']:
+  target = str(fceux[0])
+  target_dir = os.path.dirname(target)
+  gzip_src = [
+    target,
+    target + '.mem',
+    target[:-3] + '.data',
+    os.path.join(target_dir, 'style.css'),
+    os.path.join(target_dir, 'pre.js'),
+    os.path.join(target_dir, 'post.js')
+  ]
+  for f in gzip_src:
+    env.Command(f+'.gz', f, 'gzip --best -c $SOURCE > $TARGET')
+else:
   env.Program(target="fceux-net-server", source=["fceux-server/server.cpp", "fceux-server/md5.cpp", "fceux-server/throttle.cpp"])
   
   # Installation rules
