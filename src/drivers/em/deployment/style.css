@@ -44,17 +44,27 @@ canvas.emscripten {
   height: 100%;
 }
 
+#preload {
+  display: none;
+}
+img.preload {
+  width: 1px;
+  height: 1px;
+}
+
 #loader {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: #0A0A0A;
+  z-index: 255;
+}
+#loaderSpinner {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 16px;
-  height: 16px;
-  margin-left: -8px;
-  margin-top: -16px;
-}
-#loaderSpinner {
-  display: inline-block;
   margin: 0;
   width: 0px;
   height: 0px;
@@ -115,10 +125,11 @@ canvas.emscripten {
 #stackTab {
   position: absolute;
   top: 0px;
-  right: -416px;
-  width: 434px;
+  right: 0px;
+  width: 15px;
   height: 100%;
-  transition: right 500ms;
+  transition: width 500ms;
+  overflow: hidden;
 }
 #stackToggleLabel {
   position: absolute;
@@ -133,17 +144,22 @@ canvas.emscripten {
 #stackToggle:checked + #stackTab #stackToggleLabel {
   background: url('img/right.gif') no-repeat;
 }
+#stackToggle:checked + #stackTab #stackContainer {
+  width: 416px;
+  overflow-y: scroll;
+}
 #stackToggle:checked ~ #stackTab {
-  right: 0px;
+  width: 434px;
 }
 #stackContainer {
   position: absolute;
   bottom: 0px;
   right: 0px;
-  width: 416px;
+  width: 0px;
   height: 100%;
   overflow-x: hidden;
-  overflow-y: scroll;
+  overflow-y: hidden;
+  transition: width 500ms;
 }
 #stack {
   display: table;
@@ -202,14 +218,13 @@ canvas.emscripten {
   position: fixed;
   top: 0;
   right: 57px;
-  background: url('img/sound_off.gif') no-repeat;
   background: none;
 }
 #helpIcon {
   position: fixed;
   top: 0;
   right: 9px;
-  z-index: 255;
+  z-index: 254;
 }
 
 #help {
@@ -252,3 +267,4 @@ a {
 #helpToggle:checked + #helpDimmer {
   visibility: visible;
 }
+

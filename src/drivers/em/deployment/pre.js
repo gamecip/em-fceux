@@ -145,9 +145,7 @@ var FCEM = {
 };
 
 window.onbeforeunload = function (ev) {
-  var msg = 'ARE YOU SURE YOU WANT TO CLOSE EM-FCEUX? UNSAVED GAME DATA WILL BE LOST.';
-  (ev || window.event).returnValue = msg;
-  return msg;
+  return 'To prevent save game data loss, please let the game run at least one second after saving and before closing the window.';
 };
 
 var loaderElem = document.getElementById('loader');
