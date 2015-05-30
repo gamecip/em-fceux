@@ -124,23 +124,24 @@ static int DoFrame()
 		}
 	}
 
-
 	// Get the number of frames to fill the audio buffer.
 	int frames = (SOUND_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
 
     // On some systems audio can get ahead of visuals. If so, skip emulation for this requestAnimationFrame.
 // TODO: tsone: this is not a good solution as it may cause unnecessary skips of the requestAnimationFrame update
-    if (frames <= 0) {
-        return 0;
-    }
+	if (IsSoundInitialized() && frames <= 0) {
+		return 0;
+	}
 
 	FCEUD_UpdateInput();
 
 	// Skip frames (video) to fill the audio buffer. Leave two frames free for next requestAnimationFrame in case they come too frequently.
-	while (frames > 3) {
-		FCEUI_Emulate(&gfx, &sound, &ssize, 1);
-		FCEUD_Update(gfx, sound, ssize);
-		--frames;
+	if (IsSoundInitialized()) {
+		while (frames > 3) {
+			FCEUI_Emulate(&gfx, &sound, &ssize, 1);
+			FCEUD_Update(gfx, sound, ssize);
+			--frames;
+		}
 	}
 
 	FCEUI_Emulate(&gfx, &sound, &ssize, 0);

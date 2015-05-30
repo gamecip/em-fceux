@@ -214,6 +214,7 @@ extern const int DefaultFamilyKeyBoard[FAMILYKEYBOARD_NUM_BUTTONS];
 #endif //PERI
 
 int InitSound();
+int IsSoundInitialized();
 void WriteSound(int32 *Buffer, int Count);
 int KillSound(void);
 int GetSoundBufferCount(void);

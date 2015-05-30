@@ -44,9 +44,7 @@ static int s_BufferRead = 0;
 static int s_BufferWrite = 0;
 static int s_BufferCount = 0;
 
-#if SDL_VERSION_ATLEAST(2, 0, 0)
 static int s_initialized = 0;
-#endif
 static int s_silenced = 0;
 
 // Sound is NOT muted if this is 0, otherwise it is muted.
@@ -135,13 +133,16 @@ void SilenceSound(int option)
 	s_silenced = option;
 }
 
+int IsSoundInitialized()
+{
+	return s_initialized;
+}
+
 int InitSound()
 {
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	if (s_initialized) {
+	if (IsSoundInitialized()) {
 		return 1;
 	}
-#endif
 
 	SDL_AudioSpec spec;
 	SDL_AudioSpec obtained;
@@ -211,9 +212,7 @@ int InitSound()
 	FCEUI_SetNoiseVolume(256);
 	FCEUI_SetPCMVolume(256);
 
-#if SDL_VERSION_ATLEAST(2, 0, 0)
 	s_initialized = 1;
-#endif
 	return 1;
 }
 
