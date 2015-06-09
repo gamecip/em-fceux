@@ -320,7 +320,11 @@ static bool ReadStateChunks(EMUFILE* is, int32 totalsize)
 		case 8:
 			// load back buffer
 			{
+#ifndef EMSCRIPTEN
 				extern uint8 *XBackBuf;
+#else
+				uint8 *XBackBuf = XBuf;
+#endif
 				if(is->fread((char*)XBackBuf,size) != size)
 					ret = false;
 
@@ -417,7 +421,11 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 	}
 	// save back buffer
 	{
+#ifndef EMSCRIPTEN
 		extern uint8 *XBackBuf;
+#else
+		uint8 *XBackBuf = XBuf;
+#endif
 		uint32 size = 256 * 256 + 8;
 		os->fputc(8);
 		write32le(size, os);

@@ -169,7 +169,6 @@ enum FCEM_Input {
 #define SOUND_BUF_MASK		(SOUND_BUF_MAX-1)
 
 
-extern int isloaded;
 // The rate of output and emulated (internal) audio (frequency, in Hz).
 extern int em_sound_rate;
 // Number of audio samples per frame. Actually NTSC divisor is 60.0988, but since this is used as divisor
@@ -220,13 +219,12 @@ int KillSound(void);
 int GetSoundBufferCount(void);
 void SilenceSound(int option);
 
-int InitVideo(FCEUGI *gi);
-int KillVideo(void);
-void BlitScreen(uint8 *XBuf);
+int InitVideo();
+int KillVideo();
+void BlitScreen();
 
 int LoadGame(const char *path);
 int CloseGame(void);
-void FCEUD_Update(uint8 *XBuf, int32 *Buffer, int Count);
 uint64 FCEUD_GetTime();
 
 void PtoV(int *x, int *y);

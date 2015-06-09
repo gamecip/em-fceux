@@ -57,7 +57,9 @@
 #include <zlib.h>
 
 uint8 *XBuf=NULL;
+#ifndef EMSCRIPTEN
 uint8 *XBackBuf=NULL;
+#endif
 int ClipSidesOffset=0;	//Used to move displayed messages when Clips left and right sides is checked
 static uint8 *xbsave=NULL;
 
@@ -113,8 +115,12 @@ int FCEU_InitVirtualVideo(void)
 		/* 256 bytes per scanline, * 240 scanline maximum, +16 for alignment,
 		*/
 
+#ifndef EMSCRIPTEN
 		if(!(XBuf= (uint8*) (FCEU_malloc(256 * 256 + 16))) ||
 			!(XBackBuf= (uint8*) (FCEU_malloc(256 * 256 + 16))))
+#else
+		if(!(XBuf= (uint8*) (FCEU_malloc(256 * 256 + 16))))
+#endif
 		{
 			return 0;
 		}
@@ -128,8 +134,12 @@ int FCEU_InitVirtualVideo(void)
 			XBuf+=m;
 		}
 
+#ifndef EMSCRIPTEN
 		memset(XBuf,128,256*256); //*240);
 		memset(XBackBuf,128,256*256);
+#else
+		memset(XBuf,0x1D1D1D1D,256*256); //*240);
+#endif
 
 		return 1;
 }
@@ -201,11 +211,12 @@ void FCEU_PutImage(void)
 	}
 	else
 	{
+
+#ifndef EMSCRIPTEN
 		//Save backbuffer before overlay stuff is written.
 		if(!FCEUI_EmulationPaused())
 			memcpy(XBackBuf, XBuf, 256*256);
 
-#ifndef EMSCRIPTEN
 		//Some messages need to be displayed before the avi is dumped
 		DrawMessage(true);
 
@@ -276,7 +287,7 @@ void FCEU_PutImage(void)
 			// Put other port info here
 			ci = 0;
 			held = 0;
-#endif
+#endif //WIN32
 
 			//adelikat: I apologize to anyone who ever sifts through this color assignment
 			//A
@@ -539,9 +550,11 @@ uint32 GetScreenPixel(int x, int y, bool usebackup) {
 	if (((x < 0) || (x > 255)) || ((y < 0) || (y > 255)))
 		return -1;
 
+#ifndef EMSCRIPTEN
 	if (usebackup)
 		FCEUD_GetPalette(XBackBuf[(y*256)+x],&r,&g,&b);
 	else
+#endif
 		FCEUD_GetPalette(XBuf[(y*256)+x],&r,&g,&b);
 
 
@@ -553,9 +566,11 @@ int GetScreenPixelPalette(int x, int y, bool usebackup) {
 	if (((x < 0) || (x > 255)) || ((y < 0) || (y > 255)))
 		return -1;
 
+#ifndef EMSCRIPTEN
 	if (usebackup)
 		return XBackBuf[(y*256)+x] & 0x3f;
 	else
+#endif
 		return XBuf[(y*256)+x] & 0x3f;
 
 }

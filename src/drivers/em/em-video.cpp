@@ -30,6 +30,7 @@
 #define NWIDTH	(256 - (s_clipSides ? 16 : 0))
 #define NOFFSET	(s_clipSides ? 8 : 0)
 
+extern uint8 *XBuf;
 extern uint8 deempScan[240];
 extern uint8 PALRAM[0x20];
 extern Config *g_config;
@@ -84,13 +85,13 @@ void FCEUD_VideoChanged()
 		PAL = 0;
 }
 
-void BlitScreen(uint8 *buf)
+void BlitScreen()
 {
-    es2nRender(buf, deempScan, PALRAM[0]);
+    es2nRender(XBuf, deempScan, PALRAM[0]);
 }
 
 // Return 0 on success, -1 on failure.
-int InitVideo(FCEUGI *gi)
+int InitVideo()
 {
 	if (s_inited) {
 		return 0;

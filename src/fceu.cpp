@@ -187,7 +187,11 @@ static void FCEU_CloseGame(void)
 		//clear screen when game is closed
 		extern uint8 *XBuf;
 		if (XBuf)
+#ifndef EMSCRIPTEN
 			memset(XBuf, 0, 256 * 256);
+#else
+			memset(XBuf, 0x1D1D1D1D, 256 * 256);
+#endif
 
 		FCEU_CloseGenie();
 
@@ -687,8 +691,10 @@ void FCEUI_Emulate(uint8 **pXBuf, int32 **SoundBuf, int32 *SoundBufSize, int ski
 		if (EmulationPaused & EMULATIONPAUSED_PAUSED)
 		{
 			// emulator is paused
+#ifndef EMSCRIPTEN
 			memcpy(XBuf, XBackBuf, 256*256);
 			FCEU_PutImage();
+#endif
 			*pXBuf = XBuf;
 			*SoundBuf = WaveFinal;
 			*SoundBufSize = 0;
@@ -780,9 +786,11 @@ void ResetNES(void) {
 	FCEUPPU_Reset();
 	X6502_Reset();
 
+#ifndef EMSCRIPTEN
 	// clear back baffer
 	extern uint8 *XBackBuf;
 	memset(XBackBuf, 0, 256 * 256);
+#endif
 
 	FCEU_DispMessage("Reset", 0);
 }
@@ -857,9 +865,12 @@ void PowerNES(void) {
 #endif
 	FCEU_PowerCheats();
 	LagCounterReset();
+
+#ifndef EMSCRIPTEN
 	// clear back buffer
 	extern uint8 *XBackBuf;
 	memset(XBackBuf, 0, 256 * 256);
+#endif
 
 #ifdef WIN32
 	Update_RAM_Search(); // Update_RAM_Watch() is also called.

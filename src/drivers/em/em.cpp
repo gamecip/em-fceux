@@ -29,26 +29,15 @@
 // Recommended behavior is to use requestAnimationFrame, i.e. set to 0.
 #define SUPER_RATE 0
 
-void FCEUD_Update(uint8 *XBuf, int32 *Buffer, int Count);
-
 extern double g_fpsScale;
-
 extern bool MaxSpeed;
 
-int isloaded;
-
-int eoptions=0;
+int eoptions = 0;
+int gametype = 0;
+Config *g_config;
 
 static int inited = 0;
-
-static void DriverKill(void);
-static int DriverInitialize(FCEUGI *gi);
-uint64 FCEUD_GetTime();
-int gametype = 0;
-static int noconfig;
-
-// global configuration object
-Config *g_config;
+static int isloaded = 0;
 
 /**
  * Loads a game, given a full path/filename.  The driver code must be
@@ -67,10 +56,6 @@ int LoadGame(const char *path)
 
 	ParseGIInput(GameInfo);
 
-	if(!DriverInitialize(GameInfo)) {
-		return(0);
-	}
-	
 // TODO: tsone: support for PAL?
         // NTSC=0, PAL=1
 	FCEUI_SetVidSystem(0);
@@ -104,7 +89,7 @@ int CloseGame()
 
 	FCEUI_CloseGame();
 
-	DriverKill();
+//	DriverKill();
 	isloaded = 0;
 	GameInfo = 0;
 
@@ -120,7 +105,7 @@ static int DoFrame()
 	if (NoWaiting) {
 		for (int i = 0; i < TURBO_FRAMESKIPS; ++i) {
 			FCEUI_Emulate(&gfx, &sound, &ssize, 2);
-			FCEUD_Update(gfx, sound, ssize);
+			WriteSound(sound, ssize);
 		}
 	}
 
@@ -139,17 +124,13 @@ static int DoFrame()
 	if (IsSoundInitialized()) {
 		while (frames > 3) {
 			FCEUI_Emulate(&gfx, &sound, &ssize, 1);
-			FCEUD_Update(gfx, sound, ssize);
+			WriteSound(sound, ssize);
 			--frames;
 		}
 	}
 
 	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
-	FCEUD_Update(gfx, sound, ssize);
-
-	if (gfx && (inited & 4)) {
-		BlitScreen(gfx);
-	}
+	WriteSound(sound, ssize);
 
 	return 1;
 }
@@ -157,34 +138,37 @@ static int DoFrame()
 static void ReloadROM(void*)
 {
     char *filename = emscripten_run_script_string("Module.romName");
-    CloseGame();
+//    CloseGame();
     LoadGame(filename);
 }
 
+
 static void MainLoop()
 {
-    if (GameInfo && !DoFrame()) {
-	return; // If frame was not processed, skip rest of this callback.
-    }
+	if (inited & 4) {
+		if (GameInfo && !DoFrame()) {
+			return; // Frame was not processed, skip rest of this callback.
+		} else {
+			BlitScreen();
+		}
+	}
+
 // FIXME: tsone: sould be probably using exports
 // NOTE: tsone: simple way to communicate with mainloop without "exporting" functions
-    int reload = EM_ASM_INT_V({ return Module.romReload||0; });
-    if (reload) {
-        emscripten_push_main_loop_blocker(ReloadROM, 0);
-        EM_ASM({ Module.romReload = 0; });
-    }
+	int reload = EM_ASM_INT_V({ return Module.romReload||0; });
+	if (reload) {
+		emscripten_push_main_loop_blocker(ReloadROM, 0);
+		EM_ASM({ Module.romReload = 0; });
+	}
 }
 
-/**
- * Initialize all of the subsystem drivers: video, audio, and joystick.
- */
-static int DriverInitialize(FCEUGI *gi)
+static int DriverInitialize()
 {
-	if(InitVideo(gi) < 0) return 0;
+	InitVideo();
 	inited|=4;
 
-	if(InitSound())
-		inited|=1;
+	InitSound();
+	inited|=1;
 
 	int fourscore = 0;
 	g_config->getOption("SDL.FourScore", &fourscore);
@@ -193,33 +177,18 @@ static int DriverInitialize(FCEUGI *gi)
 	return 1;
 }
 
-/**
- * Shut down all of the subsystem drivers: video, audio, and joystick.
- */
+// TODO: tsone: not used
+#if 0
 static void DriverKill()
 {
-	if (!noconfig)
-		g_config->save();
-
 	if(inited&4)
 		KillVideo();
 	if(inited&1)
 		KillSound();
 	inited=0;
 }
+#endif
 
-/**
- * Update the video, audio, and input subsystems with the provided
- * video (XBuf) and audio (Buffer) information.
- */
-void FCEUD_Update(uint8 *XBuf, int32 *Buffer, int Count)
-{
-	WriteSound(Buffer, Count);
-}
-
-/**
- * Opens a file to be read a byte at a time.
- */
 EMUFILE_FILE* FCEUD_UTF8_fstream(const char *fn, const char *m)
 {
 	std::ios_base::openmode mode = std::ios_base::binary;
@@ -239,18 +208,12 @@ EMUFILE_FILE* FCEUD_UTF8_fstream(const char *fn, const char *m)
 	//return new std::fstream(fn,mode);
 }
 
-/**
- * Opens a file, C++ style, to be read a byte at a time.
- */
 FILE *FCEUD_UTF8fopen(const char *fn, const char *mode)
 {
 	return(fopen(fn,mode));
 }
 
-static char *s_linuxCompilerString = "g++ " __VERSION__;
-/**
- * Returns the compiler string.
- */
+static char *s_linuxCompilerString = "emscripten " __VERSION__;
 const char *FCEUD_GetCompilerString() {
 	return (const char *)s_linuxCompilerString;
 }
@@ -276,12 +239,6 @@ int main(int argc, char *argv[])
     FCEUI_SetDirOverride(FCEUIOD_STATES, "fceux/sav");
 //    FCEUI_SetDirOverride(FCEUIOD_ROMS, "fceux/rom");
 
-	g_config->getOption("SDL.InputCfg", &s);
-	if(s.size() != 0)
-	{
-	InitVideo(GameInfo);
-	}
-
     // update the input devices
 //	UpdateInput(g_config);
 
@@ -294,6 +251,8 @@ int main(int argc, char *argv[])
 		if (id)
 			newppu = 1;
 	}
+
+	DriverInitialize();
 
 #if SUPER_RATE
 // NOTE: tsone: set higher frame rate to ensure emulation stays ahead
