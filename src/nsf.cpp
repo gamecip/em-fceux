@@ -35,6 +35,7 @@
 #include "input.h"
 #include "state.h"
 #include "driver.h"
+#include "drawing.h"
 #ifdef _S9XLUA_H
 #include "fceulua.h"
 #endif
@@ -581,14 +582,14 @@ void DrawNSF(uint8 *XBuf)
 		}
 	}
 
-	DrawTextTrans(ClipSidesOffset+XBuf+10*256+4+(((31-strlen((char*)NSFHeader.SongName))<<2)), 256, NSFHeader.SongName, COLOR_TEXT);
-	DrawTextTrans(ClipSidesOffset+XBuf+26*256+4+(((31-strlen((char*)NSFHeader.Artist))<<2)), 256,NSFHeader.Artist, COLOR_TEXT);
-	DrawTextTrans(ClipSidesOffset+XBuf+42*256+4+(((31-strlen((char*)NSFHeader.Copyright))<<2)), 256,NSFHeader.Copyright, COLOR_TEXT);
+	DrawTextTrans(ClipSidesOffset+XBuf+10*256+4+(((31-strlen((char*)NSFHeader.SongName))<<2)), NSFHeader.SongName, COLOR_TEXT);
+	DrawTextTrans(ClipSidesOffset+XBuf+26*256+4+(((31-strlen((char*)NSFHeader.Artist))<<2)), NSFHeader.Artist, COLOR_TEXT);
+	DrawTextTrans(ClipSidesOffset+XBuf+42*256+4+(((31-strlen((char*)NSFHeader.Copyright))<<2)), NSFHeader.Copyright, COLOR_TEXT);
 
-	DrawTextTrans(ClipSidesOffset+XBuf+70*256+4+(((31-strlen("Song:"))<<2)), 256, (uint8*)"Song:", COLOR_TEXT);
+	DrawTextTrans(ClipSidesOffset+XBuf+70*256+4+(((31-strlen("Song:"))<<2)), (uint8*)"Song:", COLOR_TEXT);
 // TODO: tsone: sprintf here slows down emscripten rendering quite a lot!
 	sprintf(snbuf,"<%d/%d>",CurrentSong,NSFHeader.TotalSongs);
-	DrawTextTrans(XBuf+82*256+4+(((31-strlen(snbuf))<<2)), 256, (uint8*)snbuf, COLOR_TEXT);
+	DrawTextTrans(XBuf+82*256+4+(((31-strlen(snbuf))<<2)), (uint8*)snbuf, COLOR_TEXT);
 
 	{
 		static uint8 last=0;

@@ -65,9 +65,11 @@ int LoadGame(const char *path)
 	return 1;
 }
 
-extern "C" {
+extern "C"
+{
+
 // Write savegame and synchronize IDBFS contents to IndexedDB. Must be a C-function.
-void FCEM_onSaveGameInterval()
+void FCEM_OnSaveGameInterval()
 {
     if (GameInterface) {
         GameInterface(GI_SAVE);
@@ -76,6 +78,7 @@ void FCEM_onSaveGameInterval()
       FS.syncfs(FCEM.onSyncToIDB);
     });
 }
+
 }
 
 /**
@@ -146,10 +149,14 @@ static void ReloadROM(void*)
 static void MainLoop()
 {
 	if (inited & 4) {
-		if (GameInfo && !DoFrame()) {
-			return; // Frame was not processed, skip rest of this callback.
+		if (GameInfo) {
+			if (!DoFrame()) {
+				return; // Frame was not processed, skip rest of this callback.
+			} else {
+				RenderVideo(0);
+			}
 		} else {
-			BlitScreen();
+			RenderVideo(1);
 		}
 	}
 

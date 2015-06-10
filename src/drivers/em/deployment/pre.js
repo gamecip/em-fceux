@@ -63,9 +63,12 @@ var FCEM = {
     FCEM.updateGames();
     FCEM.updateStack();
     FCEM.showStack(true);
-    FCEM.setControl = Module.cwrap('FCEM_setControl', null, ['number', 'number']);
+    FCEM.setControl = Module.cwrap('FCEM_SetControl', null, ['number', 'number']);
+    FCEM.mapKey = Module.cwrap('FCEM_MapKey', 'number', ['number', 'number']);
     // Write savegame and synchronize IDBFS in intervals.
-    setInterval(Module.cwrap('FCEM_onSaveGameInterval'), 1000);
+    setInterval(Module.cwrap('FCEM_OnSaveGameInterval'), 1000);
+
+    FCEM.setupKeys();
   },
   onDeleteGameSyncFromIDB : function(er) {
     assert(!er);
@@ -141,6 +144,20 @@ var FCEM = {
     }
   
     stackContainer.scrollTop = scrollPos;
+  },
+  setupKeys : function() {
+    if (!localStorage.getItem('inputInit')) {
+      for (id in FCEM.inputs) {
+        var item = FCEM.inputs[id];
+        localStorage['input' + id] = item[0];
+      }
+      localStorage['inputInit'] = 'true';
+    }
+    for (id in FCEM.inputs) {
+      var item = FCEM.inputs[id];
+      var key = parseInt(localStorage['input' + id]);
+      FCEM.mapKey(id, key);
+    }
   }
 };
 

@@ -183,7 +183,7 @@ static void updateSharpenKernel()
 }
 
 extern "C" {
-void FCEM_setControl(int idx, double v)
+void FCEM_SetControl(int idx, double v)
 {
 	if (idx >= 0 && idx < CONTROL_COUNT) {
 		s_c[idx] = v;
@@ -246,9 +246,9 @@ void FCEM_setControl(int idx, double v)
 	// Generic
 	case CRT_ENABLED:
 		// Update dependent uniforms. (Without modifying stored values in s_c.)
-		FCEM_setControl(NOISE, s_c[NOISE]);
-		FCEM_setControl(SCANLINES, s_c[SCANLINES]);
-		FCEM_setControl(CONVERGENCE, s_c[CONVERGENCE]);
+		FCEM_SetControl(NOISE, s_c[NOISE]);
+		FCEM_SetControl(SCANLINES, s_c[SCANLINES]);
+		FCEM_SetControl(CONVERGENCE, s_c[CONVERGENCE]);
 		break;
 	// Other controls
 	case SOUND_ENABLED:
@@ -899,17 +899,17 @@ void es2nInit()
 
 	// Set controls to defaults.
 // TODO: tsone: think of better way to do this..?
-	FCEM_setControl(BRIGHTNESS, 0);
-	FCEM_setControl(CONTRAST, 0);
-	FCEM_setControl(COLOR, 0);
-	FCEM_setControl(SHARPNESS, 0.2);
-	FCEM_setControl(GAMMA, 0);
-	FCEM_setControl(GLOW, 0.2);
-	FCEM_setControl(RGBPPU, 0);
-	FCEM_setControl(CRT_ENABLED, 1);
-	FCEM_setControl(SCANLINES, 0.1);
-	FCEM_setControl(CONVERGENCE, 0.4);
-	FCEM_setControl(NOISE, 0.3);
+	FCEM_SetControl(BRIGHTNESS, 0);
+	FCEM_SetControl(CONTRAST, 0);
+	FCEM_SetControl(COLOR, 0);
+	FCEM_SetControl(SHARPNESS, 0.2);
+	FCEM_SetControl(GAMMA, 0);
+	FCEM_SetControl(GLOW, 0.2);
+	FCEM_SetControl(RGBPPU, 0);
+	FCEM_SetControl(CRT_ENABLED, 1);
+	FCEM_SetControl(SCANLINES, 0.1);
+	FCEM_SetControl(CONVERGENCE, 0.4);
+	FCEM_SetControl(NOISE, 0.3);
 }
 
 void es2nDeinit()

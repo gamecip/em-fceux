@@ -85,9 +85,12 @@ void FCEUD_VideoChanged()
 		PAL = 0;
 }
 
-void BlitScreen()
+void RenderVideo(int draw_splash)
 {
-    es2nRender(XBuf, deempScan, PALRAM[0]);
+	if (draw_splash) {
+		DrawSplash();
+	}
+	es2nRender(XBuf, deempScan, PALRAM[0]);
 }
 
 // Return 0 on success, -1 on failure.

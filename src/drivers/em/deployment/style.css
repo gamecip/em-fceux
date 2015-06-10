@@ -238,7 +238,7 @@ img.preload {
 }
 #helpDimmer {
   position: fixed;
-  opacity: 0.8;
+  opacity: 0.9;
   top: 0;
   left: 0;
   width: 100%;

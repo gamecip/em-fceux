@@ -402,19 +402,17 @@ static EM_BOOL FCEM_MouseCallback(int type, const EmscriptenMouseEvent *event, v
 	return 1;
 }
 
-static int getKeyMapIdx(const EmscriptenKeyboardEvent *event)
+static int getKeyMapIdx(const EmscriptenKeyboardEvent *ev)
 {
-	if (event->keyCode >= 256) {
+	if (ev->keyCode >= 256) {
 		return -1;
 	}
-	return (event->ctrlKey << 8) | (event->shiftKey << 9)
-		| (event->altKey << 10) | (event->metaKey << 11)
-		| event->keyCode;
+	return ev->keyCode | (ev->ctrlKey << 8) | (ev->shiftKey << 9) | (ev->altKey << 10) | (ev->metaKey << 11);
 }
 
-static unsigned int getInput(const EmscriptenKeyboardEvent *event)
+static unsigned int getInput(const EmscriptenKeyboardEvent *ev)
 {
-	int idx = getKeyMapIdx(event);
+	int idx = getKeyMapIdx(ev);
 	if (idx == -1) {
 		return FCEM_NULL;
 	}
@@ -445,30 +443,6 @@ void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1, ESIFC
 	// Init key map. Fills it with zeroes.
 	FCEU_ARRAY_EM(s_key_map, unsigned int, FCEM_KEY_MAP_SIZE);
 
-	// Default mapping for 1st gamepad inputs.
-// TODO: tsone: mappings for 2nd gamepad?
-	// The key codes are from:
-	// https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/keyCode
-	s_key_map[0x046] = FCEM_GAMEPAD0_A;		// F key
-	s_key_map[0x044] = FCEM_GAMEPAD0_B;		// D key
-	s_key_map[0x053] = FCEM_GAMEPAD0_SELECT;	// S key
-	s_key_map[0x00D] = FCEM_GAMEPAD0_START;		// Enter key
-	s_key_map[0x026] = FCEM_GAMEPAD0_UP;		// Up arrow
-	s_key_map[0x028] = FCEM_GAMEPAD0_DOWN;		// Down arrow
-	s_key_map[0x025] = FCEM_GAMEPAD0_LEFT;		// Left arrow
-	s_key_map[0x027] = FCEM_GAMEPAD0_RIGHT;		// Right arrow
-
-	// Default mappings for system inputs.
-	s_key_map[0x152] = FCEM_SYSTEM_RESET;		// Ctrl+R key
-	s_key_map[0x009] = FCEM_SYSTEM_THROTTLE;	// Tab key
-	s_key_map[0x050] = FCEM_SYSTEM_PAUSE;		// P key
-	s_key_map[0x0DC] = FCEM_SYSTEM_FRAME_ADVANCE;	// Backslash key
-	s_key_map[0x074] = FCEM_SYSTEM_STATE_SAVE;	// F5 key
-	s_key_map[0x076] = FCEM_SYSTEM_STATE_LOAD;	// F7 key
-	for (int i = 0; i < 10; ++i) {
-		s_key_map[0x030 + i] = FCEM_SYSTEM_STATE_SELECT_0 + i;	// 0..9 keys
-	}
-
 // TODO: tsone: more inputs, now just gamepad at port 0
 // TODO: tsone: zapper would get attrib 1
 	FCEUI_SetInput(0, port0, &JSreturn, 0);
@@ -489,5 +463,20 @@ void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1, ESIFC
 	elem = "#window";
 	emscripten_set_keydown_callback(elem, 0, 0, FCEM_KeyCallback);
 	emscripten_set_keyup_callback(elem, 0, 0, FCEM_KeyCallback);
+}
+
+extern "C"
+{
+
+// Map a HTML5 keyCode with an input.
+int FCEM_MapKey(int id, int keyIdx)
+{
+	if (keyIdx < 0 || keyIdx >= FCEM_KEY_MAP_SIZE || id < FCEM_NULL || id >= FCEM_INPUT_COUNT) {
+		return 0;
+	}
+	s_key_map[keyIdx] = id;
+	return 1;
+}
+
 }
 

@@ -8,6 +8,7 @@ source_list = Split(
     em.cpp
     em-sound.cpp
     em-video.cpp
+    em-splash.cpp
     es2n.cpp
     es2utils.cpp
     """)
