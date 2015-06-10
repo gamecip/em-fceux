@@ -64,9 +64,9 @@ static const SplashRow s_splashPageRows3[] =
 static const SplashPage s_splashPages[] =
 {
 	{ s_splashPageRows0, sizeof(s_splashPageRows0) / sizeof(*s_splashPageRows0),  2*60 },
-	{ s_splashPageRows1, sizeof(s_splashPageRows1) / sizeof(*s_splashPageRows1), 14*60 },
-	{ s_splashPageRows2, sizeof(s_splashPageRows2) / sizeof(*s_splashPageRows2),  8*60 },
-	{ s_splashPageRows3, sizeof(s_splashPageRows3) / sizeof(*s_splashPageRows3),  9*60 },
+	{ s_splashPageRows1, sizeof(s_splashPageRows1) / sizeof(*s_splashPageRows1), 13*60 },
+	{ s_splashPageRows2, sizeof(s_splashPageRows2) / sizeof(*s_splashPageRows2),  7*60 },
+	{ s_splashPageRows3, sizeof(s_splashPageRows3) / sizeof(*s_splashPageRows3),  8*60 },
 };
 
 static const int s_splashNumPages = sizeof(s_splashPages) / sizeof(*s_splashPages);
@@ -84,7 +84,7 @@ void DrawSplash()
 		s_splashFC = 0;
 	}
 
-	int numChars = s_splashFC / 3;
+	int numChars = s_splashFC / 2;
 	for (int i = 0; i < page->numRows; ++i) {
 		const SplashRow* row = &page->rows[i];
 		uint8 *dst = XBuf + 256*row->y + row->x;
