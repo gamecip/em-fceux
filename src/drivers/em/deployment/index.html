@@ -48,96 +48,125 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
     <input id="controlsToggle" type="checkbox" hidden />
     <div id="controlsTab">
-        <div id="controlsContainer">
-          <div id="controlsSliders">
-    <h3>Picture Controls</h3>
-    Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(BRIGHTNESS, this.value)" onchange="FCEM.setControl(BRIGHTNESS, this.value)"/><br/>
-    Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(CONTRAST, this.value)" onchange="FCEM.setControl(CONTRAST, this.value)"/><br/>
-    Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(COLOR, this.value)" onchange="FCEM.setControl(COLOR, this.value)"/><br/>
-    Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(GAMMA, this.value)" onchange="FCEM.setControl(GAMMA, this.value)"/><br/>
-    <h3>NTSC Emulation Controls</h3>
-    NTSC Emulation <input type="checkbox" checked oninput="FCEM.setControl(RGBPPU, !this.checked)" onchange="FCEM.setControl(RGBPPU, !this.checked)"/><br/>
-    Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="FCEM.setControl(SHARPNESS, this.value)" onchange="FCEM.setControl(SHARPNESS, this.value)"/><br/>
-    <h3>TV Emulation Controls</h3>
-    TV Emulation <input type="checkbox" checked oninput="FCEM.setControl(CRT_ENABLED, this.checked)" onchange="FCEM.setControl(CRT_ENABLED, this.checked)"/><br/>
-    Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="FCEM.setControl(SCANLINES, this.value)" onchange="FCEM.setControl(SCANLINES, this.value)"/><br/>
-    Glow <input type="range" min="0" max="1" value="0.2" step="0.1" oninput="FCEM.setControl(GLOW, this.value)" onchange="FCEM.setControl(GLOW, this.value)"/><br/>
-    Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="FCEM.setControl(CONVERGENCE, this.value)" onchange="FCEM.setControl(CONVERGENCE, this.value)"/><br/>
-    Signal Noise <input type="range" min="0" max="1" value="0.3" step="0.1" oninput="FCEM.setControl(NOISE, this.value)" onchange="FCEM.setControl(NOISE, this.value)"/><br/>
+      <div id="controlsContainer">
+        <div id="controlsSliders">
+          <h3>Picture Controls</h3>
+          Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(BRIGHTNESS, this.value)" onchange="FCEM.setControl(BRIGHTNESS, this.value)"/><br/>
+          Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(CONTRAST, this.value)" onchange="FCEM.setControl(CONTRAST, this.value)"/><br/>
+          Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(COLOR, this.value)" onchange="FCEM.setControl(COLOR, this.value)"/><br/>
+          Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(GAMMA, this.value)" onchange="FCEM.setControl(GAMMA, this.value)"/><br/>
+          <h3>NTSC Emulation Controls</h3>
+          NTSC Emulation <input type="checkbox" checked oninput="FCEM.setControl(RGBPPU, !this.checked)" onchange="FCEM.setControl(RGBPPU, !this.checked)"/><br/>
+          Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="FCEM.setControl(SHARPNESS, this.value)" onchange="FCEM.setControl(SHARPNESS, this.value)"/><br/>
+          <h3>TV Emulation Controls</h3>
+          TV Emulation <input type="checkbox" checked oninput="FCEM.setControl(CRT_ENABLED, this.checked)" onchange="FCEM.setControl(CRT_ENABLED, this.checked)"/><br/>
+          Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="FCEM.setControl(SCANLINES, this.value)" onchange="FCEM.setControl(SCANLINES, this.value)"/><br/>
+          Glow <input type="range" min="0" max="1" value="0.2" step="0.1" oninput="FCEM.setControl(GLOW, this.value)" onchange="FCEM.setControl(GLOW, this.value)"/><br/>
+          Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="FCEM.setControl(CONVERGENCE, this.value)" onchange="FCEM.setControl(CONVERGENCE, this.value)"/><br/>
+          Signal Noise <input type="range" min="0" max="1" value="0.3" step="0.1" oninput="FCEM.setControl(NOISE, this.value)" onchange="FCEM.setControl(NOISE, this.value)"/><br/>
         </div>
 <!-- <input type="button" value="dump FS" onclick="var f = findFiles('/'); f.forEach(function(x) { console.log('!!!! dump: ' + x); })" /> -->
-        </div>
-        <label id="controlsToggleLabel" for="controlsToggle"></label>
+      </div>
+      <label id="controlsToggleLabel" for="controlsToggle"></label>
     </div>
 
     <div hidden>
-      <div class="cartRow" id="cartProto"><div class="cart" onclick="return askSelectGame(event, this.parentNode);"><div class="labelContainer"><div class="label"></div></div><div class="cartDelete" onclick="return askDeleteGame(event, this.parentNode.parentNode);"></div></div></div>
+      <div class="cartRow" id="cartProto" data-idx=""><div class="cart" onclick="return askSelectGame(event, this.parentNode);"><div class="labelContainer"><div class="label"></div></div><div class="cartDelete" onclick="return askDeleteGame(event, this.parentNode.parentNode);"></div></div></div>
     </div>
     <input id="stackToggle" type="checkbox" hidden />
     <div id="stackTab">
-        <label id="stackToggleLabel" for="stackToggle"></label>
-        <div id="stackContainer"><div id="stack"><div></div></div></div>
+      <label id="stackToggleLabel" for="stackToggle"></label>
+      <div id="stackContainer"><div id="stack"><div></div></div></div>
     </div>
-
-    <img id="fullscreenIcon" width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" alt=""/>
-    <img id="soundIcon" width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" alt=""/>
 
     <input id="helpToggle" type="checkbox" hidden />
-<div id="helpDimmer"></div>
-    <div id="help">
-<h1>EM-FCEUX</h1>
-<p>em-fceux is an <a href="http://emscripten.org/">Emscripten</a> port of <a href="http://www.fceux.com/">FCEUX</a>.
-<p>Source code: <a href="https://bitbucket.org/tsone/em-fceux/">https://bitbucket.org/tsone/em-fceux/</a>
+    <img id="fullscreenIcon" width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" alt=""/>
+    <img id="soundIcon" width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" alt=""/>
+    <label id="helpIcon" for="helpToggle"><img width="48" height="48" src="img/help.gif" alt=""/></label>
 
-<h2>INSTRUCTIONS</h2>
-<p>To play a game, drag and drop it (ROM file etc.) on this browser window.
-<p>The played games are added to the game stack on the right. Play the game again by clicking it on the stack.
-<p>To remove a game, click <img src="img/x.gif" width=14 height=14 alt="the 'X' icon on it"/>. This doesn't remove save data. Built-in games (2048) cannot be removed.
-<p>Supported (tested) file formats: <i>.nes, .nsf, .zip</i>
+    <div id="keyBindDiv">
+      <div class="dimmer"></div>
+      <div id="keyBind">
+        <img id="keyboardIndicator" width="48" height="48" src="img/indicator.gif" alt="" />
 
-<h3>KEYS</h3>
-<p>Keyboard inputs are fixed (no customization is currently supported).
-<p>First gamepad keys:
-<table>
-<tr><td>Arrow keys<td>D-pad directions
-<tr><td>F<td>A button
-<tr><td>D<td>B button
-<tr><td>S<td>Select button
-<tr><td>Enter<td>Start button
-</table>
+        <h1>KEY BINDINGS</h1>
+        <table hidden>
+          <tr id="keyBindProto"><td><td><td data-id="" data-name=""><input type="button" value="Set" onclick="FCEM.catchStart(this.parentNode);" /> <input type="button" value="Unset" onclick="FCEM.keyBindUnset(this.parentNode);" />
+        </table>
+        
+        <table id="keyBindTable"></table>
+        <br/>
+        <input type="button" value="Reset to defaults" onclick="FCEM.keyBindResetAll();" />
+        <br/><br/>
+      </div>
+    </div>
+    <img id="keyboardIcon" width="48" height="48" src="img/keyboard.gif" onclick="FCEM.keyBindToggle()" alt=""/>
 
-<p>Other keys:
-<table>
-<tr><td>Ctrl-R<td>Reset system
-<tr><td>Esc<td>Exit full-screen mode
-<tr><td>Tab<td>Speed throttle
-<tr><td>0-9<td>Select save state
-<tr><td>F5<td>Save save state
-<tr><td>F7<td>Load save state
-<tr><td>P<td>Pause emulation
-<tr><td>\<td>Single frame step
-</table>
-
-
-<h3>SETTINGS TAB</h3>
-<p>The settings tab is revealed by clicking the (pixelated) triangle on the left.
-<p>The tab has controls for composite NTSC and TV emulation, gamma, sharpness, color etc.
-
-<h2>TROUBLESHOOTING</h2>
-<p>Use a recent web browser, such as Firefox, Chromium, Chrome, Safari or Opera. Internet Explorer will not work.
-<p>If input responsiveness is poor (frame rate is low), try disabling TV emulation or using the full-screen mode.
-
-<h2>NOTES</h2>
-<p>Games and save data are stored locally in the web browser and are never transmitted out of the browser.
-<p>Extracting the games and save data from the browser (for backups etc.) is not supported.
-<p>Please refer to <a href="https://bitbucket.org/tsone/em-fceux/">em-fceux repository</a> for more technical information.
-<p>em-fceux and FCEUX are licensed under <a href="gpl-2.0.txt">GNU GPL Version 2</a>.
-<p>0.1.5-alpha
-<br/>
-<br/>
+    <div id="catchDiv">
+      <div class="dimmer"></div>
+      <div id="catch">
+        <h1>PRESS A KEY TO CHANGE BINDING</h1>
+        <p>Key <span id="catchKey"></span> will be bound to <span id="catchName"></span>.
+        <p>
+        <input type="button" value="Cancel" onclick="FCEM.catchEnd(false);" />
+        <input type="button" value="OK" onclick="FCEM.catchEnd(true);" />
+      </div>
     </div>
 
-    <label id="helpIcon" for="helpToggle"><img width="48" height="48" src="img/help.gif" alt=""/></label>
+    <div id="helpDiv">
+      <div class="dimmer"></div>
+      <div id="help">
+        <img id="helpIndicator" width="48" height="48" src="img/indicator.gif" alt="" />
+
+        <h1>EM-FCEUX</h1>
+        <p>em-fceux is an <a href="http://emscripten.org/">Emscripten</a> port of <a href="http://www.fceux.com/">FCEUX</a>.
+        <p>Source code: <a href="https://bitbucket.org/tsone/em-fceux/">https://bitbucket.org/tsone/em-fceux/</a>
+        
+        <h2>INSTRUCTIONS</h2>
+        <p>To play a game, drag and drop it (ROM file etc.) on this browser window.
+        <p>The played games are added to the game stack on the right. Play the game again by clicking it on the stack.
+        <p>To remove a game, click <img src="img/x.gif" width=14 height=14 alt="the 'X' icon on it"/>. This doesn't remove save data. Built-in games (2048) cannot be removed.
+        <p>Supported (tested) file formats: <i>.nes, .nsf, .zip</i>
+        
+        <h3>DEFAULT KEYS</h3>
+        <p>Default controller 1 keys:
+        <table>
+          <tr><td>Arrow keys<td>D-pad directions
+          <tr><td>F<td>A button
+          <tr><td>D<td>B button
+          <tr><td>S<td>Select button
+          <tr><td>Enter<td>Start button
+        </table>
+        
+        <p>Other default keys:
+        <table>
+          <tr><td>Ctrl-R<td>Reset system
+          <tr><td>Esc<td>Exit full-screen mode
+          <tr><td>Tab<td>Speed throttle
+          <tr><td>0-9<td>Select save state
+          <tr><td>F5<td>Save save state
+          <tr><td>F7<td>Load save state
+          <tr><td>P<td>Pause emulation
+          <tr><td>\<td>Single frame step
+        </table>
+
+        <h3>SETTINGS TAB</h3>
+        <p>The settings tab is revealed by clicking the (pixelated) triangle on the left.
+        <p>The tab has controls for composite NTSC and TV emulation, gamma, sharpness, color etc.
+        
+        <h2>TROUBLESHOOTING</h2>
+        <p>Use a recent web browser, such as Firefox, Chromium, Chrome, Safari or Opera. Internet Explorer will not work.
+        <p>If input responsiveness is poor (frame rate is low), try disabling TV emulation or using the full-screen mode.
+        
+        <h2>NOTES</h2>
+        <p>Games and save data are stored locally in the web browser and are never transmitted out of the browser.
+        <p>Extracting the games and save data from the browser (for backups etc.) is not supported.
+        <p>Please refer to <a href="https://bitbucket.org/tsone/em-fceux/">em-fceux repository</a> for more technical information.
+        <p>em-fceux and FCEUX are licensed under <a href="gpl-2.0.txt">GNU GPL Version 2</a>.
+        <p>0.1.5-alpha
+        <br/><br/>
+      </div>
+    </div>
 
     <script src="pre.js"></script>
     <script src="input.js"></script>

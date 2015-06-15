@@ -56,7 +56,7 @@ function askConfirmGame(ev, el, q) {
   var games = FCEM.games;
   ev.stopPropagation();
   ev.preventDefault();
-  var idx = current + (el.id |0);
+  var idx = current + (el.dataset.idx |0);
   if ((idx >= 0) && (idx < games.length) && confirm(q + ' ' + games[idx].label + '?')) {
     return idx;
   } else {
@@ -126,4 +126,21 @@ function findFiles(startPath) {
 */
 }
 
+document.addEventListener("keydown", function(e) {
+  if (!FCEM.catchEnabled) {
+    return;
+  }
+  var key = e.keyCode & 0x0FF;
+  if (e.metaKey)  key |= 0x800;
+  if (e.altKey)   key |= 0x400;
+  if (e.shiftKey) key |= 0x200;
+  if (e.ctrlKey)  key |= 0x100;
+
+  var el = document.getElementById("catchKey");
+  el.innerHTML = FCEM.key2Name(key);
+
+  FCEM.catchKey = key;
+});
+
 document.addEventListener('DOMContentLoaded', FCEM.onDOMLoaded, false);
+

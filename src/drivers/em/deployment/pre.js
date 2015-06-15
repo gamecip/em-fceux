@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-// NOTE: do not change these values!
+// NOTE: Do not change these values!
 var BRIGHTNESS = 0;
 var CONTRAST = 1;
 var COLOR = 2;
@@ -31,7 +31,12 @@ var SCANLINES = 8;
 var CONVERGENCE = 9;
 var NOISE = 10;
 var SOUND_ENABLED = 11;
+// NOTE: Originally from: http://jsfiddle.net/vWx8V/
+var KEY_CODE_TO_NAME = {8:"Backspace",9:"Tab",13:"Return",16:"Shift",17:"Ctrl",18:"Alt",19:"Pause/Break",20:"Caps Lock",27:"Esc",32:"Space",33:"Page Up",34:"Page Down",35:"End",36:"Home",37:"Left",38:"Up",39:"Right",40:"Down",45:"Insert",46:"Delete",48:"0",49:"1",50:"2",51:"3",52:"4",53:"5",54:"6",55:"7",56:"8",57:"9",65:"A",66:"B",67:"C",68:"D",69:"E",70:"F",71:"G",72:"H",73:"I",74:"J",75:"K",76:"L",77:"M",78:"N",79:"O",80:"P",81:"Q",82:"R",83:"S",84:"T",85:"U",86:"V",87:"W",88:"X",89:"Y",90:"Z",91:"Meta",93:"Right Click",96:"Numpad 0",97:"Numpad 1",98:"Numpad 2",99:"Numpad 3",100:"Numpad 4",101:"Numpad 5",102:"Numpad 6",103:"Numpad 7",104:"Numpad 8",105:"Numpad 9",106:"Numpad *",107:"Numpad +",109:"Numpad -",110:"Numpad .",111:"Numpad /",112:"F1",113:"F2",114:"F3",115:"F4",116:"F5",117:"F6",118:"F7",119:"F8",120:"F9",121:"F10",122:"F11",123:"F12",144:"Num Lock",145:"Scroll Lock",182:"My Computer",183:"My Calculator",186:";",187:"=",188:",",189:"-",190:".",191:"/",192:"`",219:"[",220:"\\",221:"]",222:"'"};
 var FCEM = {
+  catchEnabled : false,
+  catchKey : null,
+  catchId : null,
   games : [],
   stackToggleElem : null,
   controlsToggleElem : null,
@@ -125,7 +130,7 @@ var FCEM = {
       var item = games[i];
       var el = proto.cloneNode(true);
   
-      el.id = i;
+      el.dataset.idx = i;
       el.style.backgroundPosition = item.offset + 'px 0px';
       list.appendChild(el);
   
@@ -145,19 +150,111 @@ var FCEM = {
   
     stackContainer.scrollTop = scrollPos;
   },
-  setupKeys : function() {
-    if (!localStorage.getItem('inputInit')) {
-      for (id in FCEM.inputs) {
-        var item = FCEM.inputs[id];
-        localStorage['input' + id] = item[0];
-      }
-      localStorage['inputInit'] = 'true';
-    }
-    for (id in FCEM.inputs) {
+  setLocalKey : function(id, key) {
+    localStorage['input' + id] = key;
+  },
+  getLocalKey : function(id) {
+    return parseInt(localStorage['input' + id]);
+  },
+  resetKeys : function() {
+    for (var id in FCEM.inputs) {
+      var key = FCEM.getLocalKey(id);
+      FCEM.mapKey(0, key);
       var item = FCEM.inputs[id];
-      var key = parseInt(localStorage['input' + id]);
+      FCEM.setLocalKey(id, item[0]);
+    }
+  },
+  mapAllKeys : function() {
+    for (var id in FCEM.inputs) {
+      var key = FCEM.getLocalKey(id);
       FCEM.mapKey(id, key);
     }
+  },
+  setupKeys : function() {
+    if (!localStorage.getItem('inputInit')) {
+      FCEM.resetKeys();
+      localStorage['inputInit'] = 'true';
+    }
+    FCEM.mapAllKeys();
+    FCEM.initKeyBind();
+  },
+  key2Name : function (key) {
+    var keyName = (key & 0x0FF) ? KEY_CODE_TO_NAME[key & 0x0FF] : '(Undefined)';
+    if (keyName === undefined) keyName = '(Unknown)';
+    var prefix = '';
+    if (key & 0x100 && keyName !== 'Ctrl')  prefix += 'Ctrl+';
+    if (key & 0x400 && keyName !== 'Alt')   prefix += 'Alt+';
+    if (key & 0x200 && keyName !== 'Shift') prefix += 'Shift+';
+    if (key & 0x800 && keyName !== 'Meta')  prefix += 'Meta+';
+    return prefix + keyName;
+  },
+  initKeyBind : function() {
+    var table = document.getElementById("keyBindTable");
+    var proto = document.getElementById("keyBindProto");
+
+    while (table.lastChild) {
+      table.removeChild(table.lastChild);
+    }
+
+    for (id in FCEM.inputs) {
+      var item = FCEM.inputs[id];
+      var key = FCEM.getLocalKey(id);
+      var keyName = FCEM.key2Name(key);
+
+      var el = proto.cloneNode(true);
+      el.children[0].innerHTML = item[1];
+      el.children[1].innerHTML = keyName;
+      el.children[2].dataset.id = id;
+      el.children[2].dataset.name = item[1];
+
+      table.appendChild(el);
+    }
+  },
+  catchStart : function(keyBind) {
+    var id = keyBind.dataset.id;
+    FCEM.catchId = id;
+  
+    var nameEl = document.getElementById("catchName");
+    nameEl.innerHTML = keyBind.dataset.name;
+    var keyEl = document.getElementById("catchKey");
+    var key = FCEM.getLocalKey(id);
+    FCEM.catchKey = key;
+    keyEl.innerHTML = FCEM.key2Name(key);
+  
+    var catchDivEl = document.getElementById("catchDiv");
+    catchDivEl.style.display = 'block';
+  
+    FCEM.catchEnabled = true;
+  },
+  catchEnd : function(save) {
+    FCEM.catchEnabled = false;
+  
+    if (save && FCEM.catchId) {
+      FCEM.setLocalKey(FCEM.catchId, FCEM.catchKey);
+      FCEM.mapKey(FCEM.catchId, FCEM.catchKey);
+      FCEM.catchId = null;
+      FCEM.initKeyBind();
+    }
+    var catchDivEl = document.getElementById("catchDiv");
+    catchDivEl.style.display = 'none';
+  },
+  keyBindUnset : function(keyBind) {
+    var id = keyBind.dataset.id;
+    var key = FCEM.getLocalKey(id);
+    if (key) {
+      FCEM.mapKey(0, key);
+    }
+    FCEM.setLocalKey(id, 0);
+    FCEM.initKeyBind();
+  },
+  keyBindResetAll : function() {
+    FCEM.resetKeys();
+    FCEM.mapAllKeys();
+    FCEM.initKeyBind();
+  },
+  keyBindToggle : function() {
+    var keyBindDivEl = document.getElementById("keyBindDiv");
+    keyBindDivEl.style.display = (keyBindDivEl.style.display == 'block') ? 'none' : 'block';
   }
 };
 
