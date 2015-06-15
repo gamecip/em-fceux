@@ -179,7 +179,8 @@ static int DriverInitialize()
 
 	int fourscore = 0;
 	g_config->getOption("SDL.FourScore", &fourscore);
-	FCEUD_SetInput(fourscore, false, SI_GAMEPAD, SI_NONE, SIFC_NONE);
+// TODO: tsone: this sets two controllers by default, but should be more flexible
+	FCEUD_SetInput(fourscore, false, SI_GAMEPAD, SI_GAMEPAD, SIFC_NONE);
 
 	return 1;
 }

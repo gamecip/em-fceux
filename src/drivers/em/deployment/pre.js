@@ -228,13 +228,28 @@ var FCEM = {
   },
   catchEnd : function(save) {
     FCEM.catchEnabled = false;
-  
+
     if (save && FCEM.catchId) {
+      // Check/overwrite duplicate bindings
+      for (var id in FCEM.inputs) {
+        var key = FCEM.getLocalKey(id);
+        if (FCEM.catchKey == key) {
+          if (!confirm('Key ' + FCEM.key2Name(key) + ' already bound as ' + FCEM.inputs[id][1] + '. Overwrite?')) {
+            FCEM.catchEnabled = true; // Re-enable key catching
+            return;
+          }
+          FCEM.setLocalKey(id, 0);
+          FCEM.mapKey(0, key);
+        }
+      }
+
+      // Set new binding
       FCEM.setLocalKey(FCEM.catchId, FCEM.catchKey);
       FCEM.mapKey(FCEM.catchId, FCEM.catchKey);
       FCEM.catchId = null;
       FCEM.initKeyBind();
     }
+
     var catchDivEl = document.getElementById("catchDiv");
     catchDivEl.style.display = 'none';
   },

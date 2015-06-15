@@ -58,6 +58,7 @@ static void UpdateTopRider (void);
 #endif
 
 static uint32 JSreturn = 0;
+static int s_rapidFireFrame = 0;
 
 // Mapping from an html5 key code to an input.
 static unsigned int* s_key_map = 0;
@@ -309,12 +310,11 @@ static int FCEM_TestGamepadButton(const EmscriptenGamepadEvent *p, int idx)
 
 static void UpdateGamepad(void)
 {
-	static int rapid = 0;
 	uint32 JS = 0;
 	int x;
 	int i;
 
-	rapid ^= 1;
+	s_rapidFireFrame ^= 1;
 
 	int opposite_dirs;
 	g_config->getOption("SDL.Input.EnableOppositeDirectionals", &opposite_dirs);
@@ -331,8 +331,10 @@ static void UpdateGamepad(void)
 	for (i = 0; i < 4; ++i) {
 		bool left = false;
 		bool up = false;
+                int inputBase = FCEM_GAMEPAD + FCEM_GAMEPAD_SIZE*i;
+
 		for (x = 0; x < 8; ++x) {
-			if (FCEM_TestGamepadButton(&gamepads[i], x) || IsInput(FCEM_GAMEPAD + x)) {
+			if (FCEM_TestGamepadButton(&gamepads[i], x) || IsInput(inputBase + x)) {
 				if (opposite_dirs == 0) {
 					// test for left+right and up+down
 					if(x == 4) {
@@ -366,9 +368,9 @@ static void UpdateGamepad(void)
 #endif
 
 		// rapid-fire a, rapid-fire b
-		if (rapid) {
+		if (s_rapidFireFrame) {
 			for (x = 0; x < 2; ++x) {
-   				if (FCEM_TestGamepadButton(&gamepads[i], 8+x) || IsInput(FCEM_GAMEPAD+8+x)) {
+   				if (FCEM_TestGamepadButton(&gamepads[i], 8+x) || IsInput(inputBase+8+x)) {
 					JS |= (1 << x) << (i << 3);
 				}
 			}
@@ -443,10 +445,10 @@ void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1, ESIFC
 	// Init key map. Fills it with zeroes.
 	FCEU_ARRAY_EM(s_key_map, unsigned int, FCEM_KEY_MAP_SIZE);
 
-// TODO: tsone: more inputs, now just gamepad at port 0
+// TODO: tsone: add more inputs, now just gamepad at both ports
 // TODO: tsone: zapper would get attrib 1
 	FCEUI_SetInput(0, port0, &JSreturn, 0);
-	FCEUI_SetInput(1, port1, 0, 0);
+	FCEUI_SetInput(1, port1, &JSreturn, 0);
 
 // TODO: tsone: support FC expansion port?
 	FCEUI_SetInputFC(fcexp, 0, 0);

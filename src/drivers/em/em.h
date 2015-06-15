@@ -93,6 +93,7 @@ enum FCEM_Input {\
 #undef KEY
 #undef KEYS_POST
 #define FCEM_GAMEPAD FCEM_GAMEPAD0_A
+#define FCEM_GAMEPAD_SIZE (FCEM_GAMEPAD1_A - FCEM_GAMEPAD0_A)
 
 // Audio options
 // NOTE: tsone: both SOUND_BUF_MAX and SOUND_HW_BUF_MAX must be power of two!

@@ -43,6 +43,7 @@ KEY(0x0216, 0x000, GAMEPAD1_LEFT, "Left (controller 2)")
 KEY(0x0217, 0x000, GAMEPAD1_RIGHT, "Right (controller 2)")
 KEY(0x0218, 0x000, GAMEPAD1_TURBO_A, "Turbo A (controller 2)")
 KEY(0x0219, 0x000, GAMEPAD1_TURBO_B, "Turbo B (controller 2)")
+#if 0
 // Controller 3
 KEY(0x0220, 0x000, GAMEPAD2_A, "A (controller 3)")
 KEY(0x0221, 0x000, GAMEPAD2_B, "B (controller 3)")
@@ -65,4 +66,5 @@ KEY(0x0236, 0x000, GAMEPAD3_LEFT, "Left (controller 4)")
 KEY(0x0237, 0x000, GAMEPAD3_RIGHT, "Right (controller 4)")
 KEY(0x0238, 0x000, GAMEPAD3_TURBO_A, "Turbo A (controller 4)")
 KEY(0x0239, 0x000, GAMEPAD3_TURBO_B, "Turbo B (controller 4)")
+#endif
 KEYS_POST
