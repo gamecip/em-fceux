@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator - Emscripten OpenGL ES 2.0 utils
  *
  * Copyright notice for this file:
  *  Copyright (C) 2015 Valtteri "tsone" Heikkila

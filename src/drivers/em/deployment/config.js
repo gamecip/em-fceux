@@ -4,6 +4,25 @@
 
 
 
+BRIGHTNESS = 0;
+CONTRAST = 1;
+COLOR = 2;
+GAMMA = 3;
+GLOW = 4;
+SHARPNESS = 5;
+RGBPPU = 6;
+CRT_ENABLED = 7;
+SCANLINES = 8;
+CONVERGENCE = 9;
+NOISE = 10;
+SOUND_ENABLED = 11;
+PORT2 = 12;
+
+
+
+
+
+
 FCEM.inputs = {
 
 0x0100 : [ 0x152, "Reset" ],

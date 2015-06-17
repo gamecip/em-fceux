@@ -74,8 +74,10 @@ typedef struct t_es2n
 } es2n;
 
 void es2nInit();
+void es2nSetController(int idx, double v);
 void es2nUpdateControls();
 void es2nDeinit();
+void es2nSetViewport(int width, int height);
 void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color);
 
 #endif

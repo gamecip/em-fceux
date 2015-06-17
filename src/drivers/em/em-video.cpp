@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator - Emscripten video/window
  *
  * Copyright notice for this file:
  *  Copyright (C) 2002 Xodnizel
@@ -27,9 +27,6 @@
 #include <emscripten/html5.h>
 
 
-#define NWIDTH	(256 - (s_clipSides ? 16 : 0))
-#define NOFFSET	(s_clipSides ? 8 : 0)
-
 extern uint8 *XBuf;
 extern uint8 deempScan[240];
 extern uint8 PALRAM[0x20];
@@ -40,10 +37,8 @@ static int s_srendline, s_erendline;
 static int s_tlines;
 static int s_inited;
 
-static double s_exs, s_eys;
-static int s_clipSides;
-static int s_nativeWidth = -1;
-static int s_nativeHeight = -1;
+static int s_width, s_height;
+static const double s_targetAspect = (256.0/224.0);// * (8.0/7.0);
 
 
 // Functions only needed for linking.
@@ -85,6 +80,31 @@ void FCEUD_VideoChanged()
 		PAL = 0;
 }
 
+static void Resize(int width, int height)
+{
+	double aspect = width / (double) height;
+
+	if (aspect >= s_targetAspect) {
+		s_width = height * s_targetAspect;
+		s_height = height;
+	} else {
+		s_width = width;
+		s_height = width / s_targetAspect;
+	}
+
+//	printf("!!!! resize: (%dx%d) '(%dx%d) asp:%f\n", width, height, s_width, s_height, aspect);
+
+	es2nSetViewport(s_width, s_height);
+	emscripten_set_canvas_size(s_width, s_height);
+}
+
+static EM_BOOL FCEM_ResizeCallback(int eventType, const EmscriptenUiEvent *uiEvent, void *userData)
+{
+	Resize(uiEvent->windowInnerWidth, uiEvent->windowInnerHeight);
+	return 1;
+}
+
+
 void RenderVideo(int draw_splash)
 {
 	if (draw_splash) {
@@ -100,25 +120,21 @@ int InitVideo()
 		return 0;
 	}
 
-	s_clipSides = 0; // Don't clip left side.
-
 	// check the starting, ending, and total scan lines
 	FCEUI_GetCurrentVidSystem(&s_srendline, &s_erendline);
 	s_tlines = s_erendline - s_srendline + 1;
 
-	// Scale x to compensate the 24px overscan.
-	s_exs = 4.0 * (280.0/256.0) + 0.5/256.0;
-	s_eys = 4.0;
-	int w = (int) (NWIDTH * s_exs);
-	int h = (int) (s_tlines * s_eys);
-	s_nativeWidth = w;
-	s_nativeHeight = h;
+// TODO: tsone: take window inner size at init. there seems to be no better way?
+	s_width = EM_ASM_INT_V({ return window.innerWidth; });
+	s_height = EM_ASM_INT_V({ return window.innerHeight; });
+	Resize(s_width, s_height);
 
 	FCEUI_SetShowFPS(1);
-    
+
 	FCEU_printf("Initializing WebGL.\n");
 
-	emscripten_set_canvas_size(w, h);
+	emscripten_set_resize_callback(0, 0, 0, FCEM_ResizeCallback);
+
 	EmscriptenWebGLContextAttributes attr;
 	emscripten_webgl_init_context_attributes(&attr);
 	attr.alpha = attr.antialias = attr.premultipliedAlpha = 0;
@@ -137,17 +153,10 @@ int InitVideo()
 	return 0;
 }
 
-/**
- *  Converts an x-y coordinate in the window manager into an x-y
- *  coordinate on FCEU's screen.
- */
-void PtoV(int *x, int *y)
+void CanvasToNESCoords(uint32 *x, uint32 *y)
 {
-	*y /= s_eys;
-	*x /= s_exs;
-	if (s_clipSides) {
-		*x += 8;
-	}
+	*x = 256 * (*x) / s_width;
+	*y = 224 * (*y) / s_height;
 	*y += s_srendline;
 }
 

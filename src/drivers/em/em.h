@@ -79,21 +79,34 @@
 #define FCEM_INPUT_TYPE_MASK 0xF00
 #define FCEM_INPUT_KEY_MASK 0x0FF
 
-// Available inputs
-#define KEYS_PRE \
+// Input ID enums and defines
+#define INPUT_PRE \
 enum FCEM_Input {\
 	FCEM_NULL = 0x0000,
-#define KEY(i_,d_,e_,t_) \
+#define INPUT(i_,d_,e_,t_) \
 	FCEM_ ## e_ = i_,
-#define KEYS_POST \
+#define INPUT_POST \
 	FCEM_INPUT_COUNT\
 };
 #include "em-input.inc.h"
-#undef KEYS_PRE
-#undef KEY
-#undef KEYS_POST
+#undef INPUT_PRE
+#undef INPUT
+#undef INPUT_POST
 #define FCEM_GAMEPAD FCEM_GAMEPAD0_A
 #define FCEM_GAMEPAD_SIZE (FCEM_GAMEPAD1_A - FCEM_GAMEPAD0_A)
+
+// Controllers (config interface) enums and defines
+#define CONTROLLER_PRE \
+enum FCEM_Controller {
+#define CONTROLLER(i_,e_) \
+	FCEM_ ## e_ = i_,
+#define CONTROLLER_POST \
+	FCEM_CONTROLLER_COUNT\
+};
+#include "em-config.inc.h"
+#undef CONTROLLER_PRE
+#undef CONTROLLER 
+#undef CONTROLLER_POST
 
 // Audio options
 // NOTE: tsone: both SOUND_BUF_MAX and SOUND_HW_BUF_MAX must be power of two!
@@ -110,7 +123,6 @@ enum FCEM_Input {\
 #endif
 #define SOUND_QUALITY		0
 #define SOUND_BUF_MASK		(SOUND_BUF_MAX-1)
-
 
 // The rate of output and emulated (internal) audio (frequency, in Hz).
 extern int em_sound_rate;
@@ -171,7 +183,7 @@ int LoadGame(const char *path);
 int CloseGame(void);
 uint64 FCEUD_GetTime();
 
-void PtoV(int *x, int *y);
+void CanvasToNESCoords(uint32 *x, uint32 *y);
 bool FCEUD_ShouldDrawInputAids();
 bool FCEUI_AviDisableMovieMessages();
 bool FCEUI_AviEnableHUDrecording();
@@ -181,11 +193,18 @@ void FCEUI_SetAviDisableMovieMessages(bool disable);
 
 Config *InitConfig(void);
 void UpdateEMUCore(Config *);
+double GetController(int idx);
+extern "C" {
+void FCEM_SetController(int idx, double v);
+}
 
+extern uint32 MouseData[3];
 void ParseGIInput(FCEUGI *GI);
 int ButtonConfigBegin();
 void ButtonConfigEnd();
 
+void BindKey(int id, int keyIdx);
+void BindPort(int portIdx, ESI peri);
 void FCEUD_UpdateInput(void);
 
 

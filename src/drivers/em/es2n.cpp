@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator - Emscripten OpenGL ES 2.0 driver
  *
  * Copyright notice for this file:
  *  Copyright (C) 2015 Valtteri "tsone" Heikkila
@@ -99,25 +99,7 @@
 
 #include "shaders.h"
 
-// NOTE: do not change order!
-enum {
-	BRIGHTNESS = 0,
-	CONTRAST,
-	COLOR,
-	GAMMA,
-	GLOW,
-	SHARPNESS,
-	RGBPPU,
-	CRT_ENABLED,
-	SCANLINES,
-	CONVERGENCE,
-	NOISE,
-	SOUND_ENABLED,
-	CONTROL_COUNT
-};
-
 static es2n s_p;
-static GLfloat s_c[CONTROL_COUNT];
 static es2n_uniforms s_u;
 
 static const GLint mesh_quad_vert_num = 4;
@@ -168,10 +150,11 @@ static const GLfloat s_downsample_ws[] = { 0.045894f, 0.096038f, 0.157115f, 0.20
 static const int s_downsample_widths[]  = { SCREEN_W, SCREEN_W/4, SCREEN_W/4,  SCREEN_W/16, SCREEN_W/16, SCREEN_W/64, SCREEN_W/64 };
 static const int s_downsample_heights[] = { SCREEN_H, SCREEN_H,   SCREEN_H/4,  SCREEN_H/4,  SCREEN_H/16, SCREEN_H/16, SCREEN_H/64 };
 
+
 static void updateSharpenKernel()
 {
 	glUseProgram(s_p.sharpen_prog);
-	double v = (1.0-s_c[RGBPPU]) * 0.4 * (s_c[SHARPNESS]+0.5);
+	double v = (1.0-GetController(FCEM_RGBPPU)) * 0.4 * (GetController(FCEM_SHARPNESS)+0.5);
 	GLfloat sharpen_kernel[] = {
 		-v, -v, -v,
 		1, 0, 0, 
@@ -180,82 +163,6 @@ static void updateSharpenKernel()
 		-v, -v, -v
 	};
 	glUniform3fv(s_u._sharpen_kernel_loc, 5, sharpen_kernel);
-}
-
-extern "C" {
-void FCEM_SetControl(int idx, double v)
-{
-	if (idx >= 0 && idx < CONTROL_COUNT) {
-		s_c[idx] = v;
-	}
-
-	switch (idx) {
-	// RGB pass controls
-	case BRIGHTNESS:
-		glUseProgram(s_p.rgb_prog);
-		v = 0.15 * v;
-		glUniform1f(s_u._rgb_brightness_loc, v);
-		break;
-	case CONTRAST:
-		glUseProgram(s_p.rgb_prog);
-		v = 1.0 + 0.4*s_c[CONTRAST];
-		glUniform1f(s_u._rgb_contrast_loc, v);
-		break;
-	case COLOR:
-		glUseProgram(s_p.rgb_prog);
-		v = 1.0 + s_c[COLOR];
-		glUniform1f(s_u._rgb_color_loc, v);
-		break;
-	case RGBPPU:
-		glUseProgram(s_p.rgb_prog);
-		v = s_c[RGBPPU];
-		glUniform1f(s_u._rgb_rgbppu_loc, v);
-		updateSharpenKernel();
-		break;
-	case GAMMA:
-		glUseProgram(s_p.rgb_prog);
-		v = 2.4/2.2 + 0.3*s_c[GAMMA];
-		glUniform1f(s_u._rgb_gamma_loc, v);
-		break;
-	case NOISE:
-		glUseProgram(s_p.rgb_prog);
-		v = s_c[CRT_ENABLED] * 0.08 * s_c[NOISE]*s_c[NOISE];
-		glUniform1f(s_u._rgb_noiseAmp_loc, v);
-		break;
-	// Sharpness pass controls
-	case CONVERGENCE:
-		glUseProgram(s_p.sharpen_prog);
-		v = s_c[CRT_ENABLED] * 2.0 * s_c[CONVERGENCE];
-		glUniform1f(s_u._sharpen_convergence_loc, v);
-		break;
-	case SHARPNESS:
-		updateSharpenKernel();
-		break;
-	// Stretch pass controls
-	case SCANLINES:
-		glUseProgram(s_p.stretch_prog);
-		v = s_c[CRT_ENABLED] * 0.45 * s_c[SCANLINES];
-		glUniform1f(s_u._stretch_scanlines_loc, v);
-		break;
-	// Combine pass controls
-	case GLOW:
-		glUseProgram(s_p.combine_prog);
-		v = 0.1 * s_c[GLOW];
-		glUniform3f(s_u._combine_glow_loc, v, v*v, v + v*v);
-		break;
-	// Generic
-	case CRT_ENABLED:
-		// Update dependent uniforms. (Without modifying stored values in s_c.)
-		FCEM_SetControl(NOISE, s_c[NOISE]);
-		FCEM_SetControl(SCANLINES, s_c[SCANLINES]);
-		FCEM_SetControl(CONVERGENCE, s_c[CONVERGENCE]);
-		break;
-	// Other controls
-	case SOUND_ENABLED:
-		SilenceSound(!v);
-		break;
-	}
-}
 }
 
 // This source code is modified from original at:
@@ -474,7 +381,6 @@ static void genNoiseTex()
 }
 
 #if DBG_MODE
-extern int MouseData[3];
 static void updateUniformsDebug()
 {
 	GLint prog = 0;
@@ -700,7 +606,7 @@ static void passRGB()
 	glUseProgram(s_p.rgb_prog);
 	updateUniformsRGB();
 
-	if (s_c[CRT_ENABLED]) {
+	if (GetController(FCEM_CRT_ENABLED)) {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
 	}
@@ -719,7 +625,7 @@ static void passSharpen()
 
 static void passStretch()
 {
-	if (s_c[CRT_ENABLED]) {
+	if (GetController(FCEM_CRT_ENABLED)) {
 		glBindFramebuffer(GL_FRAMEBUFFER, s_p.stretch_fb);
 		glViewport(0, 0, SCREEN_W, SCREEN_H);
 	} else {
@@ -750,7 +656,7 @@ static void passScreen()
 	glUseProgram(s_p.screen_prog);
 	updateUniformsScreen();
 
-	if (s_c[CRT_ENABLED]) {
+	if (GetController(FCEM_CRT_ENABLED)) {
 		meshRender(&s_p.screen_mesh);
 	} else {
 		meshRender(&s_p.quad_mesh);
@@ -759,7 +665,7 @@ static void passScreen()
 
 static void passTV()
 {
-	if (!s_c[CRT_ENABLED]) {
+	if (!GetController(FCEM_CRT_ENABLED)) {
 		return;
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.tv_fb);
@@ -778,6 +684,74 @@ static void passCombine()
 	glUseProgram(s_p.combine_prog);
 	updateUniformsCombine();
 	meshRender(&s_p.quad_mesh);
+}
+
+void es2nSetController(int idx, double v)
+{
+	assert(idx >= 0 && idx <= FCEM_NOISE);
+
+	switch (idx) {
+	// RGB pass controls
+	case FCEM_BRIGHTNESS:
+		glUseProgram(s_p.rgb_prog);
+		v = 0.15 * v;
+		glUniform1f(s_u._rgb_brightness_loc, v);
+		break;
+	case FCEM_CONTRAST:
+		glUseProgram(s_p.rgb_prog);
+		v = 1.0 + 0.4*GetController(FCEM_CONTRAST);
+		glUniform1f(s_u._rgb_contrast_loc, v);
+		break;
+	case FCEM_COLOR:
+		glUseProgram(s_p.rgb_prog);
+		v = 1.0 + GetController(FCEM_COLOR);
+		glUniform1f(s_u._rgb_color_loc, v);
+		break;
+	case FCEM_RGBPPU:
+		glUseProgram(s_p.rgb_prog);
+		v = GetController(FCEM_RGBPPU);
+		glUniform1f(s_u._rgb_rgbppu_loc, v);
+		updateSharpenKernel();
+		break;
+	case FCEM_GAMMA:
+		glUseProgram(s_p.rgb_prog);
+		v = 2.4/2.2 + 0.3*GetController(FCEM_GAMMA);
+		glUniform1f(s_u._rgb_gamma_loc, v);
+		break;
+	case FCEM_NOISE:
+		glUseProgram(s_p.rgb_prog);
+		v = GetController(FCEM_CRT_ENABLED) * 0.08 * GetController(FCEM_NOISE)*GetController(FCEM_NOISE);
+		glUniform1f(s_u._rgb_noiseAmp_loc, v);
+		break;
+	// Sharpness pass controls
+	case FCEM_CONVERGENCE:
+		glUseProgram(s_p.sharpen_prog);
+		v = GetController(FCEM_CRT_ENABLED) * 2.0 * GetController(FCEM_CONVERGENCE);
+		glUniform1f(s_u._sharpen_convergence_loc, v);
+		break;
+	case FCEM_SHARPNESS:
+		updateSharpenKernel();
+		break;
+	// Stretch pass controls
+	case FCEM_SCANLINES:
+		glUseProgram(s_p.stretch_prog);
+		v = GetController(FCEM_CRT_ENABLED) * 0.45 * GetController(FCEM_SCANLINES);
+		glUniform1f(s_u._stretch_scanlines_loc, v);
+		break;
+	// Combine pass controls
+	case FCEM_GLOW:
+		glUseProgram(s_p.combine_prog);
+		v = 0.1 * GetController(FCEM_GLOW);
+		glUniform3f(s_u._combine_glow_loc, v, v*v, v + v*v);
+		break;
+	// Generic controls
+	case FCEM_CRT_ENABLED:
+		// Enable CRT, update dependent uniforms. (Without modifying stored control values.)
+		FCEM_SetController(FCEM_NOISE, GetController(FCEM_NOISE));
+		FCEM_SetController(FCEM_SCANLINES, GetController(FCEM_SCANLINES));
+		FCEM_SetController(FCEM_CONVERGENCE, GetController(FCEM_CONVERGENCE));
+		break;
+	}
 }
 
 void es2nInit()
@@ -899,17 +873,17 @@ void es2nInit()
 
 	// Set controls to defaults.
 // TODO: tsone: think of better way to do this..?
-	FCEM_SetControl(BRIGHTNESS, 0);
-	FCEM_SetControl(CONTRAST, 0);
-	FCEM_SetControl(COLOR, 0);
-	FCEM_SetControl(SHARPNESS, 0.2);
-	FCEM_SetControl(GAMMA, 0);
-	FCEM_SetControl(GLOW, 0.2);
-	FCEM_SetControl(RGBPPU, 0);
-	FCEM_SetControl(CRT_ENABLED, 1);
-	FCEM_SetControl(SCANLINES, 0.1);
-	FCEM_SetControl(CONVERGENCE, 0.4);
-	FCEM_SetControl(NOISE, 0.3);
+	FCEM_SetController(FCEM_BRIGHTNESS, 0);
+	FCEM_SetController(FCEM_CONTRAST, 0);
+	FCEM_SetController(FCEM_COLOR, 0);
+	FCEM_SetController(FCEM_SHARPNESS, 0.2);
+	FCEM_SetController(FCEM_GAMMA, 0);
+	FCEM_SetController(FCEM_GLOW, 0.2);
+	FCEM_SetController(FCEM_RGBPPU, 0);
+	FCEM_SetController(FCEM_CRT_ENABLED, 1);
+	FCEM_SetController(FCEM_SCANLINES, 0.1);
+	FCEM_SetController(FCEM_CONVERGENCE, 0.4);
+	FCEM_SetController(FCEM_NOISE, 0.3);
 }
 
 void es2nDeinit()
@@ -938,14 +912,14 @@ void es2nDeinit()
 	free(s_p.overscan_pixels);
 }
 
-void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
+void es2nSetViewport(int width, int height)
 {
-	// Update viewport size.
-	int width, height, fullscreen;
-	emscripten_get_canvas_size(&width, &height, &fullscreen);
 	s_p.viewport[2] = width;
 	s_p.viewport[3] = height;
+}
 
+void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
+{
 	// Update input pixels.
 	glActiveTexture(TEX(IDX_I));
 	glBindTexture(GL_TEXTURE_2D, s_p.idx_tex);
@@ -970,7 +944,7 @@ void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 	passRGB();
 	passSharpen();
 	passStretch();
-	if (s_c[CRT_ENABLED]) {
+	if (GetController(FCEM_CRT_ENABLED)) {
 		passScreen();
 		passDownsample();
 		passTV();

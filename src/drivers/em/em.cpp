@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator - Emscripten main
  *
  * Copyright notice for this file:
  *  Copyright (C) 2015 Valtteri "tsone" Heikkila
@@ -65,25 +65,6 @@ int LoadGame(const char *path)
 	return 1;
 }
 
-extern "C"
-{
-
-// Write savegame and synchronize IDBFS contents to IndexedDB. Must be a C-function.
-void FCEM_OnSaveGameInterval()
-{
-    if (GameInterface) {
-        GameInterface(GI_SAVE);
-    }
-    EM_ASM({
-      FS.syncfs(FCEM.onSyncToIDB);
-    });
-}
-
-}
-
-/**
- * Closes a game.  Frees memory, and deinitializes the drivers.
- */
 int CloseGame()
 {
 	if(!isloaded) {

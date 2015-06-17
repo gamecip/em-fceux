@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator - Emscripten inputs
  *
  * Copyright notice for this file:
  *  Copyright (C) 2002 Xodnizel
@@ -22,7 +22,9 @@
 #include "../../utils/memory.h"
 #include <html5.h>
 
+
 #define GAMEPAD_THRESHOLD 0.1
+
 
 int NoWaiting = 1;
 
@@ -30,13 +32,8 @@ extern Config *g_config;
 extern bool frameAdvanceLagSkip, lagCounterDisplay;
 extern int gametype;
 
-int MouseData[3] = { 0, 0, 0 };
+uint32 MouseData[3] = { 0, 0, 0 };
 
-
-void ParseGIInput (FCEUGI * gi)
-{
-	gametype = gi->type;
-}
 
 #if PERI
 static uint8 QuizKingData = 0;
@@ -65,20 +62,13 @@ static unsigned int* s_key_map = 0;
 // Input buttons state. Set to 1 if mapped keyboard key is down, otherwise 0.
 static bool* s_input_state = 0;
 
+// Frame counter for zeroing mouse buttons.
+static int s_mouseReleaseFC = 0;
+
 #if PERI
 static int g_fkbEnabled = 0;
 #endif //PERI
 
-// TODO: tsone: dummy functions
-void FCEUD_MovieRecordTo() {}
-void FCEUD_SaveStateAs() {}
-void FCEUD_LoadStateFrom() {}
-
-// NOTE: tsone: required for boards/transformer.cpp, must return array of 256 ints...
-unsigned int *GetKeyboard()
-{
-	return s_key_map;
-}
 
 static bool IsInput(unsigned int input)
 {
@@ -380,27 +370,28 @@ static void UpdateGamepad(void)
 	JSreturn = JS;
 }
 
-void FCEUD_UpdateInput ()
+static void UpdateMouse()
 {
-	UpdateSystem();
-// TODO: tsone: add zapper etc.?
-	UpdateGamepad();
+	if (!s_mouseReleaseFC) {
+		MouseData[2] = 0;
+	} else {
+		--s_mouseReleaseFC;
+	}
 }
 
-static EM_BOOL FCEM_MouseCallback(int type, const EmscriptenMouseEvent *event, void *)
+static EM_BOOL FCEM_MouseDownCallback(int type, const EmscriptenMouseEvent *event, void *)
 {
-	// Map element coords to NES screen coords.
 	MouseData[0] = event->targetX;
 	MouseData[1] = event->targetY;
-	PtoV(&MouseData[0], &MouseData[1]);
-	// Bit 0 set if primary button down, bit 1 set if secondary down.
-// TODO: tsone: to get debug (x,y) form mouse, disable from final
-#if 1
-	if ((event->buttons & 1) && !(MouseData[2] & 1)) {
-		printf("DEBUG: mouse pos: %d,%d\n", MouseData[0], MouseData[1]);
-	}
-#endif
 	MouseData[2] = event->buttons & 3;
+
+	CanvasToNESCoords(&MouseData[0], &MouseData[1]);
+
+	// Force buttons down for 3 frames. This is because mouse events are async.
+	// We need mouse buttons remain down at least one frame -- however it seems
+	// fceux works better if duration is 3 frames.
+	s_mouseReleaseFC = 3;
+
 	return 1;
 }
 
@@ -429,8 +420,43 @@ static EM_BOOL FCEM_KeyCallback(int eventType, const EmscriptenKeyboardEvent *ev
 	return 1;
 }
 
-void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1, ESIFC fcexp)
+void BindKey(int id, int keyIdx)
 {
+	if (keyIdx >= 0 && keyIdx < FCEM_KEY_MAP_SIZE && id >= FCEM_NULL && id < FCEM_INPUT_COUNT) {
+		s_key_map[keyIdx] = id;
+	}
+}
+
+void BindPort(int portIdx, ESI peri)
+{
+	uint32 *ptr = 0;
+
+	switch (peri) {
+	case SI_GAMEPAD: ptr = &JSreturn; break;
+	case SI_ZAPPER:  ptr = MouseData; break;
+	default: return;
+	}
+
+	FCEUI_SetInput(portIdx, peri, ptr, 0);
+}
+
+void FCEUD_UpdateInput ()
+{
+	UpdateSystem();
+	UpdateGamepad();
+	UpdateMouse();
+// TODO: tsone: add other peripherals?
+}
+
+void FCEUD_SetInput(bool fourscore, bool microphone, ESI, ESI, ESIFC fcexp)
+{
+// TODO: tsone: with fourscore, only gamepads will work and must be forced on:
+/*
+	if (fourscore) {
+		FCEUI_SetInput(0,SI_GAMEPAD,&JSreturn,0);
+		FCEUI_SetInput(1,SI_GAMEPAD,&JSreturn,0);
+	}
+*/
 	eoptions &= ~EO_FOURSCORE;
 	if (fourscore) {
 		// Four Score emulation, only support gamepads, nothing else
@@ -445,40 +471,36 @@ void FCEUD_SetInput(bool fourscore, bool microphone, ESI port0, ESI port1, ESIFC
 	// Init key map. Fills it with zeroes.
 	FCEU_ARRAY_EM(s_key_map, unsigned int, FCEM_KEY_MAP_SIZE);
 
-// TODO: tsone: add more inputs, now just gamepad at both ports
-// TODO: tsone: zapper would get attrib 1
-	FCEUI_SetInput(0, port0, &JSreturn, 0);
-	FCEUI_SetInput(1, port1, &JSreturn, 0);
+// TODO: tsone: make configurable by front-end
+	FCEUI_SetInput(0, SI_GAMEPAD, &JSreturn, 0);
+	FCEUI_SetInput(1, SI_ZAPPER, MouseData, 0);
 
 // TODO: tsone: support FC expansion port?
 	FCEUI_SetInputFC(fcexp, 0, 0);
 
-// TODO: tsone: support fourscore? really?
+// TODO: tsone: support fourscore?
 //	FCEUI_SetInputFourscore((eoptions & EO_FOURSCORE) != 0);
 
-	const char *elem = "#canvas";
-	emscripten_set_mousemove_callback(elem, 0, 0, FCEM_MouseCallback);
-	emscripten_set_mousedown_callback(elem, 0, 0, FCEM_MouseCallback);
-	emscripten_set_mouseup_callback(elem, 0, 0, FCEM_MouseCallback);
-	emscripten_set_click_callback(elem, 0, 0, FCEM_MouseCallback);
+	emscripten_set_mousedown_callback("#canvas", 0, 0, FCEM_MouseDownCallback);
 
-	elem = "#window";
+	const char *elem = "#window";
 	emscripten_set_keydown_callback(elem, 0, 0, FCEM_KeyCallback);
 	emscripten_set_keyup_callback(elem, 0, 0, FCEM_KeyCallback);
 }
 
-extern "C"
+void ParseGIInput (FCEUGI * gi)
 {
-
-// Map a HTML5 keyCode with an input.
-int FCEM_MapKey(int id, int keyIdx)
-{
-	if (keyIdx < 0 || keyIdx >= FCEM_KEY_MAP_SIZE || id < FCEM_NULL || id >= FCEM_INPUT_COUNT) {
-		return 0;
-	}
-	s_key_map[keyIdx] = id;
-	return 1;
+	gametype = gi->type;
 }
 
+// NOTE: tsone: required for boards/transformer.cpp, must return array of 256 ints...
+const unsigned int *GetKeyboard()
+{
+	return s_key_map;
 }
+
+// TODO: tsone: dummy functions
+void FCEUD_MovieRecordTo() {}
+void FCEUD_SaveStateAs() {}
+void FCEUD_LoadStateFrom() {}
 

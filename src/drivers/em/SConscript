@@ -4,7 +4,7 @@ Export('env')
 source_list = Split(
     """
     em-input.cpp
-    config.cpp
+    em-config.cpp
     em.cpp
     em-sound.cpp
     em-video.cpp

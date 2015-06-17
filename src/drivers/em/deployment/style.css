@@ -38,10 +38,6 @@ html, body {
 canvas.emscripten {
   position: relative;
   border: 0px none;
-  width: 1024px;
-  height: 896px;
-  width: auto;
-  height: 100%;
 }
 
 #preload {

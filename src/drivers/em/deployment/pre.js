@@ -18,19 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-// NOTE: Do not change these values!
-var BRIGHTNESS = 0;
-var CONTRAST = 1;
-var COLOR = 2;
-var GAMMA = 3;
-var GLOW = 4;
-var SHARPNESS = 5;
-var RGBPPU = 6;
-var CRT_ENABLED = 7;
-var SCANLINES = 8;
-var CONVERGENCE = 9;
-var NOISE = 10;
-var SOUND_ENABLED = 11;
 // NOTE: Originally from: http://jsfiddle.net/vWx8V/
 var KEY_CODE_TO_NAME = {8:"Backspace",9:"Tab",13:"Return",16:"Shift",17:"Ctrl",18:"Alt",19:"Pause/Break",20:"Caps Lock",27:"Esc",32:"Space",33:"Page Up",34:"Page Down",35:"End",36:"Home",37:"Left",38:"Up",39:"Right",40:"Down",45:"Insert",46:"Delete",48:"0",49:"1",50:"2",51:"3",52:"4",53:"5",54:"6",55:"7",56:"8",57:"9",65:"A",66:"B",67:"C",68:"D",69:"E",70:"F",71:"G",72:"H",73:"I",74:"J",75:"K",76:"L",77:"M",78:"N",79:"O",80:"P",81:"Q",82:"R",83:"S",84:"T",85:"U",86:"V",87:"W",88:"X",89:"Y",90:"Z",91:"Meta",93:"Right Click",96:"Numpad 0",97:"Numpad 1",98:"Numpad 2",99:"Numpad 3",100:"Numpad 4",101:"Numpad 5",102:"Numpad 6",103:"Numpad 7",104:"Numpad 8",105:"Numpad 9",106:"Numpad *",107:"Numpad +",109:"Numpad -",110:"Numpad .",111:"Numpad /",112:"F1",113:"F2",114:"F3",115:"F4",116:"F5",117:"F6",118:"F7",119:"F8",120:"F9",121:"F10",122:"F11",123:"F12",144:"Num Lock",145:"Scroll Lock",182:"My Computer",183:"My Calculator",186:";",187:"=",188:",",189:"-",190:".",191:"/",192:"`",219:"[",220:"\\",221:"]",222:"'"};
 var FCEM = {
@@ -50,7 +37,7 @@ var FCEM = {
   },
   toggleSound : function() {
     FCEM.soundEnabled = !FCEM.soundEnabled;
-    FCEM.setControl(SOUND_ENABLED, FCEM.soundEnabled);
+    FCEM.setController(SOUND_ENABLED, FCEM.soundEnabled);
     FCEM.soundIconElem.src = FCEM.soundEnabled ? 'img/sound_on.gif' : 'img/sound_off.gif';
   },
   onInitialSyncFromIDB : function(er) {
@@ -68,8 +55,8 @@ var FCEM = {
     FCEM.updateGames();
     FCEM.updateStack();
     FCEM.showStack(true);
-    FCEM.setControl = Module.cwrap('FCEM_SetControl', null, ['number', 'number']);
-    FCEM.mapKey = Module.cwrap('FCEM_MapKey', 'number', ['number', 'number']);
+    FCEM.setController = Module.cwrap('FCEM_SetController', null, ['number', 'number']);
+    FCEM.bindKey = Module.cwrap('FCEM_BindKey', null, ['number', 'number']);
     // Write savegame and synchronize IDBFS in intervals.
     setInterval(Module.cwrap('FCEM_OnSaveGameInterval'), 1000);
 
@@ -159,7 +146,7 @@ var FCEM = {
   resetKeys : function() {
     for (var id in FCEM.inputs) {
       var key = FCEM.getLocalKey(id);
-      FCEM.mapKey(0, key);
+      FCEM.bindKey(0, key);
       var item = FCEM.inputs[id];
       FCEM.setLocalKey(id, item[0]);
     }
@@ -167,7 +154,7 @@ var FCEM = {
   mapAllKeys : function() {
     for (var id in FCEM.inputs) {
       var key = FCEM.getLocalKey(id);
-      FCEM.mapKey(id, key);
+      FCEM.bindKey(id, key);
     }
   },
   setupKeys : function() {
@@ -239,13 +226,13 @@ var FCEM = {
             return;
           }
           FCEM.setLocalKey(id, 0);
-          FCEM.mapKey(0, key);
+          FCEM.bindKey(0, key);
         }
       }
 
       // Set new binding
       FCEM.setLocalKey(FCEM.catchId, FCEM.catchKey);
-      FCEM.mapKey(FCEM.catchId, FCEM.catchKey);
+      FCEM.bindKey(FCEM.catchId, FCEM.catchKey);
       FCEM.catchId = null;
       FCEM.initKeyBind();
     }
@@ -257,7 +244,7 @@ var FCEM = {
     var id = keyBind.dataset.id;
     var key = FCEM.getLocalKey(id);
     if (key) {
-      FCEM.mapKey(0, key);
+      FCEM.bindKey(0, key);
     }
     FCEM.setLocalKey(id, 0);
     FCEM.initKeyBind();

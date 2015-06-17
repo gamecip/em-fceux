@@ -1,4 +1,4 @@
-/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator - Emscripten splash screen
  *
  * Copyright notice for this file:
  *  Copyright (C) 2015 Valtteri "tsone" Heikkila
@@ -107,3 +107,4 @@ void DrawSplash()
 	
 	s_splashFC = (s_splashFC + 1);
 }
+

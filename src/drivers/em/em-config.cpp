@@ -1,6 +1,7 @@
-/* FCE Ultra - NES/Famicom Emulator
+/* FCE Ultra - NES/Famicom Emulator - Emscripten configuration
  *
  * Copyright notice for this file:
+ *  Copyright (C) 2002 Xodnizel
  *  Copyright (C) 2015 Valtteri "tsone" Heikkila
  *
  * This program is free software; you can redistribute it and/or modify
@@ -18,14 +19,24 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "em.h"
+#include "es2n.h"
+#include "../../fceu.h"
+#include <emscripten.h>
+
+
+static double s_c[FCEM_CONTROLLER_COUNT];
+static const ESI s_periMap[] = {
+	SI_GAMEPAD,
+	SI_ZAPPER
+};
+static const int s_periMapSize = sizeof(s_periMap) / sizeof(*s_periMap);
 
 
 /**
  * Creates the subdirectories used for saving snapshots, movies, game
  * saves, etc.  Hopefully obsolete with new configuration system.
  */
-static void
-CreateDirs(const std::string &dir)
+static void CreateDirs(const std::string &dir)
 {
 	char *subs[8]={"fcs","snaps","gameinfo","sav","cheats","movies","cfg.d"};
 	std::string subdir;
@@ -43,8 +54,7 @@ CreateDirs(const std::string &dir)
  * hopefully become obsolete once the new configuration system is in
  * place.
  */
-static void
-GetBaseDirectory(std::string &dir)
+static void GetBaseDirectory(std::string &dir)
 {
 	char *home = getenv("HOME");
 	if(home) {
@@ -54,10 +64,18 @@ GetBaseDirectory(std::string &dir)
 	}
 }
 
+static void WrapBindPort(int portIdx, int periId)
+{
+	printf("!!!!! got it %d\n", periId);
+	if (periId >= 0 && periId < s_periMapSize) {
+		BindPort(portIdx, s_periMap[periId]);
+	}
+}
+
+
 // returns a config structure with default options
 // also creates config base directory (ie: /home/user/.fceux as well as subdirs
-Config *
-InitConfig()
+Config* InitConfig()
 {
 	std::string dir, prefix;
 	Config *config;
@@ -171,7 +189,7 @@ InitConfig()
 	config->addOption("rp2mic", prefix + "EnableMic", 0);
 
 // TODO: tsone: list of old unused hotkeys, remove?
-/*
+#if 0
 	const int Hotkeys[HK_MAX] = {
 		SDLK_F1, // cheat menu
 		SDLK_F2, // bind state
@@ -185,7 +203,7 @@ InitConfig()
 		SDLK_q, // toggle movie RW
 		SDLK_QUOTE, // toggle mute capture
 	};
-*/
+#endif
 
 	// All mouse devices
 	config->addOption("SDL.OekaKids.0.DeviceType", "Mouse");
@@ -203,8 +221,7 @@ InitConfig()
 	return config;
 }
 
-void
-UpdateEMUCore(Config *config)
+void UpdateEMUCore(Config *config)
 {
 // TODO: tsone: no neet to call this, color handling is by the driver
 //	FCEUI_SetNTSCTH(ntsccol, ntsctint, ntschue);
@@ -219,6 +236,7 @@ UpdateEMUCore(Config *config)
 	FCEUI_DisableSpriteLimitation(0);
 
 	int start = 0, end = 239;
+// TODO: tsone: can be removed? not sure what this is.. it's disabled due to #define
 #if DOING_SCANLINE_CHECKS
 	for(int i = 0; i < 2; x++) {
 		if(srendlinev[x]<0 || srendlinev[x]>239) srendlinev[x]=0;
@@ -226,5 +244,54 @@ UpdateEMUCore(Config *config)
 	}
 #endif
 	FCEUI_SetRenderedLines(start + 8, end - 8, start, end);
+}
+
+double GetController(int idx)
+{
+	assert(idx >= 0 && idx < FCEM_CONTROLLER_COUNT);
+	return s_c[idx];
+}
+
+
+// Emscripten externals
+extern "C"
+{
+
+// Write savegame and synchronize IDBFS contents to IndexedDB. Must be a C-function.
+void FCEM_OnSaveGameInterval()
+{
+    if (GameInterface) {
+        GameInterface(GI_SAVE);
+    }
+    EM_ASM({
+      FS.syncfs(FCEM.onSyncToIDB);
+    });
+}
+
+// Bind a HTML5 keyCode with an input ID.
+void FCEM_BindKey(int id, int keyIdx)
+{
+	BindKey(id, keyIdx);
+}
+
+// Set control value.
+void FCEM_SetController(int idx, double v)
+{
+	if (idx < 0 || idx >= FCEM_CONTROLLER_COUNT) {
+		// Skip if control idx is invalid.
+		return;
+	}
+
+	s_c[idx] = v;
+
+	if (idx >= FCEM_BRIGHTNESS && idx <= FCEM_NOISE) {
+		es2nSetController(idx, v);
+	} else if (idx == FCEM_SOUND_ENABLED) {
+		SilenceSound(!v);
+	} else if (idx == FCEM_PORT2) {
+		WrapBindPort(1, (int) v);
+	}
+}
+
 }
 

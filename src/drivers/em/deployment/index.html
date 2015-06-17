@@ -51,19 +51,22 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
       <div id="controlsContainer">
         <div id="controlsSliders">
           <h3>Picture Controls</h3>
-          Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(BRIGHTNESS, this.value)" onchange="FCEM.setControl(BRIGHTNESS, this.value)"/><br/>
-          Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(CONTRAST, this.value)" onchange="FCEM.setControl(CONTRAST, this.value)"/><br/>
-          Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(COLOR, this.value)" onchange="FCEM.setControl(COLOR, this.value)"/><br/>
-          Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setControl(GAMMA, this.value)" onchange="FCEM.setControl(GAMMA, this.value)"/><br/>
+          Brightness <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setController(BRIGHTNESS, this.value)" onchange="FCEM.setController(BRIGHTNESS, this.value)"/><br/>
+          Contrast <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setController(CONTRAST, this.value)" onchange="FCEM.setController(CONTRAST, this.value)"/><br/>
+          Color <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setController(COLOR, this.value)" onchange="FCEM.setController(COLOR, this.value)"/><br/>
+          Gamma <input type="range" min="-1" max="1" value="0" step="0.2" oninput="FCEM.setController(GAMMA, this.value)" onchange="FCEM.setController(GAMMA, this.value)"/><br/>
           <h3>NTSC Emulation Controls</h3>
-          NTSC Emulation <input type="checkbox" checked oninput="FCEM.setControl(RGBPPU, !this.checked)" onchange="FCEM.setControl(RGBPPU, !this.checked)"/><br/>
-          Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="FCEM.setControl(SHARPNESS, this.value)" onchange="FCEM.setControl(SHARPNESS, this.value)"/><br/>
+          NTSC Emulation <input type="checkbox" checked oninput="FCEM.setController(RGBPPU, !this.checked)" onchange="FCEM.setController(RGBPPU, !this.checked)"/><br/>
+          Sharpness <input type="range" min="-0.5" max="0.5" value="0.2" step="0.1" oninput="FCEM.setController(SHARPNESS, this.value)" onchange="FCEM.setController(SHARPNESS, this.value)"/><br/>
           <h3>TV Emulation Controls</h3>
-          TV Emulation <input type="checkbox" checked oninput="FCEM.setControl(CRT_ENABLED, this.checked)" onchange="FCEM.setControl(CRT_ENABLED, this.checked)"/><br/>
-          Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="FCEM.setControl(SCANLINES, this.value)" onchange="FCEM.setControl(SCANLINES, this.value)"/><br/>
-          Glow <input type="range" min="0" max="1" value="0.2" step="0.1" oninput="FCEM.setControl(GLOW, this.value)" onchange="FCEM.setControl(GLOW, this.value)"/><br/>
-          Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="FCEM.setControl(CONVERGENCE, this.value)" onchange="FCEM.setControl(CONVERGENCE, this.value)"/><br/>
-          Signal Noise <input type="range" min="0" max="1" value="0.3" step="0.1" oninput="FCEM.setControl(NOISE, this.value)" onchange="FCEM.setControl(NOISE, this.value)"/><br/>
+          TV Emulation <input type="checkbox" checked oninput="FCEM.setController(CRT_ENABLED, this.checked)" onchange="FCEM.setController(CRT_ENABLED, this.checked)"/><br/>
+          Scanlines <input type="range" min="0" max="1" value="0.1" step="0.1" oninput="FCEM.setController(SCANLINES, this.value)" onchange="FCEM.setController(SCANLINES, this.value)"/><br/>
+          Glow <input type="range" min="0" max="1" value="0.2" step="0.1" oninput="FCEM.setController(GLOW, this.value)" onchange="FCEM.setController(GLOW, this.value)"/><br/>
+          Convergence <input type="range" min="0" max="1" value="0.4" step="0.1" oninput="FCEM.setController(CONVERGENCE, this.value)" onchange="FCEM.setController(CONVERGENCE, this.value)"/><br/>
+          Signal Noise <input type="range" min="0" max="1" value="0.3" step="0.1" oninput="FCEM.setController(NOISE, this.value)" onchange="FCEM.setController(NOISE, this.value)"/><br/>
+          <h3>Input Device Controls</h3>
+          <p>Controller Port 1 <select disabled><option>Gamepad</option></select>
+          <p>Controller Port 2 <select id="port2" onchange="FCEM.setController(PORT2, this.value)"><option value="0">Gamepad</option><option value="1" selected>Zapper</option></select>
         </div>
 <!-- <input type="button" value="dump FS" onclick="var f = findFiles('/'); f.forEach(function(x) { console.log('!!!! dump: ' + x); })" /> -->
       </div>
@@ -169,7 +172,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     </div>
 
     <script src="pre.js"></script>
-    <script src="input.js"></script>
+    <script src="config.js"></script>
     <script async type="text/javascript" src="fceux.js"></script>
     <script src="post.js"></script>
     <script src="//cdn.webglstats.com/stat.js" defer="defer" async="async"></script>
