@@ -95,16 +95,27 @@ bool replaceP2StartWithMicrophone = false;
 static int currFrameCounter = 0;
 #endif
 
-//This function is a quick hack to get the NSF player to use emulated gamepad input.
+//set to true if the fourscore is attached
+static bool FSAttached = false;
+
+// Shorthand to get button bits of any connected gamepad (OR'd together).
 uint8 FCEU_GetJoyJoy(void)
 {
-	return(joy[0]|joy[1]|joy[2]|joy[3]);
+	if (!FSAttached) {
+		int result = 0;
+		for (int i = 0; i < 2; ++i) {
+			if (joyports[i].type == SI_GAMEPAD) {
+				result |= joy[i];
+			}
+		}
+		return result;
+	} else {
+// TODO: tsone: verify this actually works w/ four score
+		return joy[0] | joy[1] | joy[2] | joy[3];
+	}
 }
 
 extern uint8 coinon;
-
-//set to true if the fourscore is attached
-static bool FSAttached = false;
 
 JOYPORT joyports[2] = { JOYPORT(0), JOYPORT(1) };
 FCPORT portFC;

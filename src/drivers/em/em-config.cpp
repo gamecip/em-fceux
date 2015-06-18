@@ -66,7 +66,6 @@ static void GetBaseDirectory(std::string &dir)
 
 static void WrapBindPort(int portIdx, int periId)
 {
-	printf("!!!!! got it %d\n", periId);
 	if (periId >= 0 && periId < s_periMapSize) {
 		BindPort(portIdx, s_periMap[periId]);
 	}
