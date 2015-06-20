@@ -33,7 +33,6 @@ extern double g_fpsScale;
 extern bool MaxSpeed;
 
 int eoptions = 0;
-int gametype = 0;
 Config *g_config;
 
 static int inited = 0;
@@ -54,14 +53,10 @@ int LoadGame(const char *path)
 		return 0;
 	}
 
-	ParseGIInput(GameInfo);
+// TODO: tsone: needed for some reason even though FCEUI_LoadGame() calls it. something to do with ResetNES() call there?
+	FCEUI_SetVidSystem(PAL);
 
-// TODO: tsone: support for PAL?
-        // NTSC=0, PAL=1
-	FCEUI_SetVidSystem(0);
-	
 	isloaded = 1;
-
 	return 1;
 }
 

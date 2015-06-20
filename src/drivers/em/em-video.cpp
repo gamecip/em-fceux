@@ -74,10 +74,15 @@ int KillVideo()
 
 void FCEUD_VideoChanged()
 {
-	if(FSettings.PAL)
-		PAL = 1;
-	else
-		PAL = 0;
+	PAL = FSettings.PAL ? 1 : 0;
+
+	if (!PAL) {
+// TODO: tsone: should use 60.0988 divisor instead?
+		em_sound_frame_samples = em_sound_rate / 60;
+	} else {
+// TODO: tsone: what's the proper pal divisor?
+		em_sound_frame_samples = em_sound_rate / 50;
+	}
 }
 
 static void Resize(int width, int height)

@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "em.h"
+#include "../../fceu.h"
 #include "../../utils/memory.h"
 #include <html5.h>
 
@@ -30,7 +31,6 @@ int NoWaiting = 1;
 
 extern Config *g_config;
 extern bool frameAdvanceLagSkip, lagCounterDisplay;
-extern int gametype;
 
 uint32 MouseData[3] = { 0, 0, 0 };
 
@@ -120,7 +120,7 @@ static void UpdateSystem()
 // TODO: tsone: not yet implemented
 #ifndef EMSCRIPTEN
 		// Famicom disk-system games
-	if (gametype == GIT_FDS)
+	if (GameInfo && GameInfo->type == GIT_FDS)
 	{
 		if (_keyonly (Hotkeys[HK_FDS_SELECT]))
 		{
@@ -133,7 +133,7 @@ static void UpdateSystem()
 	}
 #endif
 
-	if (gametype != GIT_NSF) {
+	if (GameInfo && GameInfo->type != GIT_NSF) {
 		if (IsInputOnce(FCEM_SYSTEM_STATE_SAVE)) {
 			FCEUI_SaveState(NULL);
 		}
@@ -229,40 +229,43 @@ static void UpdateSystem()
 		lagCounterDisplay ^= 1;
 	}
 
-	// VS Unisystem games
-	if (gametype == GIT_VSUNI)
+	if (GameInfo)
 	{
-		// insert coin
-		if (_keyonly (SDLK_F6))
-			FCEUI_VSUniCoin ();
-
-		// toggle dipswitch display
-		if (_keyonly (SDLK_F8))
+		// VS Unisystem games
+		if (GameInfo->type == GIT_VSUNI)
 		{
-			DIPS ^= 1;
-			FCEUI_VSUniToggleDIPView ();
+			// insert coin
+			if (_keyonly (SDLK_F6))
+				FCEUI_VSUniCoin ();
+
+			// toggle dipswitch display
+			if (_keyonly (SDLK_F8))
+			{
+				DIPS ^= 1;
+				FCEUI_VSUniToggleDIPView ();
+			}
+			if (!(DIPS & 1))
+				goto DIPSless;
+
+			// toggle the various dipswitches
+			for(int i=1; i<=8;i++)
+			{
+				if(keyonly(i))
+					FCEUI_VSUniToggleDIP(i-1);
+			}
 		}
-		if (!(DIPS & 1))
-			goto DIPSless;
-
-		// toggle the various dipswitches
-		for(int i=1; i<=8;i++)
+		else
 		{
-			if(keyonly(i))
-				FCEUI_VSUniToggleDIP(i-1);
-		}
-	}
-	else
-	{
-		if (_keyonly (SDLK_EQUALS))
-			FCEUI_NTSCDEC ();
-		if (_keyonly (SDLK_MINUS))
-			FCEUI_NTSCINC ();
+			if (_keyonly (SDLK_EQUALS))
+				FCEUI_NTSCDEC ();
+			if (_keyonly (SDLK_MINUS))
+				FCEUI_NTSCINC ();
 
-		DIPSless:
-		for(int i=0; i<10;i++)
-		{
-			keyonly(i);
+			DIPSless:
+			for(int i=0; i<10;i++)
+			{
+				keyonly(i);
+			}
 		}
 	}
 #endif
@@ -486,11 +489,6 @@ void FCEUD_SetInput(bool fourscore, bool microphone, ESI, ESI, ESIFC fcexp)
 	const char *elem = "#window";
 	emscripten_set_keydown_callback(elem, 0, 0, FCEM_KeyCallback);
 	emscripten_set_keyup_callback(elem, 0, 0, FCEM_KeyCallback);
-}
-
-void ParseGIInput (FCEUGI * gi)
-{
-	gametype = gi->type;
 }
 
 // NOTE: tsone: required for boards/transformer.cpp, must return array of 256 ints...

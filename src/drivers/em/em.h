@@ -199,7 +199,6 @@ void FCEM_SetController(int idx, double v);
 }
 
 extern uint32 MouseData[3];
-void ParseGIInput(FCEUGI *GI);
 int ButtonConfigBegin();
 void ButtonConfigEnd();
 

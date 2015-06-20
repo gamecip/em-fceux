@@ -859,7 +859,6 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	}
 
 	GameInterface = iNESGI;
-	FCEU_printf("\n");
 
 	// since apparently the iNES format doesn't store this information,
 	// guess if the settings should be PAL or NTSC from the ROM name
@@ -869,11 +868,16 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 			|| strstr(name, "(Europe)") || strstr(name, "(PAL)")
 			|| strstr(name, "(F)") || strstr(name, "(f)")
 			|| strstr(name, "(G)") || strstr(name, "(g)")
-			|| strstr(name, "(I)") || strstr(name, "(i)"))
+			|| strstr(name, "(I)") || strstr(name, "(i)")) {
+			FCEU_printf(" Video system: PAL\n");
 			FCEUI_SetVidSystem(1);
-		else
+		} else {
+			FCEU_printf(" Video system: NTSC\n");
 			FCEUI_SetVidSystem(0);
+		}
 	}
+
+	FCEU_printf("\n");
 	return 1;
 }
 
