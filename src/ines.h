@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <map>
+#include "cart.h"
 
 struct TMasterRomInfo
 {
@@ -45,6 +46,7 @@ extern uint32 ROM_size;
 extern uint8 *ExtraNTARAM;
 extern int iNesSave(); //bbit Edited: line added
 extern int iNesSaveAs(char* name);
+extern int iNESDetectVidSys();
 extern char LoadedRomFName[2048]; //bbit Edited: line added
 extern const TMasterRomInfo* MasterRomInfo;
 extern TMasterRomInfoParams MasterRomInfoParams;

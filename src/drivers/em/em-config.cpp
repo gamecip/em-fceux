@@ -21,6 +21,7 @@
 #include "em.h"
 #include "es2n.h"
 #include "../../fceu.h"
+#include "../../ines.h"
 #include <emscripten.h>
 
 
@@ -225,7 +226,6 @@ void UpdateEMUCore(Config *config)
 // TODO: tsone: no neet to call this, color handling is by the driver
 //	FCEUI_SetNTSCTH(ntsccol, ntsctint, ntschue);
 
-// TODO: tsone: Handle PAL? This changes it.
 	FCEUI_SetVidSystem(0);
 
 	FCEUI_SetGameGenie(0);
@@ -283,12 +283,27 @@ void FCEM_SetController(int idx, double v)
 
 	s_c[idx] = v;
 
-	if (idx >= FCEM_BRIGHTNESS && idx <= FCEM_NOISE) {
-		es2nSetController(idx, v);
-	} else if (idx == FCEM_SOUND_ENABLED) {
+	switch (idx) {
+	case FCEM_SOUND_ENABLED:
 		SilenceSound(!v);
-	} else if (idx == FCEM_PORT2) {
+		break;
+	case FCEM_PORT2:
 		WrapBindPort(1, (int) v);
+		break;
+	case FCEM_VIDEO_SYSTEM:
+		if (v <= -1) {
+			FCEUI_SetVidSystem(iNESDetectVidSys());
+		} else if (v <= 1) {
+			FCEUI_SetVidSystem(v);
+		}
+		break;
+	default:
+		if (idx >= FCEM_BRIGHTNESS && idx <= FCEM_NOISE) {
+			es2nSetController(idx, v);
+		} else {
+			// Invalid controller idx.
+		}
+		break;
 	}
 }
 

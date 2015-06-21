@@ -111,11 +111,17 @@ img.preload {
   height: 100%;
   overflow: hidden;
 }
-#controlsSliders input {
+#controllers input {
   margin: 0;
   padding: 0;
   right: 0px;
-  width: 150px;
+  width: 140px;
+}
+#controllers select {
+  margin: 0;
+  padding: 0;
+  right: 0px;
+  width: 140px;
 }
 
 #stackTab {

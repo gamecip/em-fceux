@@ -1,3 +1,7 @@
+#ifndef _CART_H_
+#define _CART_H_
+
+
 typedef struct {
 	// Set by mapper/board code:
 	void (*Power)(void);
@@ -92,3 +96,6 @@ void FCEU_GeniePower(void);
 bool FCEU_OpenGenie(void);
 void FCEU_CloseGenie(void);
 void FCEU_KillGenie(void);
+
+#endif
+

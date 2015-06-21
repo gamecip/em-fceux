@@ -706,6 +706,54 @@ static BMAPPINGLocal bmap[] = {
 	{"",					0, NULL}
 };
 
+
+int iNESDetectVidSys()
+{
+	if (!ROM) {
+		return 0;
+	}
+
+	// Extract Filename only. Should account for Windows/Unix this way.
+	char *basename = strrchr(LoadedRomFName, '/');
+	if (!basename) {
+		basename = strrchr(LoadedRomFName, '\\');
+	}
+	if (!basename) {
+		basename = LoadedRomFName;
+	} else {
+		++basename;
+	}
+
+	char name[1024];
+	int i;
+	for (i = 0; (i < 1023) && (basename[i] != '\0'); ++i) {
+		name[i] = tolower(basename[i]);
+	}
+	name[i] = '\0';
+
+	// since apparently the iNES format doesn't store this information,
+	// guess if the settings should be PAL or NTSC from the ROM name
+	// TODO: MD5 check against a list of all known PAL games instead?
+	if (strstr(name, "(pal)")
+			|| strstr(name, "(e)") || strstr(name, "(europe)")
+			|| strstr(name, "(d)")
+			|| strstr(name, "(f)")
+			|| strstr(name, "(g)")
+			|| strstr(name, "(gr)")
+			|| strstr(name, "(i)")
+			|| strstr(name, "(nl)")
+			|| strstr(name, "(no)")
+			|| strstr(name, "(r)")
+			|| strstr(name, "(s)")
+			|| strstr(name, "(sw)")
+			|| strstr(name, "(uk)")
+			) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
 int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 	struct md5_context md5;
 
@@ -851,30 +899,12 @@ int iNESLoad(const char *name, FCEUFILE *fp, int OverwriteVidMode) {
 
 	strcpy(LoadedRomFName, name); //bbit edited: line added
 
-	// Extract Filename only. Should account for Windows/Unix this way.
-	if (strrchr(name, '/')) {
-		name = strrchr(name, '/') + 1;
-	} else if (strrchr(name, '\\')) {
-		name = strrchr(name, '\\') + 1;
-	}
-
 	GameInterface = iNESGI;
 
-	// since apparently the iNES format doesn't store this information,
-	// guess if the settings should be PAL or NTSC from the ROM name
-	// TODO: MD5 check against a list of all known PAL games instead?
 	if (OverwriteVidMode) {
-		if (strstr(name, "(E)") || strstr(name, "(e)")
-			|| strstr(name, "(Europe)") || strstr(name, "(PAL)")
-			|| strstr(name, "(F)") || strstr(name, "(f)")
-			|| strstr(name, "(G)") || strstr(name, "(g)")
-			|| strstr(name, "(I)") || strstr(name, "(i)")) {
-			FCEU_printf(" Video system: PAL\n");
-			FCEUI_SetVidSystem(1);
-		} else {
-			FCEU_printf(" Video system: NTSC\n");
-			FCEUI_SetVidSystem(0);
-		}
+		const int vidsys = iNESDetectVidSys();
+		FCEU_printf(" Video system: %s\n", vidsys ? "PAL" : "NTSC");
+		FCEUI_SetVidSystem(vidsys);
 	}
 
 	FCEU_printf("\n");
