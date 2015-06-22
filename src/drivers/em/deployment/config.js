@@ -10,14 +10,32 @@ COLOR = 2;
 GAMMA = 3;
 GLOW = 4;
 SHARPNESS = 5;
-RGBPPU = 6;
+NTSC_EMU = 6;
 CRT_ENABLED = 7;
 SCANLINES = 8;
 CONVERGENCE = 9;
 NOISE = 10;
-SOUND_ENABLED = 11;
-PORT2 = 12;
-VIDEO_SYSTEM = 13;
+PORT2 = 11;
+VIDEO_SYSTEM = 12;
+
+
+
+
+FCEM.controllers = {
+0 : [ 0.0, "brightness" ],
+1 : [ 0.0, "contrast" ],
+2 : [ 0.0, "color" ],
+3 : [ 0.0, "gamma" ],
+4 : [ 0.2, "glow" ],
+5 : [ 0.2, "sharpness" ],
+6 : [ 1.0, "ntsc_emu" ],
+7 : [ 1.0, "crt_enabled" ],
+8 : [ 0.1, "scanlines" ],
+9 : [ 0.4, "convergence" ],
+10 : [ 0.3, "noise" ],
+11 : [ 1.0, "port2" ],
+12 : [ -1.0, "video_system" ],
+};
 
 
 

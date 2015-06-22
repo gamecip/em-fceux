@@ -188,23 +188,6 @@ Config* InitConfig()
 	prefix = "SDL.Input.FamicomPad2.";
 	config->addOption("rp2mic", prefix + "EnableMic", 0);
 
-// TODO: tsone: list of old unused hotkeys, remove?
-#if 0
-	const int Hotkeys[HK_MAX] = {
-		SDLK_F1, // cheat menu
-		SDLK_F2, // bind state
-		SDLK_F3, // load lua
-		SDLK_F4, // toggleBG
-		SDLK_F6, // fds select
-		SDLK_F8, // fds eject
-		SDLK_PERIOD, // toggle frame display
-		SDLK_F10, // toggle subtitle
-		SDLK_F12, // screenshot
-		SDLK_q, // toggle movie RW
-		SDLK_QUOTE, // toggle mute capture
-	};
-#endif
-
 	// All mouse devices
 	config->addOption("SDL.OekaKids.0.DeviceType", "Mouse");
 	config->addOption("SDL.OekaKids.0.DeviceNum", 0);
@@ -284,9 +267,6 @@ void FCEM_SetController(int idx, double v)
 	s_c[idx] = v;
 
 	switch (idx) {
-	case FCEM_SOUND_ENABLED:
-		SilenceSound(!v);
-		break;
 	case FCEM_PORT2:
 		WrapBindPort(1, (int) v);
 		break;
@@ -305,6 +285,11 @@ void FCEM_SetController(int idx, double v)
 		}
 		break;
 	}
+}
+
+void FCEM_SilenceSound(int option)
+{
+	SilenceSound(option);
 }
 
 }

@@ -37,7 +37,7 @@ var FCEM = {
   },
   toggleSound : function() {
     FCEM.soundEnabled = !FCEM.soundEnabled;
-    FCEM.setController(SOUND_ENABLED, FCEM.soundEnabled);
+    FCEM.silenceSound(!FCEM.soundEnabled);
     FCEM.soundIconElem.src = FCEM.soundEnabled ? 'img/sound_on.gif' : 'img/sound_off.gif';
   },
   onInitialSyncFromIDB : function(er) {
@@ -57,9 +57,11 @@ var FCEM = {
     FCEM.showStack(true);
     FCEM.setController = Module.cwrap('FCEM_SetController', null, ['number', 'number']);
     FCEM.bindKey = Module.cwrap('FCEM_BindKey', null, ['number', 'number']);
+    FCEM.silenceSound = Module.cwrap('FCEM_SilenceSound', null, ['number']);
     // Write savegame and synchronize IDBFS in intervals.
     setInterval(Module.cwrap('FCEM_OnSaveGameInterval'), 1000);
 
+    FCEM.setupControllers();
     FCEM.setupKeys();
   },
   onDeleteGameSyncFromIDB : function(er) {
@@ -257,7 +259,35 @@ var FCEM = {
   keyBindToggle : function() {
     var keyBindDivEl = document.getElementById("keyBindDiv");
     keyBindDivEl.style.display = (keyBindDivEl.style.display == 'block') ? 'none' : 'block';
-  }
+  },
+  setLocalController : function(id, val) {
+    localStorage['ctrl' + id] = Number(val);
+    FCEM.setController(id, val);
+  },
+  setupControllers : function(force) {
+    if (force || !localStorage.getItem('ctrlInit')) {
+      for (var id in FCEM.controllers) {
+        localStorage['ctrl' + id] = FCEM.controllers[id][0];
+      }
+      localStorage['ctrlInit'] = 'true';
+    }
+    for (var id in FCEM.controllers) {
+      var val = Number(localStorage['ctrl' + id]);
+      FCEM.setController(id, val);
+      FCEM.setControllerElem(id, val);
+    }
+  },
+  setControllerElem : function(id, val) {
+      var elem = document.getElementById(FCEM.controllers[id][1]);
+      if (!elem) {
+        return;
+      }
+      if (elem.tagName == 'SELECT' || elem.type == 'range') {
+        elem.value = val;
+      } else if (elem.type == 'checkbox') {
+        elem.checked = val;
+      }
+  },
 };
 
 window.onbeforeunload = function (ev) {

@@ -154,7 +154,7 @@ static const int s_downsample_heights[] = { SCREEN_H, SCREEN_H,   SCREEN_H/4,  S
 static void updateSharpenKernel()
 {
 	glUseProgram(s_p.sharpen_prog);
-	double v = (1.0-GetController(FCEM_RGBPPU)) * 0.4 * (GetController(FCEM_SHARPNESS)+0.5);
+	double v = GetController(FCEM_NTSC_EMU) * 0.4 * (GetController(FCEM_SHARPNESS)+0.5);
 	GLfloat sharpen_kernel[] = {
 		-v, -v, -v,
 		1, 0, 0, 
@@ -707,10 +707,10 @@ void es2nSetController(int idx, double v)
 		v = 1.0 + GetController(FCEM_COLOR);
 		glUniform1f(s_u._rgb_color_loc, v);
 		break;
-	case FCEM_RGBPPU:
+	case FCEM_NTSC_EMU:
 		glUseProgram(s_p.rgb_prog);
-		v = GetController(FCEM_RGBPPU);
-		glUniform1f(s_u._rgb_rgbppu_loc, v);
+		v = GetController(FCEM_NTSC_EMU);
+		glUniform1f(s_u._rgb_rgbppu_loc, !v);
 		updateSharpenKernel();
 		break;
 	case FCEM_GAMMA:
@@ -870,20 +870,6 @@ void es2nInit()
 	// Setup combine shader.
 	s_p.combine_prog = buildShader(combine_vert_src, combine_frag_src, common_src);
 	initUniformsCombine();
-
-	// Set controls to defaults.
-// TODO: tsone: think of better way to do this..?
-	FCEM_SetController(FCEM_BRIGHTNESS, 0);
-	FCEM_SetController(FCEM_CONTRAST, 0);
-	FCEM_SetController(FCEM_COLOR, 0);
-	FCEM_SetController(FCEM_SHARPNESS, 0.2);
-	FCEM_SetController(FCEM_GAMMA, 0);
-	FCEM_SetController(FCEM_GLOW, 0.2);
-	FCEM_SetController(FCEM_RGBPPU, 0);
-	FCEM_SetController(FCEM_CRT_ENABLED, 1);
-	FCEM_SetController(FCEM_SCANLINES, 0.1);
-	FCEM_SetController(FCEM_CONVERGENCE, 0.4);
-	FCEM_SetController(FCEM_NOISE, 0.3);
 }
 
 void es2nDeinit()

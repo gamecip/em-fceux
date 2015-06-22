@@ -56,7 +56,8 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
     'main',
     'FCEM_OnSaveGameInterval',
     'FCEM_SetController',
-    'FCEM_BindKey'
+    'FCEM_BindKey',
+    'FCEM_SilenceSound'
   ]
   exports = '-s EXPORTED_FUNCTIONS=\'["_' + '","_'.join(exportsList) + '"]\''
   env.Append(LINKFLAGS = exports)
