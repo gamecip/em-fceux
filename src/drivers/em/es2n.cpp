@@ -442,6 +442,11 @@ static void updateUniformsCombine()
 	DBG(updateUniformsDebug())
 }
 
+static void updateUniformsDirect()
+{
+	DBG(updateUniformsDebug())
+}
+
 static void initUniformsRGB()
 {
 	GLint k;
@@ -492,6 +497,7 @@ static void initUniformsStretch()
 	glUniform1i(k, SHARPEN_I);
 
 	s_u._stretch_scanlines_loc = glGetUniformLocation(prog, "u_scanlines");
+	s_u._stretch_smoothenOffs_loc = glGetUniformLocation(prog, "u_smoothenOffs");
 	updateUniformsStretch();
 }
 
@@ -599,6 +605,15 @@ static void initUniformsCombine()
 	s_u._combine_glow_loc = glGetUniformLocation(prog, "u_glow");
 }
 
+static void initUniformsDirect()
+{
+	GLint k;
+	GLuint prog = s_p.direct_prog;
+
+	k = glGetUniformLocation(prog, "u_tex");
+	glUniform1i(k, STRETCH_I);
+}
+
 static void passRGB()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.rgb_fb);
@@ -625,13 +640,8 @@ static void passSharpen()
 
 static void passStretch()
 {
-	if (GetController(FCEM_CRT_ENABLED)) {
-		glBindFramebuffer(GL_FRAMEBUFFER, s_p.stretch_fb);
-		glViewport(0, 0, SCREEN_W, SCREEN_H);
-	} else {
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glViewport(s_p.viewport[0], s_p.viewport[1], s_p.viewport[2], s_p.viewport[3]);
-	}
+	glBindFramebuffer(GL_FRAMEBUFFER, s_p.stretch_fb);
+	glViewport(0, 0, SCREEN_W, SCREEN_H);
 	glUseProgram(s_p.stretch_prog);
 	updateUniformsStretch();
 	meshRender(&s_p.quad_mesh);
@@ -655,19 +665,11 @@ static void passScreen()
 	glViewport(0, 0, SCREEN_W, SCREEN_H);
 	glUseProgram(s_p.screen_prog);
 	updateUniformsScreen();
-
-	if (GetController(FCEM_CRT_ENABLED)) {
-		meshRender(&s_p.screen_mesh);
-	} else {
-		meshRender(&s_p.quad_mesh);
-	}
+	meshRender(&s_p.screen_mesh);
 }
 
 static void passTV()
 {
-	if (!GetController(FCEM_CRT_ENABLED)) {
-		return;
-	}
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.tv_fb);
 //	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, SCREEN_W, SCREEN_H);
@@ -686,12 +688,18 @@ static void passCombine()
 	meshRender(&s_p.quad_mesh);
 }
 
-void es2nSetController(int idx, double v)
+static void passDirect()
 {
-	assert(idx >= 0 && idx <= FCEM_NOISE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(s_p.viewport[0], s_p.viewport[1], s_p.viewport[2], s_p.viewport[3]);
+	glUseProgram(s_p.direct_prog);
+	updateUniformsDirect();
+	meshRender(&s_p.quad_mesh);
+}
 
+void es2nUpdateController(int idx, double v)
+{
 	switch (idx) {
-	// RGB pass controls
 	case FCEM_BRIGHTNESS:
 		glUseProgram(s_p.rgb_prog);
 		v = 0.15 * v;
@@ -712,6 +720,9 @@ void es2nSetController(int idx, double v)
 		v = GetController(FCEM_NTSC_EMU);
 		glUniform1f(s_u._rgb_rgbppu_loc, !v);
 		updateSharpenKernel();
+		// Stretch pass smoothen UV offset; smoothen if NTSC emulation is enabled.
+		glUseProgram(s_p.stretch_prog);
+		glUniform2f(s_u._stretch_smoothenOffs_loc, 0, v * -0.25/IDX_H);
 		break;
 	case FCEM_GAMMA:
 		glUseProgram(s_p.rgb_prog);
@@ -723,7 +734,6 @@ void es2nSetController(int idx, double v)
 		v = GetController(FCEM_CRT_ENABLED) * 0.08 * GetController(FCEM_NOISE)*GetController(FCEM_NOISE);
 		glUniform1f(s_u._rgb_noiseAmp_loc, v);
 		break;
-	// Sharpness pass controls
 	case FCEM_CONVERGENCE:
 		glUseProgram(s_p.sharpen_prog);
 		v = GetController(FCEM_CRT_ENABLED) * 2.0 * GetController(FCEM_CONVERGENCE);
@@ -732,24 +742,24 @@ void es2nSetController(int idx, double v)
 	case FCEM_SHARPNESS:
 		updateSharpenKernel();
 		break;
-	// Stretch pass controls
 	case FCEM_SCANLINES:
 		glUseProgram(s_p.stretch_prog);
 		v = GetController(FCEM_CRT_ENABLED) * 0.45 * GetController(FCEM_SCANLINES);
 		glUniform1f(s_u._stretch_scanlines_loc, v);
 		break;
-	// Combine pass controls
 	case FCEM_GLOW:
 		glUseProgram(s_p.combine_prog);
 		v = 0.1 * GetController(FCEM_GLOW);
 		glUniform3f(s_u._combine_glow_loc, v, v*v, v + v*v);
 		break;
-	// Generic controls
 	case FCEM_CRT_ENABLED:
 		// Enable CRT, update dependent uniforms. (Without modifying stored control values.)
 		FCEM_SetController(FCEM_NOISE, GetController(FCEM_NOISE));
 		FCEM_SetController(FCEM_SCANLINES, GetController(FCEM_SCANLINES));
 		FCEM_SetController(FCEM_CONVERGENCE, GetController(FCEM_CONVERGENCE));
+		break;
+	default:
+// TODO: tsone: warning message?
 		break;
 	}
 }
@@ -870,6 +880,10 @@ void es2nInit()
 	// Setup combine shader.
 	s_p.combine_prog = buildShader(combine_vert_src, combine_frag_src, common_src);
 	initUniformsCombine();
+
+	// Setup direct shader.
+	s_p.direct_prog = buildShader(direct_vert_src, direct_frag_src, common_src);
+	initUniformsDirect();
 }
 
 void es2nDeinit()
@@ -935,6 +949,8 @@ void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 		passDownsample();
 		passTV();
 		passCombine();
+	} else {
+		passDirect();
 	}
 }
 

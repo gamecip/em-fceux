@@ -260,6 +260,7 @@ void FCEM_BindKey(int id, int keyIdx)
 void FCEM_SetController(int idx, double v)
 {
 	if (idx < 0 || idx >= FCEM_CONTROLLER_COUNT) {
+// TODO: tsone: warning message?
 		// Skip if control idx is invalid.
 		return;
 	}
@@ -272,15 +273,16 @@ void FCEM_SetController(int idx, double v)
 		break;
 	case FCEM_VIDEO_SYSTEM:
 		if (v <= -1) {
-			FCEUI_SetVidSystem(iNESDetectVidSys());
+			FCEUI_SetVidSystem(iNESDetectVidSys()); // Attempt auto-detection.
 		} else if (v <= 1) {
 			FCEUI_SetVidSystem(v);
 		}
 		break;
 	default:
 		if (idx >= FCEM_BRIGHTNESS && idx <= FCEM_NOISE) {
-			es2nSetController(idx, v);
+			es2nUpdateController(idx, v);
 		} else {
+// TODO: tsone: wasn't this case already checked?
 			// Invalid controller idx.
 		}
 		break;

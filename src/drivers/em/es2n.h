@@ -20,6 +20,7 @@ typedef struct t_es2n_uniforms
 	GLint _sharpen_convergence_loc;
 
 	GLint _stretch_scanlines_loc;
+	GLint _stretch_smoothenOffs_loc;
 
 	GLint _combine_glow_loc;
 
@@ -53,6 +54,8 @@ typedef struct t_es2n
 
     GLuint combine_prog; // Shader for combine.
 
+    GLuint direct_prog;	// Shader for rendering texture directly to the screen.
+
     GLint viewport[4];  // Screen viewport.
 
     GLfloat mvp_mat[4*4]; // Perspective MVP matrix for the meshes.
@@ -74,8 +77,7 @@ typedef struct t_es2n
 } es2n;
 
 void es2nInit();
-void es2nSetController(int idx, double v);
-void es2nUpdateControls();
+void es2nUpdateController(int idx, double v);
 void es2nDeinit();
 void es2nSetViewport(int width, int height);
 void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color);

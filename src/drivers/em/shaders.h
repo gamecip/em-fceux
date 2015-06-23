@@ -165,35 +165,33 @@ static const char* sharpen_frag_src =
 "}\n";
 
 static const char* stretch_vert_src =
-    DEFINE(IDX_H)
-    "attribute vec4 a_0;\n"
-    "attribute vec2 a_2;\n"
-    "varying vec2 v_uv[2];\n"
-    "void main() {\n"
-    "vec2 uv = a_2;\n"
-    "v_uv[0] = vec2(uv.x, 1.0 - uv.y);\n"
-    "v_uv[1] = vec2(v_uv[0].x, v_uv[0].y - 0.25/IDX_H);\n"
-    "gl_Position = a_0;\n"
-    "}\n";
+"uniform vec2 u_smoothenOffs;\n"
+"attribute vec4 a_0;\n"
+"attribute vec2 a_2;\n"
+"varying vec2 v_uv[2];\n"
+"void main() {\n"
+	"vec2 uv = a_2;\n"
+	"v_uv[0] = vec2(uv.x, 1.0 - uv.y);\n"
+	"v_uv[1] = v_uv[0] + u_smoothenOffs;\n"
+	"gl_Position = a_0;\n"
+"}\n";
 static const char* stretch_frag_src =
-    DEFINE(IDX_H)
-    "uniform float u_scanlines;\n"
-    "uniform sampler2D u_sharpenTex;\n"
-    "varying vec2 v_uv[2];\n"
-    "void main(void) {\n"
-    // Sample adjacent scanlines and average to smoothen slightly vertically.
-    "vec3 c0 = texture2D(u_sharpenTex, v_uv[0]).rgb;\n"
-    "vec3 c1 = texture2D(u_sharpenTex, v_uv[1]).rgb;\n"
-// TODO: test encode gamma
-    "vec3 color = c0*c0 + c1*c1;\n"
-//    "vec3 color = c0 + c1;\n"
-    // Use oscillator as scanline modulator.
-    "float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*IDX_H * v_uv[0].y - M_PI*0.125)));\n"
-    // This formula dims dark colors, but keeps brights. Output is linear.
-// TODO: test encode gamma
-    "gl_FragColor = vec4(sqrt(mix(0.5 * color, max(color - 1.0, 0.0), scanlines)), 1.0);\n"
-//    "gl_FragColor = vec4(mix(0.5 * color, max(color - 1.0, 0.0), scanlines), 1.0);\n"
-    "}\n";
+DEFINE(IDX_H)
+"uniform float u_scanlines;\n"
+"uniform sampler2D u_sharpenTex;\n"
+"varying vec2 v_uv[2];\n"
+"void main(void) {\n"
+	// Sample adjacent scanlines and average to smoothen slightly vertically.
+	"vec3 c0 = texture2D(u_sharpenTex, v_uv[0]).rgb;\n"
+	"vec3 c1 = texture2D(u_sharpenTex, v_uv[1]).rgb;\n"
+	"vec3 color = c0*c0 + c1*c1;\n" // Average linear-space color values.
+//	"vec3 color = c0 + c1;\n"
+	// Use oscillator as scanline modulator.
+	"float scanlines = u_scanlines * (1.0 - abs(sin(M_PI*IDX_H * v_uv[0].y - M_PI*0.125)));\n"
+	// This formula dims dark colors, but keeps brights. Output is linear.
+	"gl_FragColor = vec4(sqrt(mix(0.5 * color, max(color - 1.0, 0.0), scanlines)), 1.0);\n"
+//	"gl_FragColor = vec4(mix(0.5 * color, max(color - 1.0, 0.0), scanlines), 1.0);\n"
+"}\n";
 
 static const char* screen_vert_src =
     DEFINE(SCREEN_W)
@@ -440,3 +438,19 @@ static const char* combine_frag_src =
         // Gamma encode w/ sqrt() to something similar to sRGB space.
         "gl_FragColor = vec4(sqrt(color) + noise, 1.0);\n"
     "}\n";
+
+static const char* direct_vert_src =
+"attribute vec4 a_0;\n"
+"attribute vec2 a_2;\n"
+"varying vec2 v_uv;\n"
+"void main(void) {\n"
+        "v_uv = a_2;\n"
+	"gl_Position = a_0;\n"
+"}\n";
+static const char* direct_frag_src =
+"uniform sampler2D u_tex;\n"
+"varying vec2 v_uv;\n"
+"void main(void) {\n"
+	"gl_FragColor = texture2D(u_tex, v_uv);\n"
+"}\n";
+
