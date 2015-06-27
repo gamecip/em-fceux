@@ -229,8 +229,8 @@ else:
     common += ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
     common += ' -s DISABLE_EXCEPTION_CATCHING=1'
     common += ' -s ASSERTIONS=0'
-    env.Append(CCFLAGS = '-O3' + common)
-    env.Append(LINKFLAGS = '-O3' + common)
+    env.Append(CCFLAGS = '-flto -O3' + common)
+    env.Append(LINKFLAGS = '-flto -O3 -strip-all' + common)
   else:
     env.Append(CCFLAGS = ['-O2'])
     env.Append(LINKFLAGS = ['-O2'])
