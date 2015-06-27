@@ -99,8 +99,19 @@ static void Resize(int width, int height)
 
 //	printf("!!!! resize: (%dx%d) '(%dx%d) asp:%f\n", width, height, s_width, s_height, aspect);
 
+	// HACK: emscripten_set_canvas_size() forces canvas size by setting css style
+	// width and height with "!important" flag. Workaround is to set size manually
+	// and remove the style attribute. See Emscripten's updateCanvasDimensions()
+	// in library_browser.js for the faulty code.
+	EM_ASM_INT({
+		var canvas = Module.canvas;
+		canvas.width = canvas.widthNative = $0 |0;
+		canvas.height = canvas.heightNative = $1 |0;
+		canvas.style.setProperty( "width", ($0 |0) + "px", "important");
+		canvas.style.setProperty("height", ($1 |0) + "px", "important");
+	}, s_width, s_height);
+
 	es2nSetViewport(s_width, s_height);
-	emscripten_set_canvas_size(s_width, s_height);
 }
 
 static EM_BOOL FCEM_ResizeCallback(int eventType, const EmscriptenUiEvent *uiEvent, void *userData)
@@ -129,7 +140,8 @@ int InitVideo()
 	FCEUI_GetCurrentVidSystem(&s_srendline, &s_erendline);
 	s_tlines = s_erendline - s_srendline + 1;
 
-// TODO: tsone: take window inner size at init. there seems to be no better way?
+	// HACK: Manually resize to cover the window inner size.
+	// Apparently there's no way to do this with Emscripten...?
 	s_width = EM_ASM_INT_V({ return window.innerWidth; });
 	s_height = EM_ASM_INT_V({ return window.innerHeight; });
 	Resize(s_width, s_height);

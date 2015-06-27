@@ -303,7 +303,13 @@ var Module = {
     FS.mount(IDBFS, {}, '/fceux');
     FS.syncfs(true, FCEM.onInitialSyncFromIDB);
   }],
-  postRun: [],
+  postRun: [function() {
+    // HACK: Disable default fullscreen handlers. See Emscripten's library_browser.js
+    // The handlers forces the canvas size by setting css style width and height with
+    // "!important" flag. Workaround is to disable the default fullscreen handlers.
+    // See Emscripten's updateCanvasDimensions() in library_browser.js for the faulty code.
+    Browser.fullScreenHandlersInstalled = true;
+  }],
   print: function() {
     text = Array.prototype.slice.call(arguments).join(' ');
     console.log(text);
