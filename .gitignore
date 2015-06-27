@@ -6,4 +6,3 @@
 /config.log
 /src/drivers/em/deployment/fceux.*
 /src/drivers/em/deployment/*.gz
-/src/drivers/em/gitversion.c

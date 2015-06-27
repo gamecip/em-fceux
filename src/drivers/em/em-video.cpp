@@ -146,7 +146,7 @@ int InitVideo()
 	s_height = EM_ASM_INT_V({ return window.innerHeight; });
 	Resize(s_width, s_height);
 
-	FCEUI_SetShowFPS(1);
+//	FCEUI_SetShowFPS(1);
 
 	FCEU_printf("Initializing WebGL.\n");
 

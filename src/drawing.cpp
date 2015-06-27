@@ -4,9 +4,6 @@
 #include "video.h"
 #include "movie.h"
 #include "driver.h"
-#ifdef EMSCRIPTEN
-#include "drivers/em/gitversion.c"
-#endif
 
 #ifndef EMSCRIPTEN
 #define COLOR_CURSOR_BORDER 4
@@ -357,10 +354,6 @@ void DrawMessage(bool beforeMovie)
 #endif
 		}
 	}
-
-#ifdef EMSCRIPTEN
-	DrawTextTrans(XBuf + (FSettings.FirstSLine+4) * 256 + 4, (const uint8*) gitversion, 0x20);
-#endif
 }
 
 
