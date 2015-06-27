@@ -32,6 +32,14 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     <link rel="apple-touch-icon" sizes="120x120" href="img/favicon-120.png" />
 
     <link href="style.css" rel="stylesheet" />
+    <style>html { display: none; }</style>
+    <script>
+      if (self == top) {
+        document.documentElement.style.display = 'block'; 
+      } else {
+        top.location = self.location; 
+      }
+    </script>
   </head>
   <body>
 

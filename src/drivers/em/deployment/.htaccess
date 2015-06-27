@@ -43,3 +43,6 @@ Header append Vary Accept-Encoding
 # Do this to set proper ETags for server clusters
 FileETag MTime Size
 
+# Disable framing
+Header append X-FRAME-OPTIONS "DENY"
+
