@@ -11,43 +11,44 @@ More about FCEUX: http://www.fceux.com/
 
 The goal of em-fceux is to enable FCEUX in the modern web browsers.
 Primarily this means real-time frame rates and interactivivity at 60 fps,
-high-quality fullscreen visuals, support for audio, battery-backed
-save RAM, save states and gamepads.
+high-quality visuals, support for audio, battery-backed save RAM, save
+states and gamepads.
 
 Additional goal is to emulate late 80's / early 90's console gaming
-experience by providing NTSC and CRT emulation and a "game stack"
-in the client/browser.
+experience by providing NTSC signal and CRT TV emulation and a
+"game stack" in the client/browser.
 
 
 ### FEATURES ###
 
 em-fceux contains major modifications to make the FCEUX code more suitable
 for Emscripten and web browsers. It also adds a new Emscripten driver that
-uses OpenGL ES 2.0 for rendering. The use of GPU allows the driver to emulate
-NTSC signal and analog CRT output via shaders.
+uses OpenGL ES 2.0 for rendering. This enables the use of shaders to
+emulate NTSC signal and analog CRT TV output.
 
 New features:
 
-* Emscripten-specific optimizations for interactive 60 fps in web browsers
+* Emscripten-specific optimizations for 60 fps interactivity in web browsers
 * NTSC composite video emulation
 * CRT TV emulation
 
 Notable supported FCEUX features:
 
-* NTSC system emulation (USA, Japan)
-* Audio support
-* Keyboard input (for one game controller)
-* Gamepad input
-* Save states
+* Both NTSC and PAL system emulation
+* Save states and battery-backed SRAM
 * Speed throttling
+* Audio
+* Support for two game controllers
+* Zapper support
+* Support for gamepads/joysticks
+* Custom keyboard bindings
 * Support for .zip and .nsf file formats
 
-Notable unsupported FCEUX features:
+Notable *unsupported* FCEUX features:
 
-* PAL system emulation (Europe)
 * FDS disk system
 * VS system
-* Special peripherals: Zapper, Family Keyboard, Mahjong controller etc.
+* Special peripherals: Family Keyboard, Mahjong controller etc.
 * Screenshots and movie recording
 * Cheats, TAS features and Lua scripting
 
@@ -76,8 +77,7 @@ the deployment/ directory to a web server.
 To test em-fceux locally, run 'python -m SimpleHTTPServer' in the deployment/
 directory. Then navigate web browser to http://localhost:8000/
 
-Please refer to em-fceux help (the '?' icon) for the emulator usage,
-keyboard mappings and the like.
+Please refer to em-fceux help (the '?' icon) for help.
 
 
 ### CONTACT ###
@@ -93,10 +93,15 @@ em-fceux utilizes web browser client-side storage (Emscripten IndexedDB
 file system) to store the games, save data and save states. None of these
 are ever transmitted out from the client/browser.
 
-em-fceux implements NTSC emulation by modeling the composite YIQ signal
-output. The separation of luminance (Y) and chrominance (IQ/UV) is achieved
-with "1D comb filter" to reduce chroma fringing. The YIQ to RGB conversion
-is done in a shader.
+Emulator settings and keyboard bindings are stored in localStorage.
+Web Audio API is used for the audio.
+
+em-fceux implements NTSC signal emulation by modeling the composite YIQ
+output. The separation of YIQ luminance (Y) and chrominance (IQ/UV) is
+achieved with a technique known as "1D comb filter" which reduces chroma
+fringing compared to band or low-pass methods (and is also simple to
+implement). Under the hood, YIQ to RGB conversion relies on a large lookup
+table (texture) which is referenced in a fragment shader.
 
 
 ### LEGAL / OTHER ###
@@ -106,3 +111,4 @@ https://www.gnu.org/licenses/gpl-2.0.txt
 
 em-fceux is based on the source code release of FCEUX 2.2.2: 
 http://sourceforge.net/projects/fceultra/files/Source%20Code/2.2.2%20src/fceux-2.2.2.src.tar.gz/download
+

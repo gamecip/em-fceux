@@ -26,14 +26,14 @@ var FCEM = {
   catchId : null,
   games : [],
   stackToggleElem : null,
-  controlsToggleElem : null,
+  controllersToggleElem : null,
   soundIconElem : null,
   soundEnabled : true,
   showStack : function(show) {
     FCEM.stackToggleElem.checked = (show === undefined) ? !FCEM.stackToggleElem.checked : show;
   },
   showControls : function(show) {
-    FCEM.controlsToggleElem.checked = (show === undefined) ? !FCEM.controlsToggleElem.checked : show;
+    FCEM.controllersToggleElem.checked = (show === undefined) ? !FCEM.controllersToggleElem.checked : show;
   },
   toggleSound : function() {
     FCEM.soundEnabled = !FCEM.soundEnabled;
@@ -74,7 +74,7 @@ var FCEM = {
   },
   onDOMLoaded : function() {
     FCEM.stackToggleElem = document.getElementById('stackToggle');
-    FCEM.controlsToggleElem = document.getElementById('controlsToggle');
+    FCEM.controllersToggleElem = document.getElementById('controllersToggle');
     FCEM.soundIconElem = document.getElementById('soundIcon');
     FCEM.showStack(false);
     FCEM.showControls(false);
@@ -100,7 +100,7 @@ var FCEM = {
 
     // sort in alphabetic order and assign as new games list
     games.sort(function(a, b) {
-      return a < b ? -1 : a > b ? 1 : 0;
+      return (a.label < b.label) ? -1 : ((a.label > b.label) ? 1 : 0);
     });
     FCEM.games = games;
   },
@@ -124,11 +124,17 @@ var FCEM = {
       list.appendChild(el);
   
       var label = el.firstChild.firstChild.firstChild;
-      label.style.fontSize = '12px';
-      label.style.lineHeight = '16px';
       label.innerHTML = item.label;
+
+      label.style.fontSize = '16px';
+      label.style.lineHeight = '18px';
+
+      var fontSize = 13;
+      while (label.scrollHeight > 18 && fontSize >= 9) {
+        label.style.fontSize = fontSize + 'px';
+        fontSize -= 2;
+      }
       if (label.scrollHeight > 18) {
-        label.style.fontSize = '8px';
         label.style.lineHeight = '9px';
       }
 
@@ -181,7 +187,7 @@ var FCEM = {
     var table = document.getElementById("keyBindTable");
     var proto = document.getElementById("keyBindProto");
 
-    while (table.lastChild) {
+    while (table.lastChild != table.firstChild) {
       table.removeChild(table.lastChild);
     }
 
