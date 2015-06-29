@@ -1,4 +1,6 @@
 
+Options -Indexes
+
 ExpiresActive On
 RewriteEngine on
 
@@ -44,5 +46,5 @@ Header append Vary Accept-Encoding
 FileETag MTime Size
 
 # Disable framing
-Header append X-FRAME-OPTIONS "DENY"
+Header always append X-Frame-Options DENY
 
