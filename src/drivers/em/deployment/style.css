@@ -129,6 +129,12 @@ img.preload {
   50%         { box-shadow: -12px 0 0 12px #FCFCFC, 12px 0 0  6px #FCFCFC; }
 }
 
+#fullscreenIcon, #soundIcon, #keyboardIcon, #helpIcon,
+#controllersToggleLabel, #stackToggleLabel,
+.cart {
+  cursor: pointer;
+}
+
 #controllersTab {
   position: absolute;
   top: 0;
