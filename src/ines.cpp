@@ -101,7 +101,7 @@ void iNESGI(GI h) { //bbit edited: removed static keyword
 		break;
 	case GI_SAVE:
 		FCEU_SaveGameSave(&iNESCart);
-        break;
+		break;
 	case GI_CLOSE:
 	{
 		FCEU_SaveGameSave(&iNESCart);

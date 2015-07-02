@@ -95,6 +95,8 @@ bool replaceP2StartWithMicrophone = false;
 static int currFrameCounter = 0;
 #endif
 
+extern uint8 coinon;
+
 //set to true if the fourscore is attached
 static bool FSAttached = false;
 
@@ -114,8 +116,6 @@ uint8 FCEU_GetJoyJoy(void)
 		return joy[0] | joy[1] | joy[2] | joy[3];
 	}
 }
-
-extern uint8 coinon;
 
 JOYPORT joyports[2] = { JOYPORT(0), JOYPORT(1) };
 FCPORT portFC;

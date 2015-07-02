@@ -1,4 +1,3 @@
-#ifndef EMSCRIPTEN
 /*
  * This file is part of the Scale2x project.
  *
@@ -382,4 +381,3 @@ void scale3x_32_def(scale3x_uint32* dst0, scale3x_uint32* dst1, scale3x_uint32* 
 	scale3x_32_def_border(dst2, src2, src1, src0, count);
 }
 
-#endif //EMSCRIPTEN

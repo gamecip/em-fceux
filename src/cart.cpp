@@ -38,10 +38,6 @@
 #include <cstdio>
 #include <climits>
 
-#ifdef EMSCRIPTEN // tsone: for savegames (IndexedDB sync)
-#include <emscripten.h>
-#endif
-
 uint8 *Page[32], *VPage[8];
 uint8 **VPageR = VPage;
 uint8 *VPageG[8];
@@ -106,7 +102,7 @@ void ResetCartMapping(void) {
 
 	PPU_ResetHooks();
 
-    FCEU_ARRAY_EM(nothing, uint8, 8192);
+	FCEU_ARRAY_EM(nothing, uint8, 8192);
 
 	for (x = 0; x < 32; x++) {
 		Page[x] = nothing - x * 2048;
@@ -537,6 +533,7 @@ void FCEU_GeniePower(void) {
 	else
 		geniestage = 2;
 }
+
 
 void FCEU_SaveGameSave(CartInfo *LocalHWInfo) {
 	if (LocalHWInfo->battery && LocalHWInfo->SaveGame[0]) {

@@ -410,6 +410,7 @@ void FCEU_DrawRecordingStatus(uint8* XBuf)
 #endif
 }
 
+
 void FCEU_DrawNumberRow(uint8 *XBuf, int *nstatus, int cur)
 {
 	uint8 *XBaf;

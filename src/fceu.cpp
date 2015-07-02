@@ -816,14 +816,15 @@ void hand(X6502 *X, int type, uint32 A) {
 }
 
 void PowerNES(void) {
-    FCEU_ARRAY_EM(ARead, readfunc, 0x10000);
-    FCEU_ARRAY_EM(BWrite, writefunc, 0x10000);
+	FCEU_ARRAY_EM(ARead, readfunc, 0x10000);
+	FCEU_ARRAY_EM(BWrite, writefunc, 0x10000);
 
 	FCEUMOV_AddCommand(FCEUNPCMD_POWER);
 	if (!GameInfo) return;
 
 	FCEU_CheatResetRAM();
 	FCEU_CheatAddRAM(2, 0, RAM);
+
 	FCEU_GeniePower();
 
 	//dont do this, it breaks some games: Cybernoid; Minna no Taabou no Nakayoshi Daisakusen; and maybe mechanized attack
@@ -1158,13 +1159,8 @@ virtual void Power() {
 };
 
 void FCEUXGameInterface(GI command) {
-// tsone: this is pretty stupid, rewrite?
-	switch (command) {
-	case GI_POWER:
+	if (command == GI_POWER) {
 		cart->Power();
-        break;
-    default:
-        break;
 	}
 }
 

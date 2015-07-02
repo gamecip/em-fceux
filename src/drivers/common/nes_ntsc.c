@@ -1,4 +1,3 @@
-#ifndef EMSCRIPTEN
 // Several parts of this were significantly customized to be compatible with FCEUX input
 // and output. Drop-in replacement is not an option.
 
@@ -25,11 +24,7 @@ nes_ntsc_setup_t const nes_ntsc_rgb        = { 0, 0, 0, 0,.2,  0,.7, -1, -1,-1, 
 #define alignment_count 3
 #define burst_count     3
 #define rescale_in      8
-#ifndef EMSCRIPTEN
 #define rescale_out     6
-#else
-#define rescale_out     7
-#endif
 
 #define artifacts_mid   1.0f
 #define fringing_mid    1.0f
@@ -310,5 +305,3 @@ void nes_ntsc_blit( nes_ntsc_t const* ntsc, NES_NTSC_IN_T const* input, long in_
 }
 
 #endif
-
-#endif //EMSCRIPTEN

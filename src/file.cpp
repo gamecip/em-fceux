@@ -58,7 +58,7 @@ static char FileExt[2048];	//Includes the . character, as in ".nes"
 static char FileBaseDirectory[2048];
 char FileBase[2048];
 #else
-static char* FileExt = 0;	//Includes the . character, as in ".nes"
+static char* FileExt = 0;
 static char* FileBaseDirectory = 0;
 static char* FileBase = 0;
 #endif
@@ -176,9 +176,9 @@ void FCEU_SplitArchiveFilename(std::string src, std::string& archive, std::strin
 }
 
 FileBaseInfo CurrentFileBase() {
-    FCEU_ARRAY_EM(FileBase, char, 2048);
-    FCEU_ARRAY_EM(FileExt, char, 2048);
-    FCEU_ARRAY_EM(FileBaseDirectory, char, 2048);
+	FCEU_ARRAY_EM(FileBase, char, 2048);
+	FCEU_ARRAY_EM(FileExt, char, 2048);
+	FCEU_ARRAY_EM(FileBaseDirectory, char, 2048);
 	return FileBaseInfo(FileBaseDirectory,FileBase,FileExt);
 }
 
@@ -456,7 +456,7 @@ std::string GetMfn() //Retrieves the movie filename from curMovieFilename (for a
 		}
 	return movieFilenamePart;
 #else
-    return std::string();
+	return std::string();
 #endif
 }
 
@@ -477,20 +477,20 @@ void FCEUI_SetDirOverride(int which, char *n)
 	}
 }
 
-#if !defined(HAVE_ASPRINTF) && !defined(EMSCRIPTEN)
-static int asprintf(char **strp, const char *fmt, ...)
-{
-	va_list ap;
-	int ret;
+	#if !defined(HAVE_ASPRINTF) && !defined(EMSCRIPTEN)
+	static int asprintf(char **strp, const char *fmt, ...)
+	{
+		va_list ap;
+		int ret;
 
-	va_start(ap,fmt);
-	if(!(*strp=(char*)FCEU_dmalloc(2048))) //mbg merge 7/17/06 cast to char*
-		return(0);
-	ret=vsnprintf(*strp,2048,fmt,ap);
-	va_end(ap);
-	return(ret);
-}
-#endif
+		va_start(ap,fmt);
+		if(!(*strp=(char*)FCEU_dmalloc(2048))) //mbg merge 7/17/06 cast to char*
+			return(0);
+		ret=vsnprintf(*strp,2048,fmt,ap);
+		va_end(ap);
+		return(ret);
+	}
+	#endif
 
 std::string  FCEU_GetPath(int type)
 {
@@ -609,7 +609,7 @@ std::string FCEU_MakeFName(int type, int id1, const char *cd1)
 	std::string mfnString;
 	const char* mfn;	// the movie filename
 
-    FCEU_ARRAY_EM(FileBase, char, 2048);
+	FCEU_ARRAY_EM(FileBase, char, 2048);
 
 	switch(type)
 	{
@@ -778,8 +778,9 @@ std::string FCEU_MakeFName(int type, int id1, const char *cd1)
 
 void GetFileBase(const char *f)
 {
-    FCEU_ARRAY_EM(FileBase, char, 2048);
-    FCEU_ARRAY_EM(FileBaseDirectory, char, 2048);
+	FCEU_ARRAY_EM(FileBase, char, 2048);
+	FCEU_ARRAY_EM(FileBaseDirectory, char, 2048);
+
 	FileBaseInfo fbi = DetermineFileBase(f);
 	strcpy(FileBase,fbi.filebase.c_str());
 	strcpy(FileBaseDirectory,fbi.filebasedirectory.c_str());

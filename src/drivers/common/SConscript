@@ -2,6 +2,17 @@ import glob
 Import('env')
 source_list = glob.glob('*.cpp') + glob.glob('*.c')
 
+if env['EMSCRIPTEN']:
+  source_list.remove('args.cpp')
+  source_list.remove('config.cpp')
+  source_list.remove('hq2x.cpp')
+  source_list.remove('hq3x.cpp')
+  source_list.remove('nes_ntsc.c')
+  source_list.remove('scale2x.cpp')
+  source_list.remove('scale3x.cpp')
+  source_list.remove('scalebit.cpp')
+  source_list.remove('vidblit.cpp')
+
 for x in range(len(source_list)):
   source_list[x] = 'drivers/common/' + source_list[x]
 Return('source_list')
