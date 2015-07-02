@@ -38,7 +38,12 @@ static int s_tlines;
 static int s_inited;
 
 static int s_width, s_height;
-static const double s_targetAspect = (256.0/224.0);// * (8.0/7.0);
+// Aspect is adjusted with CRT TV pixel aspect to get proper look.
+// In-depth details can be found here:
+//   http://wiki.nesdev.com/w/index.php/Overscan
+// While 8:7 pixel aspect is probably correct, this uses 292:256 as it
+// looks better on LCD. This assumes square pixel aspect in output.
+static const double s_targetAspect = (256.0/224.0) * (292.0/256.0);
 
 
 // Functions only needed for linking.
@@ -164,7 +169,7 @@ int InitVideo()
 
 	s_curbpp = 32;
 
-	es2Init();
+	es2Init(s_targetAspect);
 
 	s_inited = 1;
 	return 0;

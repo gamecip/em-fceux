@@ -76,7 +76,7 @@ typedef struct t_es2
 
 } es2;
 
-void es2Init();
+void es2Init(double aspect);
 void es2UpdateController(int idx, double v);
 void es2Deinit();
 void es2SetViewport(int width, int height);

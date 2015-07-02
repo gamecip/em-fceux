@@ -764,13 +764,15 @@ void es2UpdateController(int idx, double v)
 	}
 }
 
-void es2Init()
+void es2Init(double aspect)
 {
 	// Build perspective MVP matrix.
 	GLfloat trans[3] = { 0, 0, -2.5 };
 	GLfloat proj[4*4];
 	GLfloat view[4*4];
-	mat4Persp(proj, 0.25*M_PI*224.0/280.0, 280.0/224.0, 0.125, 16.0);
+	// Stretch aspect slightly as the TV mesh is wee bit vertically squished.
+	aspect *= 1.04;
+	mat4Persp(proj, 0.25*M_PI / aspect, aspect, 0.125, 16.0);
 	mat4Trans(view, trans);
 	mat4Mul(s_p.mvp_mat, proj, view);
 
