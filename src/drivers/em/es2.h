@@ -1,9 +1,9 @@
-#ifndef _ES2N_H_
-#define _ES2N_H_
-#include "es2utils.h"
+#ifndef _ES2_H_
+#define _ES2_H_
+#include "es2util.h"
 
 // Uniform locations.
-typedef struct t_es2n_uniforms
+typedef struct t_es2_uniforms
 {
 	GLint _rgb_brightness_loc;
 	GLint _rgb_contrast_loc;
@@ -24,9 +24,9 @@ typedef struct t_es2n_uniforms
 
 	GLint _combine_glow_loc;
 
-} es2n_uniforms;
+} es2_uniforms;
 
-typedef struct t_es2n
+typedef struct t_es2
 {
     GLuint idx_tex;     // Input indexed color texture (NES palette, 256x240).
     GLuint deemp_tex;   // Input de-emphasis bits per row (240x1).
@@ -74,12 +74,12 @@ typedef struct t_es2n
     GLfloat yiq_mins[3];
     GLfloat yiq_maxs[3];
 
-} es2n;
+} es2;
 
-void es2nInit();
-void es2nUpdateController(int idx, double v);
-void es2nDeinit();
-void es2nSetViewport(int width, int height);
-void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color);
+void es2Init();
+void es2UpdateController(int idx, double v);
+void es2Deinit();
+void es2SetViewport(int width, int height);
+void es2Render(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color);
 
 #endif

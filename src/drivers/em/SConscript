@@ -3,14 +3,14 @@ Export('env')
 
 source_list = Split(
     """
-    em-input.cpp
-    em-config.cpp
+    input.cpp
+    config.cpp
     em.cpp
-    em-sound.cpp
-    em-video.cpp
-    em-splash.cpp
-    es2n.cpp
-    es2utils.cpp
+    sound.cpp
+    video.cpp
+    splash.cpp
+    es2.cpp
+    es2util.cpp
     """)
 
 source_list = ['drivers/em/' + s for s in source_list]

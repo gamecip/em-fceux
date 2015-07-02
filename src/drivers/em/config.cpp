@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "em.h"
-#include "es2n.h"
+#include "es2.h"
 #include "../../fceu.h"
 #include "../../ines.h"
 #include <emscripten.h>
@@ -280,7 +280,7 @@ void FCEM_SetController(int idx, double v)
 		break;
 	default:
 		if (idx >= FCEM_BRIGHTNESS && idx <= FCEM_NOISE) {
-			es2nUpdateController(idx, v);
+			es2UpdateController(idx, v);
 		} else {
 // TODO: tsone: wasn't this case already checked?
 			// Invalid controller idx.

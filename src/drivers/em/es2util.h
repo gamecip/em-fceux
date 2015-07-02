@@ -1,5 +1,5 @@
-#ifndef _ES2UTILS_H_
-#define _ES2UTILS_H_
+#ifndef _ES2UTIL_H_
+#define _ES2UTIL_H_
 
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>

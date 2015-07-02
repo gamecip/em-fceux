@@ -88,7 +88,7 @@ enum FCEM_Input {\
 #define INPUT_POST \
 	FCEM_INPUT_COUNT\
 };
-#include "em-input.inc.hpp"
+#include "input.inc.hpp"
 #undef INPUT_PRE
 #undef INPUT
 #undef INPUT_POST
@@ -103,7 +103,7 @@ enum FCEM_Controller {
 #define CONTROLLER_POST \
 	FCEM_CONTROLLER_COUNT\
 };
-#include "em-config.inc.hpp"
+#include "config.inc.hpp"
 #undef CONTROLLER_PRE
 #undef CONTROLLER 
 #undef CONTROLLER_POST

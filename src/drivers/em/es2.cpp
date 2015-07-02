@@ -18,12 +18,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "em.h"
-#include "es2n.h"
+#include "es2.h"
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
 #include <emscripten.h>
-#include "es2utils.h"
+#include "es2util.h"
 #include "meshes.h"
 
 #define STR(s_) _STR(s_)
@@ -99,8 +99,8 @@
 
 #include "shaders.h"
 
-static es2n s_p;
-static es2n_uniforms s_u;
+static es2 s_p;
+static es2_uniforms s_u;
 
 static const GLint mesh_quad_vert_num = 4;
 static const GLint mesh_quad_face_num = 2;
@@ -697,7 +697,7 @@ static void passDirect()
 	meshRender(&s_p.quad_mesh);
 }
 
-void es2nUpdateController(int idx, double v)
+void es2UpdateController(int idx, double v)
 {
 	switch (idx) {
 	case FCEM_BRIGHTNESS:
@@ -764,7 +764,7 @@ void es2nUpdateController(int idx, double v)
 	}
 }
 
-void es2nInit()
+void es2Init()
 {
 	// Build perspective MVP matrix.
 	GLfloat trans[3] = { 0, 0, -2.5 };
@@ -886,7 +886,7 @@ void es2nInit()
 	initUniformsDirect();
 }
 
-void es2nDeinit()
+void es2Deinit()
 {
 	deleteFBTex(&s_p.rgb_tex, &s_p.rgb_fb);
 	deleteFBTex(&s_p.sharpen_tex, &s_p.sharpen_fb);
@@ -912,13 +912,13 @@ void es2nDeinit()
 	free(s_p.overscan_pixels);
 }
 
-void es2nSetViewport(int width, int height)
+void es2SetViewport(int width, int height)
 {
 	s_p.viewport[2] = width;
 	s_p.viewport[3] = height;
 }
 
-void es2nRender(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
+void es2Render(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 {
 	// Update input pixels.
 	glActiveTexture(TEX(IDX_I));

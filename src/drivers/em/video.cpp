@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "em.h"
-#include "es2n.h"
+#include "es2.h"
 #include "../../fceu.h"
 #include "../../video.h"
 #include "../../utils/memory.h"
@@ -65,7 +65,7 @@ int KillVideo()
 
 	// if the rest of the system has been initialized, shut it down
 	// check for OpenGL and shut it down
-	es2nDeinit();
+	es2Deinit();
 
 	s_inited = 0;
 #endif
@@ -111,7 +111,7 @@ static void Resize(int width, int height)
 		canvas.style.setProperty("height", ($1 |0) + "px", "important");
 	}, s_width, s_height);
 
-	es2nSetViewport(s_width, s_height);
+	es2SetViewport(s_width, s_height);
 }
 
 static EM_BOOL FCEM_ResizeCallback(int eventType, const EmscriptenUiEvent *uiEvent, void *userData)
@@ -126,7 +126,7 @@ void RenderVideo(int draw_splash)
 	if (draw_splash) {
 		DrawSplash();
 	}
-	es2nRender(XBuf, deempScan, PALRAM[0]);
+	es2Render(XBuf, deempScan, PALRAM[0]);
 }
 
 // Return 0 on success, -1 on failure.
@@ -164,7 +164,7 @@ int InitVideo()
 
 	s_curbpp = 32;
 
-	es2nInit();
+	es2Init();
 
 	s_inited = 1;
 	return 0;
