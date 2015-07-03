@@ -1,5 +1,5 @@
 #
-# SConstruct - build script for the emscripten/SDL port of fceux
+# SConstruct - build script for the SDL and Emscripten port of fceux
 #
 # You can adjust the BoolVariables below to include/exclude features 
 # at compile-time.  You may also use arguments to specify the parameters.
@@ -14,8 +14,8 @@ import platform
 
 opts = Variables(None, ARGUMENTS)
 opts.AddVariables( 
-  BoolVariable('DEBUG',     'Build with debugging symbols', 1),
-  BoolVariable('RELEASE',   'Set to 1 to build for release', 0),
+  BoolVariable('DEBUG',     'Build with debugging symbols', 0),
+  BoolVariable('RELEASE',   'Set to 1 to build for release', 1),
   BoolVariable('FRAMESKIP', 'Enable frameskipping', 1),
   BoolVariable('OPENGL',    'Enable OpenGL support', 1),
   BoolVariable('LUA',       'Enable Lua support', 1),
@@ -206,7 +206,6 @@ else:
    
   if env['OPENGL'] and (env['EMSCRIPTEN'] or conf.CheckLibWithHeader('GL', 'GL/gl.h', 'c', autoadd=1)):
     conf.env.Append(CCFLAGS = "-DOPENGL")
-        
   conf.env.Append(CPPDEFINES = ['PSS_STYLE=1'])
   
   env = conf.Finish()
