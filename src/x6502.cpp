@@ -355,6 +355,7 @@ static uint8 CycTable[256] =
 
 #ifdef EMSCRIPTEN
 #include "utils/memory.h"
+// Function table includes.
 #include "opsfunc.inc"
 #include "opstab.inc"
 #endif
@@ -391,6 +392,7 @@ void X6502_Init(void)
 	unsigned int i;
 
 #ifdef EMSCRIPTEN
+	// Initialize function table.
 	opsinit();
 #endif
 
@@ -514,6 +516,7 @@ extern int test; test++;
     #include "ops.inc"
    }
 #else
+   // Call function table.
    opstab[b1]();
 #endif
   }

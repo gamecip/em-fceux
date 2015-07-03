@@ -287,7 +287,7 @@ void FCEU_PutImage(void)
 			// Put other port info here
 			ci = 0;
 			held = 0;
-#endif //WIN32
+#endif
 
 			//adelikat: I apologize to anyone who ever sifts through this color assignment
 			//A

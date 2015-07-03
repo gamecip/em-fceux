@@ -1207,11 +1207,11 @@ void FCEUSND_Power(void)
 {
         int x;
 
-    FCEU_ARRAY_EM(wlookup1, uint32, 32);
-    FCEU_ARRAY_EM(wlookup2, uint32, 203);
-    FCEU_ARRAY_EM(Wave, int32, WAVE_NUM);
-    FCEU_ARRAY_EM(WaveFinal, int32, WAVE_NUM);
-    FCEU_ARRAY_EM(WaveHi, int32, WAVEHI_NUM);
+	FCEU_ARRAY_EM(wlookup1, uint32, 32);
+	FCEU_ARRAY_EM(wlookup2, uint32, 203);
+	FCEU_ARRAY_EM(Wave, int32, WAVE_NUM);
+	FCEU_ARRAY_EM(WaveFinal, int32, WAVE_NUM);
+	FCEU_ARRAY_EM(WaveHi, int32, WAVEHI_NUM);
 
         SetNESSoundMap();
         memset(PSG,0x00,sizeof(PSG));

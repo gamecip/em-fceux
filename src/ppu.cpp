@@ -1223,10 +1223,10 @@ static void DoLine(void) {
 	uint8 *target = XBuf + (scanline << 8);
 
 #ifdef EMSCRIPTEN
-    // For Emscripten, store the deemphasis bits per scanline.
-    if (scanline < 240) {
-        deempScan[scanline] = PPU[1] >> 5;
-    }
+	// Store the deemphasis bits per scanline.
+	if (scanline < 240) {
+		deempScan[scanline] = PPU[1] >> 5;
+	}
 #endif
 
 	if (MMC5Hack && (ScreenON || SpriteON)) MMC5_hb(scanline);
@@ -1265,10 +1265,10 @@ static void DoLine(void) {
 		for (x = 63; x >= 0; x--)
 			*(uint32*)&target[x << 2] = ((*(uint32*)&target[x << 2]) & 0x3f3f3f3f) | 0x80808080;
 #else
-    // For Emscripten, clear top 2 deemphasis flag bits.
-	for (x = 63; x >= 0; x--) {
-		*(uint32*)&target[x << 2] &= 0x3f3f3f3f;
-    }
+		// Clear top 2 deemphasis flag bits.
+		for (x = 63; x >= 0; x--) {
+			*(uint32*)&target[x << 2] &= 0x3f3f3f3f;
+		}
 #endif
 	sphitx = 0x100;
 

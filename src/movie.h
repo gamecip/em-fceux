@@ -103,9 +103,9 @@ bool FCEUMOV_ReadState(EMUFILE* is, uint32 size);
 void FCEUMOV_PreLoad();
 bool FCEUMOV_PostLoad();
 #else
-#define FCEUMOV_ReadState(is_, size_) (true) // tsone: load successful?
+#define FCEUMOV_ReadState(is_, size_) (true)
 #define FCEUMOV_PreLoad()
-#define FCEUMOV_PostLoad() (true) // tsone: load successful?
+#define FCEUMOV_PostLoad() (true)
 #endif
 void FCEUMOV_IncrementRerecordCount();
 

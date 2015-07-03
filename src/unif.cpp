@@ -115,7 +115,7 @@ static uint8* exntar = 0;
 #endif
 
 static void MooMirroring(void) {
-    FCEU_ARRAY_EM(exntar, uint8, 2048);
+	FCEU_ARRAY_EM(exntar, uint8, 2048);
 	if (mirrortodo < 0x4)
 		SetupCartMirroring(mirrortodo, 1, 0);
 	else if (mirrortodo == 0x4) {
@@ -552,7 +552,7 @@ static void UNIFGI(GI h) {
 		break;
 	case GI_SAVE:
 		FCEU_SaveGameSave(&UNIFCart);
-        break;
+		break;
 	case GI_CLOSE:
 		FCEU_SaveGameSave(&UNIFCart);
 		if (UNIFCart.Close)

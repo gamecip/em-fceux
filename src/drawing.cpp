@@ -540,7 +540,6 @@ void DrawTextTransWH(uint8 *dest, const uint8 *textmsg, uint8 fgcolor, int max_w
 				target[y + ny][x + nx] = pixel_color;
 			}
 		}
-
 		// proceed to next char
 		x += wid;
 		if (max_x < x) {

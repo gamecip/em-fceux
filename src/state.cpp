@@ -75,7 +75,7 @@ bool FCEU_state_loading_old_format;
 #ifndef EMSCRIPTEN
 char lastSavestateMade[2048]; //Stores the filename of the last savestate made (needed for UndoSavestate)
 #else
-char *lastSavestateMade = 0; //Stores the filename of the last savestate made (needed for UndoSavestate)
+char *lastSavestateMade = 0;
 #endif
 bool undoSS = false;		  //This will be true if there is lastSavestateMade, it was made since ROM was loaded, a backup state for lastSavestateMade exists
 bool redoSS = false;		  //This will be true if UndoSaveState is run, will turn false when a new savestate is made
@@ -83,7 +83,7 @@ bool redoSS = false;		  //This will be true if UndoSaveState is run, will turn f
 #ifndef EMSCRIPTEN
 char lastLoadstateMade[2048]; //Stores the filename of the last state loaded (needed for Undo/Redo loadstate)
 #else
-char *lastLoadstateMade = 0; //Stores the filename of the last state loaded (needed for Undo/Redo loadstate)
+char *lastLoadstateMade = 0;
 #endif
 bool undoLS = false;		  //This will be true if a backupstate was made and it was made since ROM was loaded
 bool redoLS = false;		  //This will be true if a backupstate was loaded, meaning redoLoadState can be run
@@ -470,11 +470,10 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 	outstream->fwrite((char*)header,16);
 	outstream->fwrite((char*)cbuf,comprlen==-1?totalsize:comprlen);
 
-#ifdef EMSCRIPTEN // tsone: sync IndexedDB for savestates
-// TODO: tsone: what to do on success/fail? pause emulation until sync is done?
-    EM_ASM({
-      FS.syncfs(FCEM.onSyncToIDB);
-    });
+#ifdef EMSCRIPTEN
+	EM_ASM({
+		FS.syncfs(FCEM.onSyncToIDB);
+	});
 #endif
 
 	return error == Z_OK;

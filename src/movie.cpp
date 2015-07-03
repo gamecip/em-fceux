@@ -649,10 +649,12 @@ bool LoadFM2(MovieData& movieData, EMUFILE* fp, int size, bool stopAfterHeader)
 			return true;
 		switch(state)
 		{
-//tsone: holy shit this is nasty ass vomit
-        default:
-            goto bail;
-            break;
+// TODO: tsone: just to get rid of a warning... i'm so proud of this code :)
+#ifdef EMSCRIPTEN
+		default:
+			goto bail;
+			break;
+#endif
 		case NEWLINE:
 			if(isnewline) goto done;
 			if(iswhitespace) goto done;
