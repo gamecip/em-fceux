@@ -55,14 +55,8 @@ var FCEM = {
     FCEM.updateGames();
     FCEM.updateStack();
     FCEM.showStack(true);
-    FCEM.setController = Module.cwrap('FCEM_SetController', null, ['number', 'number']);
-    FCEM.bindKey = Module.cwrap('FCEM_BindKey', null, ['number', 'number']);
-    FCEM.silenceSound = Module.cwrap('FCEM_SilenceSound', null, ['number']);
     // Write savegame and synchronize IDBFS in intervals.
     setInterval(Module.cwrap('FCEM_OnSaveGameInterval'), 1000);
-
-    FCEM.setupControllers();
-    FCEM.setupKeys();
   },
   onDeleteGameSyncFromIDB : function(er) {
     assert(!er);
@@ -307,14 +301,21 @@ var Module = {
     // Mount IndexedDB file system (IDBFS) to /fceux.
     FS.mkdir('/fceux');
     FS.mount(IDBFS, {}, '/fceux');
-    FS.syncfs(true, FCEM.onInitialSyncFromIDB);
   }],
   postRun: [function() {
+    FCEM.setController = Module.cwrap('FCEM_SetController', null, ['number', 'number']);
+    FCEM.bindKey = Module.cwrap('FCEM_BindKey', null, ['number', 'number']);
+    FCEM.silenceSound = Module.cwrap('FCEM_SilenceSound', null, ['number']);
     // HACK: Disable default fullscreen handlers. See Emscripten's library_browser.js
     // The handlers forces the canvas size by setting css style width and height with
     // "!important" flag. Workaround is to disable the default fullscreen handlers.
     // See Emscripten's updateCanvasDimensions() in library_browser.js for the faulty code.
     Browser.fullScreenHandlersInstalled = true;
+    // Initial IDBFS sync.
+    FS.syncfs(true, FCEM.onInitialSyncFromIDB);
+    // Setup configuration from localStorage.
+    FCEM.setupControllers();
+    FCEM.setupKeys();
   }],
   print: function() {
     text = Array.prototype.slice.call(arguments).join(' ');

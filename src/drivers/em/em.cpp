@@ -26,17 +26,23 @@
 // Number of frames to skip per regular frame when frameskipping.
 #define TURBO_FRAMESKIPS 3
 // Set to 1 to set mainloop call at higher rate than requestAnimationFrame.
-// Recommended behavior is to use requestAnimationFrame, i.e. set to 0.
+// It's recommended to set this to 0, i.e. to use requestAnimationFrame.
 #define SUPER_RATE 0
+
+// For s_status.
+#define STATUS_INIT (1<<0)
+#define STATUS_LOAD (1<<1)
 
 extern double g_fpsScale;
 extern bool MaxSpeed;
 
+// TODO: tsone: this is used in fceu.cpp. should be probably defined there, not here?
+bool turbo;
+
 int eoptions = 0;
 Config *g_config;
 
-static int inited = 0;
-static int isloaded = 0;
+static int s_status = 0;
 
 /**
  * Loads a game, given a full path/filename.  The driver code must be
@@ -46,9 +52,10 @@ static int isloaded = 0;
  */
 int LoadGame(const char *path)
 {
-    if (isloaded){
-        CloseGame();
-    }
+	if (s_status & STATUS_LOAD) {
+		CloseGame();
+	}
+
 	if(!FCEUI_LoadGame(path, 1)) {
 		return 0;
 	}
@@ -56,23 +63,22 @@ int LoadGame(const char *path)
 // TODO: tsone: needed for some reason even though FCEUI_LoadGame() calls it. something to do with ResetNES() call there?
 	FCEUI_SetVidSystem(PAL);
 
-	isloaded = 1;
+	s_status |= STATUS_LOAD;
 	return 1;
 }
 
 int CloseGame()
 {
-	if(!isloaded) {
-		return(0);
+	if (!(s_status & STATUS_LOAD)) {
+		return 0;
 	}
 
 	FCEUI_CloseGame();
 
 //	DriverKill();
-	isloaded = 0;
+	s_status &= ~STATUS_LOAD;
 	GameInfo = 0;
-
-	return(1);
+	return 1;
 }
 
 static int DoFrame()
@@ -91,8 +97,8 @@ static int DoFrame()
 	// Get the number of frames to fill the audio buffer.
 	int frames = (SOUND_BUF_MAX - GetSoundBufferCount()) / em_sound_frame_samples;
 
-    // On some systems audio can get ahead of visuals. If so, skip emulation for this requestAnimationFrame.
-// TODO: tsone: this is not a good solution as it may cause unnecessary skips of the requestAnimationFrame update
+	// It's possible audio to go ahead of visuals. If so, skip all emulation for this frame.
+// TODO: tsone: this is not a good solution as it may cause unnecessary skipping in emulation
 	if (IsSoundInitialized() && frames <= 0) {
 		return 0;
 	}
@@ -116,15 +122,14 @@ static int DoFrame()
 
 static void ReloadROM(void*)
 {
-    char *filename = emscripten_run_script_string("Module.romName");
-//    CloseGame();
-    LoadGame(filename);
+	char *filename = emscripten_run_script_string("Module.romName");
+//	CloseGame();
+	LoadGame(filename);
 }
-
 
 static void MainLoop()
 {
-	if (inited & 4) {
+	if (s_status & STATUS_INIT) {
 		if (GameInfo) {
 			if (!DoFrame()) {
 				return; // Frame was not processed, skip rest of this callback.
@@ -136,8 +141,7 @@ static void MainLoop()
 		}
 	}
 
-// FIXME: tsone: sould be probably using exports
-// NOTE: tsone: simple way to communicate with mainloop without "exporting" functions
+// FIXME: tsone: should be probably using exported funcs
 	int reload = EM_ASM_INT_V({ return Module.romReload||0; });
 	if (reload) {
 		emscripten_push_main_loop_blocker(ReloadROM, 0);
@@ -148,10 +152,8 @@ static void MainLoop()
 static int DriverInitialize()
 {
 	InitVideo();
-	inited|=4;
-
 	InitSound();
-	inited|=1;
+	s_status |= STATUS_INIT;
 
 	int fourscore = 0;
 	g_config->getOption("SDL.FourScore", &fourscore);
@@ -165,16 +167,17 @@ static int DriverInitialize()
 #if 0
 static void DriverKill()
 {
-	if(inited&4)
+	if (s_status & STATUS_INIT) {
 		KillVideo();
-	if(inited&1)
 		KillSound();
-	inited=0;
+	}
+	s_status &= ~STATUS_INIT;
 }
 #endif
 
 EMUFILE_FILE* FCEUD_UTF8_fstream(const char *fn, const char *m)
 {
+// TODO: tsone: mode variable is not even used, remove?
 	std::ios_base::openmode mode = std::ios_base::binary;
 	if(!strcmp(m,"r") || !strcmp(m,"rb"))
 		mode |= std::ios_base::in;
@@ -188,18 +191,18 @@ EMUFILE_FILE* FCEUD_UTF8_fstream(const char *fn, const char *m)
 		mode |= std::ios_base::in | std::ios_base::out | std::ios_base::trunc;
 	else if(!strcmp(m,"a+") || !strcmp(m,"a+b"))
 		mode |= std::ios_base::in | std::ios_base::out | std::ios_base::app;
-    return new EMUFILE_FILE(fn, m);
-	//return new std::fstream(fn,mode);
+	return new EMUFILE_FILE(fn, m);
 }
 
 FILE *FCEUD_UTF8fopen(const char *fn, const char *mode)
 {
-	return(fopen(fn,mode));
+	return fopen(fn, mode);
 }
 
 static char *s_linuxCompilerString = "emscripten " __VERSION__;
-const char *FCEUD_GetCompilerString() {
-	return (const char *)s_linuxCompilerString;
+const char *FCEUD_GetCompilerString()
+{
+	return (const char*) s_linuxCompilerString;
 }
 
 int main(int argc, char *argv[])
@@ -220,29 +223,26 @@ int main(int argc, char *argv[])
 	error = FCEUI_Initialize();
 	std::string s;
 
-    // override savegame, savestate and rom directory with IndexedDB mount at /fceux
-    FCEUI_SetDirOverride(FCEUIOD_NV, "fceux/sav");
-    FCEUI_SetDirOverride(FCEUIOD_STATES, "fceux/sav");
-//    FCEUI_SetDirOverride(FCEUIOD_ROMS, "fceux/rom");
+	// override savegame, savestate and rom directory with IndexedDB mount at /fceux
+	FCEUI_SetDirOverride(FCEUIOD_NV, "fceux/sav");
+	FCEUI_SetDirOverride(FCEUIOD_STATES, "fceux/sav");
+//	FCEUI_SetDirOverride(FCEUIOD_ROMS, "fceux/rom");
 
-    // update the input devices
-//	UpdateInput(g_config);
-
-	// update the emu core
 	UpdateEMUCore(g_config);
 
+// TODO: tsone: don't use new ppu (for now) 
 	{
 		int id;
 		g_config->getOption("SDL.NewPPU", &id);
-		if (id)
+		if (id) {
 			newppu = 1;
+		}
 	}
 
 	DriverInitialize();
 
 #if SUPER_RATE
-// NOTE: tsone: set higher frame rate to ensure emulation stays ahead
-//	emscripten_set_main_loop(MainLoop, 100, 1);
+// NOTE: tsone: UNTESTED! higher call rate to generate frames
 	emscripten_set_main_loop(MainLoop, 2 * (em_sound_rate + SOUND_HW_BUF_MAX-1) / SOUND_HW_BUF_MAX, 1);
 #else
 	emscripten_set_main_loop(MainLoop, 0, 1);
@@ -275,12 +275,8 @@ void FCEUD_PrintError(const char *errormsg)
 }
 
 
-// NOTE: tsone: dummy functions, not implemented
-#define DUMMY(__f) \
-    void __f(void) {\
-        printf("%s\n", #__f);\
-        FCEU_DispMessage("Not implemented.",0);\
-    }
+// NOTE: tsone: following are non-implemented "dummy" functions in this driver
+#define DUMMY(__f) void __f() {}
 DUMMY(FCEUD_DebugBreakpoint)
 DUMMY(FCEUD_TraceInstruction)
 DUMMY(FCEUD_HideMenuToggle)
@@ -288,10 +284,10 @@ DUMMY(FCEUD_MovieReplayFrom)
 DUMMY(FCEUD_ToggleStatusIcon)
 DUMMY(FCEUD_AviRecordTo)
 DUMMY(FCEUD_AviStop)
-void FCEUI_AviVideoUpdate(const unsigned char* buffer) { }
+void FCEUI_AviVideoUpdate(const unsigned char* buffer) {}
 int FCEUD_ShowStatusIcon(void) {return 0;}
 bool FCEUI_AviIsRecording(void) {return false;}
-void FCEUI_UseInputPreset(int preset) { }
+void FCEUI_UseInputPreset(int preset) {}
 bool FCEUD_PauseAfterPlayback() { return false; }
 // These are actually fine, but will be unused and overriden by the current UI code.
 void FCEUD_TurboToggle(void) { NoWaiting^= 1; }

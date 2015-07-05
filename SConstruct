@@ -69,7 +69,6 @@ else:
 
 if env['RELEASE']:
   env.Append(CPPDEFINES=["PUBLIC_RELEASE"])
-  env['DEBUG'] = 0
 
 # LSB_FIRST must be off for PPC to compile
 if platform.system == "ppc":
@@ -223,13 +222,18 @@ if env['DEBUG']:
   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
 else:
   if env['EMSCRIPTEN']:
-    common = ' --llvm-opts 3'
+    env.Append(LINKFLAGS = '-strip-all')
+
+if env['RELEASE']:
+  if env['EMSCRIPTEN']:
+    common = ' -flto -O3'
+    common += ' --llvm-opts 3'
     common += ' --llvm-lto 3'
     common += ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
     common += ' -s DISABLE_EXCEPTION_CATCHING=1'
     common += ' -s ASSERTIONS=0'
-    env.Append(CCFLAGS = '-flto -O3' + common)
-    env.Append(LINKFLAGS = '-flto -O3 -strip-all' + common)
+    env.Append(CCFLAGS = common)
+    env.Append(LINKFLAGS = common)
   else:
     env.Append(CCFLAGS = ['-O2'])
     env.Append(LINKFLAGS = ['-O2'])
