@@ -19,190 +19,196 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 -->
 <html lang="en-us">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
-    <meta property="og:title" content="em-fceux" />
-    <meta property="og:site_name" content="em-fceux" />
-    <meta property="og:description" content="em-fceux is a web version of the FCEUX 8-bit Nintendo Entertainment System (NES) emulator. To play a game, simply drag and drop a ROM file on the em-fceux window! Enjoy!" />
-    <!-- NOTE: Following URLs must be absolute -->
-    <meta property="og:url" content="https://tsone.kapsi.fi/em-fceux/" />
-    <meta property="og:image" content="https://tsone.kapsi.fi/em-fceux/img/preview.png" />
+<meta property="og:title" content="em-fceux" />
+<meta property="og:site_name" content="em-fceux" />
+<meta property="og:description" content="em-fceux is a web version of the FCEUX 8-bit Nintendo Entertainment System (NES) emulator. To play a game, simply drag and drop a ROM file on the em-fceux window! Enjoy!" />
+<!-- NOTE: Following URLs must be absolute -->
+<meta property="og:url" content="https://tsone.kapsi.fi/em-fceux/" />
+<meta property="og:image" content="https://tsone.kapsi.fi/em-fceux/img/preview.png" />
 
-    <title>em-fceux</title>
+<title>em-fceux</title>
 
-    <meta name="author" content="Valtteri Heikkilä" />
-    <meta name="keywords" content="8-bit,emscripten,emu,emulator,famicom,fc,fceu,fceux,nes,nintendo" />
+<meta name="author" content="Valtteri Heikkilä" />
+<meta name="keywords" content="8-bit,emscripten,emu,emulator,famicom,fc,fceu,fceux,nes,nintendo" />
 
-    <link rel="license" href="gpl-2.0.txt" />
+<link rel="license" href="gpl-2.0.txt" />
 
-    <link rel="icon" type="image/png" href="img/favicon-48.png" />
-    <link rel="apple-touch-icon" href="img/favicon-60.png">
-    <link rel="apple-touch-icon" sizes="120x120" href="img/favicon-120.png" />
+<link rel="icon" type="image/png" href="img/favicon-48.png" />
+<link rel="apple-touch-icon" href="img/favicon-60.png">
+<link rel="apple-touch-icon" sizes="120x120" href="img/favicon-120.png" />
 
-    <link href="style.css" rel="stylesheet" />
-  </head>
-  <body>
+<link href="style.css" rel="stylesheet" />
+</head>
+<body>
 
-    <div id="preload">
-      <img class="preload" alt="" src="img/sound_off.gif" />
-      <img class="preload" alt="" src="img/cart.gif" />
-    </div>
+<div id="preload">
+  <img class="preload" alt="" src="img/sound_off.gif" />
+  <img class="preload" alt="" src="img/cart.gif" />
+</div>
 
-    <canvas class="emscripten" id="canvas" hidden oncontextmenu="event.preventDefault()"></canvas>
+<canvas class="emscripten" id="canvas" hidden oncontextmenu="event.preventDefault()"></canvas>
 
-    <div id="loader">
-      <span id="loaderSpinner"></span>
-    </div>
+<div id="loader">
+  <noscript id="noscript">
+     PLEASE ENABLE JAVASCRIPT em-fceux requires JavaScript
+  </noscript>
+  <span id="loaderSpinner"></span>
+  <script>
+    document.getElementById('loaderSpinner').style.display = 'block';
+  </script>
+</div>
 
-    <input id="controllersToggle" type="checkbox" hidden />
-    <div id="controllersTab">
-      <div id="controllersContainer">
-        <table id="controllers">
+<input id="controllersToggle" type="checkbox" hidden />
+<div id="controllersTab">
+  <div id="controllersContainer">
+    <table id="controllers">
 
-          <tr><td colspan="2"><h4>PICTURE CONTROLS</h4>
-          <tr><td>Brightness<td><input id="brightness" type="range" min="-1" max="1" step="0.2" oninput="FCEM.setLocalController(BRIGHTNESS, this.value)" onchange="FCEM.setLocalController(BRIGHTNESS, this.value)"/>
-          <tr><td>Contrast<td><input id="contrast" type="range" min="-1" max="1" step="0.2" oninput="FCEM.setLocalController(CONTRAST, this.value)" onchange="FCEM.setLocalController(CONTRAST, this.value)"/>
-          <tr><td>Color<td><input id="color" type="range" min="-1" max="1" step="0.2" oninput="FCEM.setLocalController(COLOR, this.value)" onchange="FCEM.setLocalController(COLOR, this.value)"/>
-          <tr><td>Gamma<td><input id="gamma" type="range" min="-1" max="1" step="0.2" oninput="FCEM.setLocalController(GAMMA, this.value)" onchange="FCEM.setLocalController(GAMMA, this.value)"/>
+      <tr><td colspan="2"><h4>PICTURE CONTROLS</h4>
+      <tr><td>Brightness<td><input id="brightness" type="range" min="-1" max="1" step="0.2" oninput="FCEM.setLocalController(BRIGHTNESS, this.value)" onchange="FCEM.setLocalController(BRIGHTNESS, this.value)"/>
+      <tr><td>Contrast<td><input id="contrast" type="range" min="-1" max="1" step="0.2" oninput="FCEM.setLocalController(CONTRAST, this.value)" onchange="FCEM.setLocalController(CONTRAST, this.value)"/>
+      <tr><td>Color<td><input id="color" type="range" min="-1" max="1" step="0.2" oninput="FCEM.setLocalController(COLOR, this.value)" onchange="FCEM.setLocalController(COLOR, this.value)"/>
+      <tr><td>Gamma<td><input id="gamma" type="range" min="-1" max="1" step="0.2" oninput="FCEM.setLocalController(GAMMA, this.value)" onchange="FCEM.setLocalController(GAMMA, this.value)"/>
 
-          <tr><td colspan="2"><h4>NTSC EMULATION</h4>
-          <tr><td>NTSC Emulation*<td><input id="ntsc_emu" type="checkbox" checked oninput="FCEM.setLocalController(NTSC_EMU, this.checked)" onchange="FCEM.setLocalController(NTSC_EMU, this.checked)"/>
-          <tr><td>Sharpness<td><input id="sharpness" type="range" min="-0.5" max="0.5" step="0.1" oninput="FCEM.setLocalController(SHARPNESS, this.value)" onchange="FCEM.setLocalController(SHARPNESS, this.value)"/>
+      <tr><td colspan="2"><h4>NTSC EMULATION</h4>
+      <tr><td>NTSC Emulation*<td><input id="ntsc_emu" type="checkbox" checked oninput="FCEM.setLocalController(NTSC_EMU, this.checked)" onchange="FCEM.setLocalController(NTSC_EMU, this.checked)"/>
+      <tr><td>Sharpness<td><input id="sharpness" type="range" min="-0.5" max="0.5" step="0.1" oninput="FCEM.setLocalController(SHARPNESS, this.value)" onchange="FCEM.setLocalController(SHARPNESS, this.value)"/>
 
-          <tr><td colspan="2"><h4>TV EMULATION</h4>
-          <tr><td>TV Emulation<td><input id="crt_enabled" type="checkbox" checked oninput="FCEM.setLocalController(CRT_ENABLED, this.checked)" onchange="FCEM.setLocalController(CRT_ENABLED, this.checked)"/><br/>
-          <tr><td>Scanlines<td><input id="scanlines" type="range" min="0" max="1" step="0.1" oninput="FCEM.setLocalController(SCANLINES, this.value)" onchange="FCEM.setLocalController(SCANLINES, this.value)"/><br/>
-          <tr><td>Glow<td><input id="glow" type="range" min="0" max="1" step="0.1" oninput="FCEM.setLocalController(GLOW, this.value)" onchange="FCEM.setLocalController(GLOW, this.value)"/><br/>
-          <tr><td>Convergence<td><input id="convergence" type="range" min="0" max="1" step="0.1" oninput="FCEM.setLocalController(CONVERGENCE, this.value)" onchange="FCEM.setLocalController(CONVERGENCE, this.value)"/><br/>
-          <tr><td>Signal Noise<td><input id="noise" type="range" min="0" max="1" step="0.1" oninput="FCEM.setLocalController(NOISE, this.value)" onchange="FCEM.setLocalController(NOISE, this.value)"/><br/>
+      <tr><td colspan="2"><h4>TV EMULATION</h4>
+      <tr><td>TV Emulation<td><input id="crt_enabled" type="checkbox" checked oninput="FCEM.setLocalController(CRT_ENABLED, this.checked)" onchange="FCEM.setLocalController(CRT_ENABLED, this.checked)"/><br/>
+      <tr><td>Scanlines<td><input id="scanlines" type="range" min="0" max="1" step="0.1" oninput="FCEM.setLocalController(SCANLINES, this.value)" onchange="FCEM.setLocalController(SCANLINES, this.value)"/><br/>
+      <tr><td>Glow<td><input id="glow" type="range" min="0" max="1" step="0.1" oninput="FCEM.setLocalController(GLOW, this.value)" onchange="FCEM.setLocalController(GLOW, this.value)"/><br/>
+      <tr><td>Convergence<td><input id="convergence" type="range" min="0" max="1" step="0.1" oninput="FCEM.setLocalController(CONVERGENCE, this.value)" onchange="FCEM.setLocalController(CONVERGENCE, this.value)"/><br/>
+      <tr><td>Signal Noise<td><input id="noise" type="range" min="0" max="1" step="0.1" oninput="FCEM.setLocalController(NOISE, this.value)" onchange="FCEM.setLocalController(NOISE, this.value)"/><br/>
 
-          <tr><td colspan="2"><h4>SYSTEM SETTINGS</h4>
-          <tr><td>Controller Port 1<td><select disabled><option>Gamepad</option></select>
-          <tr><td>Controller Port 2<td><select id="port2" onchange="FCEM.setLocalController(PORT2, this.value)"><option value="0">Gamepad</option><option value="1">Zapper</option></select>
-          <tr><td>Video System<td><select id="video_system" onchange="FCEM.setLocalController(VIDEO_SYSTEM, this.value)"><option value="-1">(Auto)</option><option value="0">NTSC</option><option value="1">PAL</option></select>
-        </table>
-        <p><input type="button" value="Reset to Defaults" onclick="FCEM.setupControllers(true)" />
-        <p><i><small>* NTSC composite signal path emulation.</small></i>
-<!-- <input type="button" value="dump FS" onclick="var f = findFiles('/'); f.forEach(function(x) { console.log('!!!! dump: ' + x); })" /> -->
-      </div>
-      <label id="controllersToggleLabel" for="controllersToggle"></label>
-    </div>
+      <tr><td colspan="2"><h4>SYSTEM SETTINGS</h4>
+      <tr><td>Controller Port 1<td><select disabled><option>Gamepad</option></select>
+      <tr><td>Controller Port 2<td><select id="port2" onchange="FCEM.setLocalController(PORT2, this.value)"><option value="0">Gamepad</option><option value="1">Zapper</option></select>
+      <tr><td>Video System<td><select id="video_system" onchange="FCEM.setLocalController(VIDEO_SYSTEM, this.value)"><option value="-1">(Auto)</option><option value="0">NTSC</option><option value="1">PAL</option></select>
+    </table>
+    <p><input type="button" value="Reset to Defaults" onclick="FCEM.setupControllers(true)" />
+    <p><i><small>* NTSC composite signal path emulation.</small></i>
+    <!-- <input type="button" value="dump FS" onclick="var f = findFiles('/'); f.forEach(function(x) { console.log('!!!! dump: ' + x); })" /> -->
+  </div>
+  <label id="controllersToggleLabel" for="controllersToggle"></label>
+</div>
 
-    <div hidden>
-      <div class="cartRow" id="cartProto" data-idx=""><div class="cart" onclick="return askSelectGame(event, this.parentNode);"><div class="labelContainer"><div class="label"></div></div><div class="cartDelete" onclick="return askDeleteGame(event, this.parentNode.parentNode);"></div></div></div>
-    </div>
-    <input id="stackToggle" type="checkbox" hidden />
-    <div id="stackTab">
-      <label id="stackToggleLabel" for="stackToggle"></label>
-      <div id="stackContainer"><div id="stack"><div></div></div></div>
-    </div>
+<div hidden>
+  <div class="cartRow" id="cartProto" data-idx=""><div class="cart" onclick="return askSelectGame(event, this.parentNode);"><div class="labelContainer"><div class="label"></div></div><div class="cartDelete" onclick="return askDeleteGame(event, this.parentNode.parentNode);"></div></div></div>
+</div>
+<input id="stackToggle" type="checkbox" hidden />
+<div id="stackTab">
+  <label id="stackToggleLabel" for="stackToggle"></label>
+  <div id="stackContainer"><div id="stack"><div></div></div></div>
+</div>
 
-    <input id="helpToggle" type="checkbox" hidden />
-    <img id="fullscreenIcon" width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" alt="fullscreen icon"/>
-    <img id="soundIcon" width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" alt="sound icon"/>
-    <label id="helpIcon" for="helpToggle"><img width="48" height="48" src="img/help.gif" alt="help icon"/></label>
+<input id="helpToggle" type="checkbox" hidden />
+<img id="fullscreenIcon" width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" alt="fullscreen icon"/>
+<img id="soundIcon" width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" alt="sound icon"/>
+<label id="helpIcon" for="helpToggle"><img width="48" height="48" src="img/help.gif" alt="help icon"/></label>
 
-    <div id="keyBindDiv">
-      <div class="dimmer"></div>
-      <div class="scrollingContainer">
-      <div class="scrollingContent">
-        <img id="keyboardIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
+<div id="keyBindDiv">
+  <div class="dimmer"></div>
+  <div class="scrollingContainer">
+  <div class="scrollingContent">
+    <img id="keyboardIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
 
-        <h3>KEYBOARD BINDINGS</h3>
-        <table hidden>
-          <tr id="keyBindProto"><td><td><td data-id="" data-name=""><input type="button" value="Set" onclick="FCEM.catchStart(this.parentNode);" /> <input type="button" value="Unset" onclick="FCEM.keyBindUnset(this.parentNode);" />
-        </table>
-        
-        <p>Click 'Set' button to bind a key to an input. Click 'Unset' to remove a binding.
-        <p><table id="keyBindTable"><tr><td><b>Input</b><td><b>Key</b><td><b>Options</b></table>
-        <br/>
-        <input type="button" value="Reset to Defaults" onclick="FCEM.keyBindResetAll();" />
-        <br/><br/>
-      </div>
-      </div>
-    </div>
-    <img id="keyboardIcon" width="48" height="48" src="img/keyboard.gif" onclick="FCEM.keyBindToggle()" alt="key bindings icon"/>
+    <h3>KEYBOARD BINDINGS</h3>
+    <table hidden>
+      <tr id="keyBindProto"><td><td><td data-id="" data-name=""><input type="button" value="Set" onclick="FCEM.catchStart(this.parentNode);" /> <input type="button" value="Unset" onclick="FCEM.keyBindUnset(this.parentNode);" />
+    </table>
+    
+    <p>Click 'Set' button to bind a key to an input. Click 'Unset' to remove a binding.
+    <p><table id="keyBindTable"><tr><td><b>Input</b><td><b>Key</b><td><b>Options</b></table>
+    <br/>
+    <input type="button" value="Reset to Defaults" onclick="FCEM.keyBindResetAll();" />
+    <br/><br/>
+  </div>
+  </div>
+</div>
+<img id="keyboardIcon" width="48" height="48" src="img/keyboard.gif" onclick="FCEM.keyBindToggle()" alt="key bindings icon"/>
 
-    <div id="catchDiv">
-      <div class="dimmer"></div>
-      <div id="catch">
-        <h1>PRESS A KEY TO CHANGE BINDING</h1>
-        <p>Key <span id="catchKey"></span> will be bound to <span id="catchName"></span>.
-        <p>
-        <input type="button" value="Cancel" onclick="FCEM.catchEnd(false);" />
-        <input type="button" value="OK" onclick="FCEM.catchEnd(true);" />
-      </div>
-    </div>
+<div id="catchDiv">
+  <div class="dimmer"></div>
+  <div id="catch">
+    <h1>PRESS A KEY TO CHANGE BINDING</h1>
+    <p>Key <span id="catchKey"></span> will be bound to <span id="catchName"></span>.
+    <p>
+    <input type="button" value="Cancel" onclick="FCEM.catchEnd(false);" />
+    <input type="button" value="OK" onclick="FCEM.catchEnd(true);" />
+  </div>
+</div>
 
-    <div id="helpDiv">
-      <div class="dimmer"></div>
-      <div class="scrollingContainer">
-      <div class="scrollingContent">
-        <img id="helpIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
+<div id="helpDiv">
+  <div class="dimmer"></div>
+  <div class="scrollingContainer">
+  <div class="scrollingContent">
+    <img id="helpIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
 
-        <h2>EM-FCEUX</h2>
-        <p>em-fceux is an <a href="http://emscripten.org/">Emscripten</a> port of <a href="http://www.fceux.com/">FCEUX</a>.
-        Code: <a href="https://bitbucket.org/tsone/em-fceux/">https://bitbucket.org/tsone/em-fceux/</a>
-        
-        <h3>INSTRUCTIONS</h3>
-        <p>To play a game, drag and drop it (ROM file etc.) on this browser window.
-        Played games are added to the game stack on the right. Play the game again by clicking it on the stack.
-        <p>To remove a game, click <img src="img/x.gif" width=19 height=19 alt="X icon"/> on the game.
-        This doesn't remove save data however. Built-in games (<i>2048, Alter Ego, Lan Master, Lawn Mower, Streemerz</i>) cannot be removed.
-        <p>Supported file formats are: <i>.nes, .nsf, .zip</i>
-        
-        <h3>INPUTS</h3>
+    <h2>EM-FCEUX</h2>
+    <p>em-fceux is an <a href="http://emscripten.org/">Emscripten</a> port of <a href="http://www.fceux.com/">FCEUX</a>.
+    Code: <a href="https://bitbucket.org/tsone/em-fceux/">https://bitbucket.org/tsone/em-fceux/</a>
+    
+    <h3>INSTRUCTIONS</h3>
+    <p>To play a game, drag and drop it (ROM file etc.) on this browser window.
+    Played games are added to the game stack on the right. Play the game again by clicking it on the stack.
+    <p>To remove a game, click <img src="img/x.gif" width=19 height=19 alt="X icon"/> on the game.
+    This doesn't remove save data however. Built-in games (<i>2048, Alter Ego, Lan Master, Lawn Mower, Streemerz</i>) cannot be removed.
+    <p>Supported file formats are: <i>.nes, .nsf, .zip</i>
+    
+    <h3>INPUTS</h3>
 
-        <p>Keyboard bindings can be customized by clicking <img src="img/keyboard_sm.gif" width=20 height=20 alt="key bindings icon" /> icon in top right corner of this window.
-        <p>Default keyboard bindings are:
-        <table>
-          <tr><td><b>Input</b><td><b>Key</b>
-          <tr><td>Directional Pad (Controller 1)<td>Arrow Keys
-          <tr><td>A Button (Controller 1)<td>F
-          <tr><td>B Button (Controller 1)<td>D
-          <tr><td>Select (Controller 1)<td>S
-          <tr><td>Start (Controller 1)<td>Enter
-          <tr><td>Reset System<td>Ctrl-R
-          <tr><td>Exit Full-screen Mode<td>Esc
-          <tr><td>Speed Throttle<td>Tab
-          <tr><td>Select Save State<td>0-9
-          <tr><td>Save Save State<td>F5
-          <tr><td>Load Save State<td>F7
-          <tr><td>Pause Emulation<td>P
-          <tr><td>Single Frame Step<td>\ (Backslash)
-        </table>
-        <p>To shoot with Zapper (if selected as controller), simply click on mouse button where you want to shoot.
-        It is recommended to disable TV emulation when using Zapper.
+    <p>Keyboard bindings can be customized by clicking <img src="img/keyboard_sm.gif" width=20 height=20 alt="key bindings icon" /> icon in top right corner of this window.
+    <p>Default keyboard bindings are:
+    <table>
+      <tr><td><b>Input</b><td><b>Key</b>
+      <tr><td>Directional Pad (Controller 1)<td>Arrow Keys
+      <tr><td>A Button (Controller 1)<td>F
+      <tr><td>B Button (Controller 1)<td>D
+      <tr><td>Select (Controller 1)<td>S
+      <tr><td>Start (Controller 1)<td>Enter
+      <tr><td>Reset System<td>Ctrl-R
+      <tr><td>Exit Full-screen Mode<td>Esc
+      <tr><td>Speed Throttle<td>Tab
+      <tr><td>Select Save State<td>0-9
+      <tr><td>Save Save State<td>F5
+      <tr><td>Load Save State<td>F7
+      <tr><td>Pause Emulation<td>P
+      <tr><td>Single Frame Step<td>\ (Backslash)
+    </table>
+    <p>To shoot with Zapper (if selected as controller), simply click on mouse button where you want to shoot.
+    It is recommended to disable TV emulation when using Zapper.
 
-        <h3>SETTINGS TAB</h3>
-        <p>The settings tab is revealed by clicking the (pixelated) triangle on the left.
-        The tab has controllers for composite NTSC and TV emulation, gamma, sharpness, color etc.
-        
-        <h3>TROUBLESHOOTING</h3>
-        <p>In case of issues with audio or the site is not working at all, try using a recent web browser,
-        such as Firefox, Chromium, Chrome, Safari or Opera. Internet Explorer 11 will not work.
-        <p>If input responsiveness is poor (frame rate is low), try disabling TV emulation or using the full-screen mode.
-        <p>In case a game appears running too fast, try changing to PAL mode in the settings.
-        <p>The user interface and inputs are designed for keyboard and mouse. There is no support (yet) for touch-only devices.
-        <p>To file a bug or a feature request, do it in the project <a href="https://bitbucket.org/tsone/em-fceux/issues?status=new&status=open">issue tracker</a>. This requires a bitbucket.org account.
-        
-        <h3>NOTES</h3>
-        <p>Games and save data are stored locally in the web browser and are never transmitted out of the browser.
-        Extracting the games and save data from the browser (for backups etc.) is not supported.
-        <p>Please refer to <a href="https://bitbucket.org/tsone/em-fceux/">em-fceux repository</a> for more technical information.
-        <p>em-fceux and FCEUX are licensed under <a href="gpl-2.0.txt">GNU GPL Version 2</a>.
-        <p>Version: 0.2.3-alpha
-        <br/><br/>
-      </div>
-      </div>
-    </div>
+    <h3>SETTINGS TAB</h3>
+    <p>The settings tab is revealed by clicking the (pixelated) triangle on the left.
+    The tab has controllers for composite NTSC and TV emulation, gamma, sharpness, color etc.
+    
+    <h3>TROUBLESHOOTING</h3>
+    <p>In case of issues with audio or the site is not working at all, try using a recent web browser,
+    such as Firefox, Chromium, Chrome, Safari or Opera. Internet Explorer 11 will not work.
+    <p>If input responsiveness is poor (frame rate is low), try disabling TV emulation or using the full-screen mode.
+    <p>In case a game appears running too fast, try changing to PAL mode in the settings.
+    <p>The user interface and inputs are designed for keyboard and mouse. There is no support (yet) for touch-only devices.
+    <p>To file a bug or a feature request, do it in the project <a href="https://bitbucket.org/tsone/em-fceux/issues?status=new&status=open">issue tracker</a>. This requires a bitbucket.org account.
+    
+    <h3>NOTES</h3>
+    <p>Games and save data are stored locally in the web browser and are never transmitted out of the browser.
+    Extracting the games and save data from the browser (for backups etc.) is not supported.
+    <p>Please refer to <a href="https://bitbucket.org/tsone/em-fceux/">em-fceux repository</a> for more technical information.
+    <p>em-fceux and FCEUX are licensed under <a href="gpl-2.0.txt">GNU GPL Version 2</a>.
+    <p>Version: 0.2.3-alpha
+    <br/><br/>
+  </div>
+  </div>
+</div>
 
-    <script src="pre.js"></script>
-    <script src="config.js"></script>
-    <script async type="text/javascript" src="fceux.js"></script>
-    <script src="post.js"></script>
-    <script src="//cdn.webglstats.com/stat.js" defer="defer" async="async"></script>
-  </body>
+<script src="pre.js"></script>
+<script src="config.js"></script>
+<script async type="text/javascript" src="fceux.js"></script>
+<script src="post.js"></script>
+<script src="//cdn.webglstats.com/stat.js" defer="defer" async="async"></script>
+</body>
 </html>
