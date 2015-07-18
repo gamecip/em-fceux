@@ -118,7 +118,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
     <h3>KEYBOARD BINDINGS</h3>
     <table hidden>
-      <tr id="keyBindProto"><td><td><td data-id="" data-name=""><input type="button" value="Set" onclick="FCEM.catchStart(this.parentNode);" /> <input type="button" value="Unset" onclick="FCEM.keyBindUnset(this.parentNode);" />
+      <tr id="keyBindProto"><td><td><td data-id="" data-name=""><input type="button" value="Set" onclick="FCEV.catchStart(this.parentNode);" /> <input type="button" value="Unset" onclick="FCEM.keyBindUnset(this.parentNode);" />
     </table>
     
     <p>Click 'Set' button to bind a key to an input. Click 'Unset' to remove a binding.
@@ -129,7 +129,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   </div>
   </div>
 </div>
-<img id="keyboardIcon" width="48" height="48" src="img/keyboard.gif" onclick="FCEM.keyBindToggle()" alt="key bindings icon"/>
+<img id="keyboardIcon" width="48" height="48" src="img/keyboard.gif" onclick="FCEV.keyBindToggle()" alt="key bindings icon"/>
 
 <div id="catchDiv">
   <div class="dimmer"></div>
@@ -137,8 +137,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     <h1>PRESS A KEY TO CHANGE BINDING</h1>
     <p>Key <span id="catchKey"></span> will be bound to <span id="catchName"></span>.
     <p>
-    <input type="button" value="Cancel" onclick="FCEM.catchEnd(false);" />
-    <input type="button" value="OK" onclick="FCEM.catchEnd(true);" />
+    <input type="button" value="Cancel" onclick="FCEV.catchEnd(false);" />
+    <input type="button" value="OK" onclick="FCEV.catchEnd(true);" />
   </div>
 </div>
 
@@ -205,9 +205,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   </div>
 </div>
 
-<script src="pre.js"></script>
 <script src="config.js"></script>
-<script src="post.js"></script>
+<script src="loader.js"></script>
 <script src="//cdn.webglstats.com/stat.js" defer="defer" async="async"></script>
 </body>
 </html>

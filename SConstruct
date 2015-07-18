@@ -253,8 +253,7 @@ if env['EMSCRIPTEN']:
     target + '.mem',
     target[:-3] + '.data',
     os.path.join(target_dir, 'style.css'),
-    os.path.join(target_dir, 'pre.js'),
-    os.path.join(target_dir, 'post.js')
+    os.path.join(target_dir, 'loader.js'),
   ]
   for f in gzip_src:
     env.Command(f+'.gz', f, 'gzip --best -c $SOURCE > $TARGET')

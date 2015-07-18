@@ -21,7 +21,7 @@ var VIDEO_SYSTEM = 12;
 
 
 
-FCEM.controllers = {
+var FCEC = { controllers : {
 0 : [ 0.0, "brightness" ],
 1 : [ 0.0, "contrast" ],
 2 : [ 0.0, "color" ],
@@ -35,14 +35,14 @@ FCEM.controllers = {
 10 : [ 0.3, "noise" ],
 11 : [ 1.0, "port2" ],
 12 : [ -1.0, "video_system" ],
-};
+},
 
 
 
 
 
 
-FCEM.inputs = {
+inputs : {
 
 0x0100 : [ 0x152, "Reset" ],
 0x0101 : [ 0x009, "Throttle" ],
@@ -82,5 +82,6 @@ FCEM.inputs = {
 0x0217 : [ 0x000, "Right (Controller 2)" ],
 0x0218 : [ 0x000, "Turbo A (Controller 2)" ],
 0x0219 : [ 0x000, "Turbo B (Controller 2)" ],
+},
+FCEUX_JS_SIZE : 2856153,
 };
-var FCEUX_JS_SIZE = 2856153;
