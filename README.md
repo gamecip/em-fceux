@@ -112,3 +112,6 @@ https://www.gnu.org/licenses/gpl-2.0.txt
 em-fceux is based on the source code release of FCEUX 2.2.2: 
 http://sourceforge.net/projects/fceultra/files/Source%20Code/2.2.2%20src/fceux-2.2.2.src.tar.gz/download
 
+The built-in games (binaries, ROMs) in em-fceux are distributed with permission
+from the game authors who retain all the rights to the games. The games are
+not licensed with GNU GPL Version 2.
