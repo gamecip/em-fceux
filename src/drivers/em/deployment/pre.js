@@ -288,6 +288,13 @@ var FCEM = {
         elem.checked = val;
       }
   },
+setProgress : (function(x) {
+	var el = document.getElementById('progress');
+	return function(x) {
+		x = (x > 1) ? 1 : ((x < 0) ? 0 : x);
+		el.style.width = 3 * ((42*x) |0) + 'px';
+	};
+})(),
 };
 
 window.onbeforeunload = function (ev) {
@@ -336,18 +343,16 @@ var Module = {
     return canvasElement;
   })(),
   setStatus: function(text) {
-    if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
-    if (text === Module.setStatus.text) return;
-    var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-    var now = Date.now();
-    if (m && now - Date.now() < 30) return;
-    if (m) {
-      text = m[1];
-    } else {
-      if (!text) {
-        Module.canvas.hidden = false;
-        loaderElem.hidden = true;
-      }
+    var dl = 'Downloading data...';
+// TODO: tsone: add startswith() method?
+    if (text.substring(0, dl.length) === dl) {
+      var r = text.match(/\(([\d.]+)\/([\d.]+)\)/);
+      var x = parseFloat(r[1]) / parseFloat(r[2]);
+      FCEM.setProgress(0.75 + 0.25*x);
+    }
+    if (!text) {
+      Module.canvas.hidden = false;
+      loaderElem.hidden = true;
     }
   },
   totalDependencies: 0,

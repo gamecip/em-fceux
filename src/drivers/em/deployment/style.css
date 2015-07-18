@@ -120,26 +120,20 @@ img.preload {
   height: 100px;
   text-align: center;
 }
-#loaderSpinner {
+#progressDiv {
   display: none;
   position: absolute;
+  border: solid 3px #FCFCFC;
   top: 50%;
   left: 50%;
-  margin: -20px 0 0 0;
+  margin: -31px 0 0 -63px;
+  width: 126px;
+  height: 21px;
+}
+#progress {
   width: 0px;
-  height: 0px;
-  -webkit-animation: spinner 0.8s infinite step-start;
-  animation: spinner 0.8s infinite step-start;
-}
-@-webkit-keyframes spinner {
-  0%,75%,100% { box-shadow: -12px 0 0  6px #FCFCFC, 12px 0 0  6px #FCFCFC; }
-  25%         { box-shadow: -12px 0 0  6px #FCFCFC, 12px 0 0 12px #FCFCFC; }
-  50%         { box-shadow: -12px 0 0 12px #FCFCFC, 12px 0 0  6px #FCFCFC; }
-}
-@keyframes spinner {
-  0%,75%,100% { box-shadow: -12px 0 0  6px #FCFCFC, 12px 0 0  6px #FCFCFC; }
-  25%         { box-shadow: -12px 0 0  6px #FCFCFC, 12px 0 0 12px #FCFCFC; }
-  50%         { box-shadow: -12px 0 0 12px #FCFCFC, 12px 0 0  6px #FCFCFC; }
+  height: 21px;
+  background: #FCFCFC;
 }
 
 #fullscreenIcon, #soundIcon, #keyboardIcon, #helpIcon,

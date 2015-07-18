@@ -4,19 +4,19 @@
 
 
 
-BRIGHTNESS = 0;
-CONTRAST = 1;
-COLOR = 2;
-GAMMA = 3;
-GLOW = 4;
-SHARPNESS = 5;
-NTSC_EMU = 6;
-CRT_ENABLED = 7;
-SCANLINES = 8;
-CONVERGENCE = 9;
-NOISE = 10;
-PORT2 = 11;
-VIDEO_SYSTEM = 12;
+var BRIGHTNESS = 0;
+var CONTRAST = 1;
+var COLOR = 2;
+var GAMMA = 3;
+var GLOW = 4;
+var SHARPNESS = 5;
+var NTSC_EMU = 6;
+var CRT_ENABLED = 7;
+var SCANLINES = 8;
+var CONVERGENCE = 9;
+var NOISE = 10;
+var PORT2 = 11;
+var VIDEO_SYSTEM = 12;
 
 
 
@@ -83,3 +83,4 @@ FCEM.inputs = {
 0x0218 : [ 0x000, "Turbo A (Controller 2)" ],
 0x0219 : [ 0x000, "Turbo B (Controller 2)" ],
 };
+var FCEUX_JS_SIZE = 2856153;

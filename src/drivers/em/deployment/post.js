@@ -17,6 +17,23 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
+var req = new XMLHttpRequest();
+req.addEventListener('progress', function(event) {
+	var x = event.loaded / FCEUX_JS_SIZE;
+	FCEM.setProgress(0.75 * x);
+}, false);
+req.addEventListener('load', function(event) {
+	var e = event.target;
+	var s = document.createElement("script");
+	s.innerHTML = e.responseText;
+	document.documentElement.appendChild(s);
+
+// TODO: tsone: add action when script is loaded?
+//	s.addEventListener("load", function() {});
+}, false);
+req.open("GET", "fceux.js", true);
+req.send();
+
 function dragHandler(text) {
   return function(ev) {
     ev.stopPropagation();
@@ -143,4 +160,3 @@ document.addEventListener("keydown", function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', FCEM.onDOMLoaded, false);
-
