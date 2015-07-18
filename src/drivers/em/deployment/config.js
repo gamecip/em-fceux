@@ -83,5 +83,5 @@ inputs : {
 0x0218 : [ 0x000, "Turbo A (Controller 2)" ],
 0x0219 : [ 0x000, "Turbo B (Controller 2)" ],
 },
-FCEUX_JS_SIZE : 2856153,
+FCEUX_JS_SIZE : 2856362,
 };
