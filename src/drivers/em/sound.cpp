@@ -1,7 +1,6 @@
 /* FCE Ultra - NES/Famicom Emulator - Emscripten audio
  *
  * Copyright notice for this file:
- *  Copyright (C) 2002 Xodnizel
  *  Copyright (C) 2015 Valtteri "tsone" Heikkila
  *
  * This program is free software; you can redistribute it and/or modify
@@ -51,8 +50,8 @@ static int s_soundvolumestore = 0;
 static double testSinePhase = 0.0;
 #endif
 
-// Consumes samples from buffer. Modifies the buffer indexes and
-// returns the number of available samples in buffer.
+// Consumes samples from audio buffer. Modifies the buffer indexes and
+// returns the number of available samples. Does NOT modify HW audio buffer.
 static int consumeBuffer(int samples)
 {
 	const int available = (s_BufferCount > samples) ? samples : s_BufferCount;
@@ -62,7 +61,7 @@ static int consumeBuffer(int samples)
 }
 
 // Copy buffer samples to HW buffer. Fill zeros if there's not enough samples.
-static void copyAudio()
+static void AudioCopy()
 {
 	int bufferRead = s_BufferRead; // consumeBuffer() modifies this.
 // FIXME: tsone: hard-coded SOUND_HW_BUF_MAX
@@ -100,7 +99,7 @@ static void copyAudio()
 }
 
 // Fill HW audio buffer with silence.
-static void silencedAudio()
+static void AudioSilence()
 {
 	EM_ASM({
 		var channelData = FCEM.currentOutputBuffer.getChannelData(0);
@@ -112,12 +111,12 @@ static void silencedAudio()
 }
 
 // Callback for filling HW audio buffer.
-static void fillaudio()
+static void AudioCallback()
 {
 	if (!EmulationPaused && !s_silenced) {
-		copyAudio();
+		AudioCopy();
 	} else {
-		silencedAudio();
+		AudioSilence();
 	}
 
 	if (s_silenced) {
@@ -152,11 +151,10 @@ int CreateAudioContext()
 	});
 }
 
+// Returns the sampleRate (Hz) of initialized audio context.
 int InitAudioContext()
 {
 	if (!CreateAudioContext()) {
-// TODO: tsone: error creating audio context
-		printf("!!!! error creating audio context\n");
 		return 0;
 	}
 
@@ -168,7 +166,7 @@ int InitAudioContext()
 			Runtime.dynCall('v', $1);
 		};
 		FCEM.scriptProcessorNode.connect(FCEM.audioContext.destination);
-	}, SOUND_HW_BUF_MAX, fillaudio);
+	}, SOUND_HW_BUF_MAX, AudioCallback);
 
 	return EM_ASM_INT_V({
 		return FCEM.audioContext.sampleRate;
@@ -178,25 +176,25 @@ int InitAudioContext()
 
 int InitSound()
 {
+	int sampleRate;
+
 	if (IsSoundInitialized()) {
 		return 1;
 	}
 
 	printf("Initializing Web Audio.\n");
 
-	// Create audio buffer.
 	s_Buffer = (buf_t*) FCEU_dmalloc(sizeof(buf_t) * SOUND_BUF_MAX);
 	if (!s_Buffer) {
-		return 0;
+		goto error;
 	}
 	s_BufferRead = s_BufferWrite = s_BufferCount = 0;
 
-	int sampleRate = InitAudioContext();
+	sampleRate = InitAudioContext();
 	if (!sampleRate) {
-// TODO: tsone: error handling, audio context can't be created
 		FCEU_dfree(s_Buffer);
 		s_Buffer = 0;
-		return 0;
+		goto error;
 	}
 	em_sound_rate = sampleRate;
 // TODO: tsone: should use 60.0988 divisor instead?
@@ -213,6 +211,10 @@ int InitSound()
 
 	s_initialized = 1;
 	return 1;
+
+error:
+	FCEUD_PrintError("Failed to initialize Web Audio.");
+	return 0;
 }
 
 int GetSoundBufferCount(void)
@@ -222,13 +224,10 @@ int GetSoundBufferCount(void)
 
 void WriteSound(int32 *buf, int Count)
 {
-	if (EmulationPaused != 0) {
+	if (EmulationPaused || (Count <= 0)) {
 		return;
 	}
-	if (Count <= 0) {
-//		printf("!!!! WriteSound: Unable to write %d samples.\n", Count);
-		return;
-	}
+
 	int freeCount = SOUND_BUF_MAX - s_BufferCount;
 	if (Count > freeCount) {
 //		printf("!!!! WriteSound: Tried to write %d samples while buffer has %d free.\n", Count, freeCount);
@@ -310,8 +309,6 @@ void FCEUD_SoundVolumeAdjust(int n)
         }
 
 	FCEUI_SetSoundVolume(soundvolume);
-
-//	FCEU_DispMessage("Sound volume %d.",0, soundvolume);
 }
 
 void FCEUD_SoundToggle(void)
