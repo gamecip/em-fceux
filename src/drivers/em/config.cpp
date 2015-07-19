@@ -87,12 +87,8 @@ Config* InitConfig()
 
 	config = new Config(dir);
 
-	config->addOption("autoscale", "SDL.AutoScale", 1);
-	config->addOption("keepratio", "SDL.KeepRatio", 1);
-
-	// OpenGL options
-	config->addOption("SDL.Vsync", 1);
-
+// TODO: tsone: network play is disabled
+#if 0
 	// network play options - netplay is broken
 	config->addOption("server", "SDL.NetworkIsServer", 0);
 	config->addOption('n', "net", "SDL.NetworkIP", "");
@@ -101,24 +97,9 @@ Config* InitConfig()
 	config->addOption('k', "netkey", "SDL.NetworkGameKey", "");
 	config->addOption("port", "SDL.NetworkPort", 4046);
 	config->addOption("players", "SDL.NetworkPlayers", 1);
-     
-	// input configuration options
-	config->addOption("input1", "SDL.Input.0", "GamePad.0");
-	config->addOption("input2", "SDL.Input.1", "GamePad.1");
-	config->addOption("input3", "SDL.Input.2", "Gamepad.2");
-	config->addOption("input4", "SDL.Input.3", "Gamepad.3");
+#endif
 
-	// enable / disable opposite directionals (left + right or up + down simultaneously)
-	config->addOption("opposite-directionals", "SDL.Input.EnableOppositeDirectionals", 1);
-    
-	config->addOption("fourscore", "SDL.FourScore", 0);
-
-	// enable new PPU core
-	config->addOption("newppu", "SDL.NewPPU", 0);
-
-    // quit when a+b+select+start is pressed
-    config->addOption("4buttonexit", "SDL.ABStartSelectExit", 0);
-
+// TODO: tsone: fc extension port peripherals support
 #if PERI
 	// PowerPad 0 - 1
 	for(unsigned int i = 0; i < POWERPAD_NUM_DEVICES; i++) {
@@ -181,12 +162,6 @@ Config* InitConfig()
 		config->addOption(prefix + FamilyKeyBoardNames[j],
 						DefaultFamilyKeyBoard[j]);
 	}
-#endif //PERI
-
-	// for FAMICOM microphone in pad 2 pad 1 didn't have it
-	// Takeshi no Chousenjou uses it for example.
-	prefix = "SDL.Input.FamicomPad2.";
-	config->addOption("rp2mic", prefix + "EnableMic", 0);
 
 	// All mouse devices
 	config->addOption("SDL.OekaKids.0.DeviceType", "Mouse");
@@ -200,15 +175,13 @@ Config* InitConfig()
 
 	config->addOption("SDL.Zapper.0.DeviceType", "Mouse");
 	config->addOption("SDL.Zapper.0.DeviceNum", 0);
+#endif
 
 	return config;
 }
 
 void UpdateEMUCore(Config *config)
 {
-// TODO: tsone: no neet to call this, color handling is by the driver
-//	FCEUI_SetNTSCTH(ntsccol, ntsctint, ntschue);
-
 	FCEUI_SetVidSystem(0);
 
 	FCEUI_SetGameGenie(0);
@@ -259,8 +232,8 @@ void FCEM_BindKey(int id, int keyIdx)
 // Set control value.
 void FCEM_SetController(int idx, double v)
 {
-	if (idx < 0 || idx >= FCEM_CONTROLLER_COUNT) {
-// TODO: tsone: warning message?
+	if ((idx < 0) || (idx >= FCEM_CONTROLLER_COUNT)) {
+// TODO: tsone: warning message if contoller idx is invalid?
 		// Skip if control idx is invalid.
 		return;
 	}
@@ -281,9 +254,6 @@ void FCEM_SetController(int idx, double v)
 	default:
 		if (idx >= FCEM_BRIGHTNESS && idx <= FCEM_NOISE) {
 			es2UpdateController(idx, v);
-		} else {
-// TODO: tsone: wasn't this case already checked?
-			// Invalid controller idx.
 		}
 		break;
 	}
@@ -295,4 +265,3 @@ void FCEM_SilenceSound(int option)
 }
 
 }
-

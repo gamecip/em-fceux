@@ -32,7 +32,7 @@ typedef float mix_t;
 extern int EmulationPaused;
 
 int em_sound_rate = SOUND_RATE;
-int em_sound_frame_samples = SOUND_RATE / 60;
+int em_sound_frame_samples = SOUND_RATE / NTSC_FPS;
 
 static buf_t *s_Buffer = 0;
 static int s_BufferRead = 0;
@@ -197,8 +197,7 @@ int InitSound()
 		goto error;
 	}
 	em_sound_rate = sampleRate;
-// TODO: tsone: should use 60.0988 divisor instead?
-	em_sound_frame_samples = em_sound_rate / 60;
+	em_sound_frame_samples = em_sound_rate / NTSC_FPS;
 
 	FCEUI_SetSoundVolume(150);
 	FCEUI_SetSoundQuality(SOUND_QUALITY);

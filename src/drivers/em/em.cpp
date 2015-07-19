@@ -155,15 +155,14 @@ static int DriverInitialize()
 	InitSound();
 	s_status |= STATUS_INIT;
 
-	int fourscore = 0;
-	g_config->getOption("SDL.FourScore", &fourscore);
+	int fourscore = 0; // Set to 1 to enable FourScore.
 // TODO: tsone: this sets two controllers by default, but should be more flexible
 	FCEUD_SetInput(fourscore, false, SI_GAMEPAD, SI_GAMEPAD, SIFC_NONE);
 
 	return 1;
 }
 
-// TODO: tsone: not used
+// TODO: tsone: driver is never closed, hence DriverKill() is unused
 #if 0
 static void DriverKill()
 {
@@ -213,7 +212,7 @@ int main(int argc, char *argv[])
 
 	// Initialize the configuration system
 	g_config = InitConfig();
-		
+
 	// initialize the infrastructure
 	error = FCEUI_Initialize();
 	std::string s;
@@ -225,13 +224,10 @@ int main(int argc, char *argv[])
 
 	UpdateEMUCore(g_config);
 
-// TODO: tsone: don't use new ppu (for now) 
-	{
-		int id;
-		g_config->getOption("SDL.NewPPU", &id);
-		if (id) {
-			newppu = 1;
-		}
+// TODO: tsone: do not use new PPU, it's probably not working
+	int use_new_ppu = 0;
+	if (use_new_ppu) {
+		newppu = 1;
 	}
 
 	DriverInitialize();
@@ -246,13 +242,13 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-// TODO: tsone: is it necessary?
+// TODO: tsone: is FCEUD_GetTime() necessary?
 uint64 FCEUD_GetTime()
 {
 	return emscripten_get_now();
 }
 
-// TODO: tsone: is it necessary?
+// TODO: tsone: is FCEUD_GetTimeFreq() necessary?
 uint64 FCEUD_GetTimeFreq(void)
 {
 	// emscripten_get_now() returns time in milliseconds.
@@ -289,4 +285,3 @@ void FCEUD_TurboToggle(void) { NoWaiting^= 1; }
 FCEUFILE* FCEUD_OpenArchiveIndex(ArchiveScanRecord& asr, std::string &fname, int innerIndex) { return 0; }
 FCEUFILE* FCEUD_OpenArchive(ArchiveScanRecord& asr, std::string& fname, std::string* innerFilename) { return 0; }
 ArchiveScanRecord FCEUD_ScanArchive(std::string fname) { return ArchiveScanRecord(); }
-

@@ -287,15 +287,15 @@ static int FCEM_TestGamepadButton(const EmscriptenGamepadEvent *p, int idx)
         const int positive_axis = idx & 1;
         idx = !((idx & 0x02) >> 1);
         if (idx < p->numAxes) {
-            if (positive_axis) { 
+            if (positive_axis) {
                 return p->axis[idx] >= GAMEPAD_THRESHOLD;
-            } else { 
+            } else {
                 return p->axis[idx] <= -GAMEPAD_THRESHOLD;
             }
         } else {
             return 0;
         }
-    } else { 
+    } else {
         // A, B, Select, Start.
         return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] >= GAMEPAD_THRESHOLD)));
     }
@@ -309,8 +309,8 @@ static void UpdateGamepad(void)
 
 	s_rapidFireFrame ^= 1;
 
-	int opposite_dirs;
-	g_config->getOption("SDL.Input.EnableOppositeDirectionals", &opposite_dirs);
+	// Set to 1 to enable opposite dirs in D-Pad.
+	int opposite_dirs = 0;
 
 	// Four possibly connected joysticks/gamepads are read here, each matching a NES gamepad.
 	EmscriptenGamepadEvent gamepads[4];
@@ -349,8 +349,7 @@ static void UpdateGamepad(void)
 
 // TODO: tsone: keypad exit is not supported
 #ifndef EMSCRIPTEN
-		int four_button_exit;
-		g_config->getOption("SDL.ABStartSelectExit", &four_button_exit);
+		int four_button_exit = 0;
 		// if a+b+start+select is pressed, exit
 		if (four_button_exit && JS == 15) {
 			FCEUI_printf("all buttons pressed, exiting\n");
@@ -501,4 +500,3 @@ const unsigned int *GetKeyboard()
 void FCEUD_MovieRecordTo() {}
 void FCEUD_SaveStateAs() {}
 void FCEUD_LoadStateFrom() {}
-

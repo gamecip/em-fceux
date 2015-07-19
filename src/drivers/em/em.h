@@ -100,7 +100,7 @@ enum FCEM_Controller {
 };
 #include "config.inc.hpp"
 #undef CONTROLLER_PRE
-#undef CONTROLLER 
+#undef CONTROLLER
 #undef CONTROLLER_POST
 
 // Audio options
@@ -112,10 +112,14 @@ enum FCEM_Controller {
 #define SOUND_QUALITY		0
 #define SOUND_BUF_MASK		(SOUND_BUF_MAX-1)
 
+// SDL and Windows drivers use following values for FPS, however PAL FPS is
+// documented to be 50.0070 in http://wiki.nesdev.com/w/index.php/Clock_rate
+#define NTSC_FPS 60.0988
+#define PAL_FPS  50.0069
+
 // The rate of output and emulated (internal) audio (frequency, in Hz).
 extern int em_sound_rate;
-// Number of audio samples per frame. Actually NTSC divisor is 60.0988, but since this is used as divisor
-// to find out number of frames to skip, higher value will avoid audio buffer overflow.
+// Number of audio samples per frame.
 extern int em_sound_frame_samples;
 
 extern int eoptions;
@@ -124,7 +128,7 @@ extern int NoWaiting;
 
 extern bool replaceP2StartWithMicrophone;
 
-// TODO: tsone: unsupported peripherals
+// TODO: tsone: fc extension port peripherals support
 #if PERI
 extern const char *PowerPadNames[POWERPAD_NUM_BUTTONS];
 extern const char *DefaultPowerPadDevice[POWERPAD_NUM_DEVICES];

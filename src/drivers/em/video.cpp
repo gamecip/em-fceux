@@ -82,11 +82,9 @@ void FCEUD_VideoChanged()
 	PAL = FSettings.PAL ? 1 : 0;
 
 	if (!PAL) {
-// TODO: tsone: should use 60.0988 divisor instead?
-		em_sound_frame_samples = em_sound_rate / 60;
+		em_sound_frame_samples = em_sound_rate / NTSC_FPS;
 	} else {
-// TODO: tsone: what's the proper pal divisor?
-		em_sound_frame_samples = em_sound_rate / 50;
+		em_sound_frame_samples = em_sound_rate / PAL_FPS;
 	}
 }
 
@@ -181,4 +179,3 @@ void CanvasToNESCoords(uint32 *x, uint32 *y)
 	*y = 224 * (*y) / s_height;
 	*y += s_srendline;
 }
-
