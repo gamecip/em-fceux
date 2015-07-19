@@ -1,7 +1,7 @@
 #
 # SConstruct - build script for the SDL and Emscripten port of fceux
 #
-# You can adjust the BoolVariables below to include/exclude features 
+# You can adjust the BoolVariables below to include/exclude features
 # at compile-time.  You may also use arguments to specify the parameters.
 #   ie: scons RELEASE=1 GTK3=1
 #
@@ -10,10 +10,10 @@
 
 import os
 import sys
-import platform 
+import platform
 
 opts = Variables(None, ARGUMENTS)
-opts.AddVariables( 
+opts.AddVariables(
   BoolVariable('DEBUG',     'Build with debugging symbols', 0),
   BoolVariable('RELEASE',   'Set to 1 to build for release', 1),
   BoolVariable('FRAMESKIP', 'Enable frameskipping', 1),
@@ -62,8 +62,6 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   exports = '-s EXPORTED_FUNCTIONS=\'["_' + '","_'.join(exportsList) + '"]\''
   env.Append(LINKFLAGS = exports)
   env.Append(LINKFLAGS = '--preload-file src/drivers/em/assets/games/@/default/')
-  env.Append(LINKFLAGS = '-s USE_SDL=2')
-  env.Append(CCFLAGS = '-s USE_SDL=2')
 else:
   env['EMSCRIPTEN'] = 0
 
@@ -175,7 +173,7 @@ else:
     env.Append(CPPDEFINES=["_S9XLUA_H"])
     if env['PLATFORM'] == 'darwin':
       # Define LUA_USE_MACOSX otherwise we can't bind external libs from lua
-      env.Append(CCFLAGS = ["-DLUA_USE_MACOSX"])    
+      env.Append(CCFLAGS = ["-DLUA_USE_MACOSX"])
     if env['PLATFORM'] == 'posix':
       # If we're POSIX, we use LUA_USE_LINUX since that combines usual lua posix defines with dlfcn calls for dynamic library loading.
       # Should work on any *nix
@@ -195,18 +193,18 @@ else:
   # "--as-needed" no longer available on OSX (probably BSD as well? TODO: test)
   if env['PLATFORM'] != 'darwin':
     env.Append(LINKFLAGS=['-Wl,--as-needed'])
-  
+
   ### Search for gd if we're not in Windows
   if env['PLATFORM'] != 'win32' and env['PLATFORM'] != 'cygwin' and env['CREATE_AVI'] and env['LOGO']:
     gd = conf.CheckLib('gd', autoadd=1)
     if gd == 0:
       env['LOGO'] = 0
       print 'Did not find libgd, you won\'t be able to create a logo screen for your avis.'
-   
+
   if env['OPENGL'] and (env['EMSCRIPTEN'] or conf.CheckLibWithHeader('GL', 'GL/gl.h', 'c', autoadd=1)):
     conf.env.Append(CCFLAGS = "-DOPENGL")
   conf.env.Append(CPPDEFINES = ['PSS_STYLE=1'])
-  
+
   env = conf.Finish()
 
 if sys.byteorder == 'little' or env['PLATFORM'] == 'win32':
@@ -226,7 +224,7 @@ else:
 
 if env['RELEASE']:
   if env['EMSCRIPTEN']:
-    common = ' -flto -O3'
+    common = ' -flto -Oz'
     common += ' --llvm-opts 3'
     common += ' --llvm-lto 3'
     common += ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
@@ -259,47 +257,47 @@ if env['EMSCRIPTEN']:
     env.Command(f+'.gz', f, 'gzip --best -c $SOURCE > $TARGET')
 else:
   env.Program(target="fceux-net-server", source=["fceux-server/server.cpp", "fceux-server/md5.cpp", "fceux-server/throttle.cpp"])
-  
+
   # Installation rules
   if prefix == None:
     prefix = "/usr/local"
-  
+
   exe_suffix = ''
   if env['PLATFORM'] == 'win32':
     exe_suffix = '.exe'
-  
+
   fceux_src = 'src/fceux' + exe_suffix
   fceux_dst = 'bin/fceux' + exe_suffix
-  
+
   fceux_net_server_src = 'fceux-net-server' + exe_suffix
   fceux_net_server_dst = 'bin/fceux-net-server' + exe_suffix
-  
+
   auxlib_src = 'src/auxlib.lua'
   auxlib_dst = 'bin/auxlib.lua'
   auxlib_inst_dst = prefix + '/share/fceux/auxlib.lua'
-  
+
   fceux_h_src = 'output/fceux.chm'
   fceux_h_dst = 'bin/fceux.chm'
-  
+
   env.Command(fceux_h_dst, fceux_h_src, [Copy(fceux_h_dst, fceux_h_src)])
   env.Command(fceux_dst, fceux_src, [Copy(fceux_dst, fceux_src)])
   env.Command(fceux_net_server_dst, fceux_net_server_src, [Copy(fceux_net_server_dst, fceux_net_server_src)])
   env.Command(auxlib_dst, auxlib_src, [Copy(auxlib_dst, auxlib_src)])
-  
+
   man_src = 'documentation/fceux.6'
   man_net_src = 'documentation/fceux-net-server.6'
   man_dst = prefix + '/share/man/man6/fceux.6'
   man_net_dst = prefix + '/share/man/man6/fceux-net-server.6'
-  
+
   share_src = 'output/'
   share_dst = prefix + '/share/fceux/'
-  
+
   image_src = 'fceux.png'
   image_dst = prefix + '/share/pixmaps'
-  
+
   desktop_src = 'fceux.desktop'
   desktop_dst = prefix + '/share/applications/'
-  
+
   env.Install(prefix + "/bin/", fceux)
   env.Install(prefix + "/bin/", "fceux-net-server")
   # TODO:  Where to put auxlib on "scons install?"

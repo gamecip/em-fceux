@@ -20,15 +20,10 @@
  */
 #ifndef _EM_H_
 #define _EM_H_
-#include <SDL.h>
 #include "../../driver.h"
 #include "../common/args.h"
 #include "../common/config.h"
 #include "../common/configSys.h"
-
-#if !SDL_VERSION_ATLEAST(2, 0, 0)
-#error "compile with emscripten -s USE_SDL=2 option"
-#endif
 
 // eoptions variable flags
 #define EO_NO8LIM      1
@@ -110,17 +105,10 @@ enum FCEM_Controller {
 
 // Audio options
 // NOTE: tsone: both SOUND_BUF_MAX and SOUND_HW_BUF_MAX must be power of two!
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-// NOTE: tsone: for 32-bit floating-point audio (SDL2 port)
+// NOTE: tsone: for 32-bit floating-point audio
 #define SOUND_RATE		48000
 #define SOUND_BUF_MAX		8192
 #define SOUND_HW_BUF_MAX	2048
-#else
-// NOTE: tsone: for SDL1.x 16-bit integer audio (SDL1)
-#define SOUND_RATE		22050
-#define SOUND_BUF_MAX		4096
-#define SOUND_HW_BUF_MAX	512
-#endif
 #define SOUND_QUALITY		0
 #define SOUND_BUF_MASK		(SOUND_BUF_MAX-1)
 

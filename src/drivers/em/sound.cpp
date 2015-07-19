@@ -21,18 +21,14 @@
 #include "em.h"
 #include "../../utils/memory.h"
 #include "../../fceu.h"
+#include <emscripten.h>
 
 // NOTE: tsone: define to output test sine tone
 #define TEST_SINE_AT_FILL	0
 #define TEST_SINE_AT_WRITE	0
 
-#if SDL_VERSION_ATLEAST(2, 0, 0)
 typedef float buf_t;
 typedef float mix_t;
-#else
-typedef int buf_t;
-typedef int16 mix_t;
-#endif
 
 extern int EmulationPaused;
 
@@ -55,7 +51,8 @@ static int s_soundvolumestore = 0;
 static double testSinePhase = 0.0;
 #endif
 
-// Consumes samples from buffer. Modifies indexes and returns the number of samples available.
+// Consumes samples from buffer. Modifies the buffer indexes and
+// returns the number of available samples in buffer.
 static int consumeBuffer(int samples)
 {
 	const int available = (s_BufferCount > samples) ? samples : s_BufferCount;
@@ -64,68 +61,69 @@ static int consumeBuffer(int samples)
 	return available;
 }
 
-// Copy audio samples to buffer. Fill zeros if there's not enough samples.
-static void copyAudio(mix_t *str, int samples)
+// Copy buffer samples to HW buffer. Fill zeros if there's not enough samples.
+static void copyAudio()
 {
-	int j = s_BufferRead - 1;
-	int m = SOUND_BUF_MAX - s_BufferRead;
-	int available = consumeBuffer(samples);
-	if (m > available) {
-		m = available;
-	}
+	int bufferRead = s_BufferRead; // consumeBuffer() modifies this.
+// FIXME: tsone: hard-coded SOUND_HW_BUF_MAX
+	int available = consumeBuffer(SOUND_HW_BUF_MAX);
+	EM_ASM_ARGS({
+		var s_Buffer = $0;
+		var s_BufferRead = $1;
+		var available = $2;
 
-	samples = samples - available + 1;
-	available = available - m + 1;
-	++m;
+  		var j = s_Buffer + s_BufferRead - 1;
+// FIXME: tsone: hard-coded SOUND_BUF_MAX
+		var m = 8192 - s_BufferRead;
+		if (m > available) {
+			m = available;
+		}
 
-	int i = -1;
+// FIXME: tsone: hard-coded SOUND_HW_BUF_MAX
+		var samples = 2048 - available + 1;
+		available = available - m + 1;
+		++m;
 
-// TODO: tsone: could use memcpy and memset. not sure if it's faster though
-	while (--m) {
-		str[++i] = s_Buffer[++j];
-	}
-	j = -1;
-	while (--available) {
-		str[++i] = s_Buffer[++j];
-	}
-	while (--samples) {
-		str[++i] = 0;
-	}
+		var channelData = FCEM.currentOutputBuffer.getChannelData(0);
+		var i = -1;
+		while (--m) {
+			channelData[++i] = HEAPF32[++j];
+		}
+		j = s_Buffer - 1;
+		while (--available) {
+			channelData[++i] = HEAPF32[++j];
+		}
+		while (--samples) {
+			channelData[++i] = 0;
+		}
+	}, (ptrdiff_t) s_Buffer >> 2, bufferRead, available);
 }
 
-// Callback from the SDL to get and play audio data.
-static void fillaudio(void *udata, uint8 *stream, int len)
+// Fill HW audio buffer with silence.
+static void silencedAudio()
 {
-#if TEST_SINE_AT_FILL
+	EM_ASM({
+		var channelData = FCEM.currentOutputBuffer.getChannelData(0);
+// FIXME: tsone: hard-coded SOUND_HW_BUF_MAX
+		for (var i = 2048 - 1; i >= 0; --i) {
+			channelData[i] = 0;
+		}
+	});
+}
 
-	// Sine wave test outputs a 440Hz tone.
-	len = len / sizeof(mix_t);
-	mix_t* str = (mix_t*) stream;
-	for (int i = 0; i < len; ++i) {
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-		str[i] = 0.5 * sin(testSinePhase * (2.0*M_PI * 440.0/em_sound_rate));
-#else
-		str[i] = 0xFFF * sin(testSinePhase * (2.0*M_PI * 440.0/em_sound_rate));
-#endif
-		++testSinePhase;
-	}
-	s_BufferCount -= len;
-
-#else
-
-	const int samples = len / sizeof(mix_t);
-
+// Callback for filling HW audio buffer.
+static void fillaudio()
+{
 	if (!EmulationPaused && !s_silenced) {
-		copyAudio((mix_t*) stream, samples);
+		copyAudio();
 	} else {
-		memset(stream, 0, len);
+		silencedAudio();
 	}
 
 	if (s_silenced) {
-		consumeBuffer(samples);
+// FIXME: tsone: hard-coded SOUND_HW_BUF_MAX
+		consumeBuffer(SOUND_HW_BUF_MAX);
 	}
-
-#endif // TEST_SINE_AT_FILL
 }
 
 void SilenceSound(int option)
@@ -138,70 +136,71 @@ int IsSoundInitialized()
 	return s_initialized;
 }
 
+int CreateAudioContext()
+{
+	return EM_ASM_INT_V({
+		if (!FCEM.audioContext) {
+				if (typeof(AudioContext) !== 'undefined') {
+					FCEM.audioContext = new AudioContext();
+				} else if (typeof(webkitAudioContext) !== 'undefined') {
+					FCEM.audioContext = new webkitAudioContext();
+				} else {
+					return 0;
+				}
+		}
+		return 1;
+	});
+}
+
+int InitAudioContext()
+{
+	if (!CreateAudioContext()) {
+// TODO: tsone: error creating audio context
+		printf("!!!! error creating audio context\n");
+		return 0;
+	}
+
+	EM_ASM_ARGS({
+		// Always mono (1 channel).
+		FCEM.scriptProcessorNode = FCEM.audioContext.createScriptProcessor($0, 0, 1);
+		FCEM.scriptProcessorNode.onaudioprocess = function(ev) {
+			FCEM.currentOutputBuffer = ev.outputBuffer;
+			Runtime.dynCall('v', $1);
+		};
+		FCEM.scriptProcessorNode.connect(FCEM.audioContext.destination);
+	}, SOUND_HW_BUF_MAX, fillaudio);
+
+	return EM_ASM_INT_V({
+		return FCEM.audioContext.sampleRate;
+	});
+}
+
+
 int InitSound()
 {
 	if (IsSoundInitialized()) {
 		return 1;
 	}
 
-	SDL_AudioSpec spec;
-	SDL_AudioSpec obtained;
+	printf("Initializing Web Audio.\n");
 
-	memset(&spec, 0, sizeof(spec));
-	if(SDL_InitSubSystem(SDL_INIT_AUDIO) < 0) {
-		puts(SDL_GetError());
-		KillSound();
-		return 0;
-	}
-
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	const char *driverName = SDL_GetAudioDriver(0);
-#else
-	char driverName[8];
-	SDL_AudioDriverName(driverName, 8);
-#endif
-	printf("Loading SDL audio driver %s...\n", driverName);
-
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	spec.format = AUDIO_F32;
-#else
-	spec.format = AUDIO_S16SYS;
-#endif
-	spec.channels = 1;
-	spec.freq = SOUND_RATE;
-	spec.samples = SOUND_HW_BUF_MAX;
-	spec.callback = fillaudio;
-	spec.userdata = 0;
-
-//	printf("Sound buffersize: %d, HW: %d)\n", SOUND_BUF_MAX, spec.samples);
-
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	if(SDL_OpenAudio(&spec, &obtained)) {
-#else
-	if(SDL_OpenAudio(&spec, 0)) {
-#endif
-		puts(SDL_GetError());
-		KillSound();
-		return 0;
-	}
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	printf("SDL open audio requested: format:%d freq:%d channels:%d samples:%d\n", spec.format,
-		spec.freq, spec.channels, spec.samples);
-	printf("SDL open audio obtained: format:%d freq:%d channels:%d samples:%d\n", obtained.format,
-		obtained.freq, obtained.channels, obtained.samples);
-#endif
-	em_sound_rate = obtained.freq;
-// TODO: tsone: should use 60.0988 divisor instead?
-	em_sound_frame_samples = em_sound_rate / 60;
-
+	// Create audio buffer.
 	s_Buffer = (buf_t*) FCEU_dmalloc(sizeof(buf_t) * SOUND_BUF_MAX);
 	if (!s_Buffer) {
-		KillSound();
 		return 0;
 	}
 	s_BufferRead = s_BufferWrite = s_BufferCount = 0;
 
-	SDL_PauseAudio(0);
+	int sampleRate = InitAudioContext();
+	if (!sampleRate) {
+// TODO: tsone: error handling, audio context can't be created
+		FCEU_dfree(s_Buffer);
+		s_Buffer = 0;
+		return 0;
+	}
+	em_sound_rate = sampleRate;
+// TODO: tsone: should use 60.0988 divisor instead?
+	em_sound_frame_samples = em_sound_rate / 60;
 
 	FCEUI_SetSoundVolume(150);
 	FCEUI_SetSoundQuality(SOUND_QUALITY);
@@ -242,11 +241,7 @@ void WriteSound(int32 *buf, int Count)
 	s_BufferCount += Count;
 	++Count;
 	while (--Count) {
-#if SDL_VERSION_ATLEAST(2, 0, 0)
 		s_Buffer[s_BufferWrite] = 0.5 * sin(testSinePhase * (2.0*M_PI * 440.0/em_sound_rate));
-#else
-		s_Buffer[s_BufferWrite] = 0xFFF * sin(testSinePhase * (2.0*M_PI * 440.0/em_sound_rate));
-#endif
 		s_BufferWrite = (s_BufferWrite + 1) & SOUND_BUF_MASK;
 		++testSinePhase;
 	}
@@ -269,19 +264,11 @@ void WriteSound(int32 *buf, int Count)
 	++m;
 
 	while (--m) {
-#if SDL_VERSION_ATLEAST(2, 0, 0)
 		s_Buffer[++i] = buf[++j] / 32768.0;
-#else
-		s_Buffer[++i] = buf[++j];
-#endif
 	}
 	i = -1;
 	while (--Count) {
-#if SDL_VERSION_ATLEAST(2, 0, 0)
 		s_Buffer[++i] = buf[++j] / 32768.0;
-#else
-		s_Buffer[++i] = buf[++j];
-#endif
 	}
 
 #else
@@ -300,17 +287,6 @@ void WriteSound(int32 *buf, int Count)
 
 int KillSound(void)
 {
-#if SDL_VERSION_ATLEAST(2, 0, 0)
-	// Don't close audio with SDL2.
-#else
-	FCEUI_Sound(0);
-	SDL_CloseAudio();
-	SDL_QuitSubSystem(SDL_INIT_AUDIO);
-	if(s_Buffer) {
-		free(s_Buffer);
-		s_Buffer = 0;
-	}
-#endif
 	return 0;
 }
 
@@ -343,11 +319,8 @@ void FCEUD_SoundToggle(void)
 	if(s_soundvolumestore) {
 		FCEUI_SetSoundVolume(s_soundvolumestore);
 		s_soundvolumestore = 0;
-//		FCEU_DispMessage("Sound mute off.",0);
 	} else {
 		s_soundvolumestore = FSettings.SoundVolume;
 		FCEUI_SetSoundVolume(0);
-//		FCEU_DispMessage("Sound mute on.",0);
 	}
 }
-

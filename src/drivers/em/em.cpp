@@ -211,11 +211,6 @@ int main(int argc, char *argv[])
 
 	FCEUD_Message("Starting " FCEU_NAME_AND_VERSION "...\n");
 
-	// HACK: Set subsystem flags to 0 to avoid including video and input
-	// event handling code of Emscripte SDL2 port. We only want the audio
-	// handling code, which will be included no matter the flags value.
-	SDL_Init(0);
-
 	// Initialize the configuration system
 	g_config = InitConfig();
 		
