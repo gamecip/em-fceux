@@ -114,7 +114,7 @@ static const GLfloat mesh_quad_uvs[] = {
 	 0.0f,  0.0f,
 	 1.0f,  0.0f,
 	 0.0f,  1.0f,
-	 1.0f,  1.0f 
+	 1.0f,  1.0f
 };
 static const GLfloat mesh_quad_norms[] = {
 	 0.0f,  0.0f, 1.0f,
@@ -157,9 +157,9 @@ static void updateSharpenKernel()
 	double v = GetController(FCEM_NTSC_EMU) * 0.4 * (GetController(FCEM_SHARPNESS)+0.5);
 	GLfloat sharpen_kernel[] = {
 		-v, -v, -v,
-		1, 0, 0, 
-		2*v, 1+2*v, 2*v, 
-		0, 0, 1, 
+		1, 0, 0,
+		2*v, 1+2*v, 2*v,
+		0, 0, 1,
 		-v, -v, -v
 	};
 	glUniform3fv(s_u._sharpen_kernel_loc, 5, sharpen_kernel);
@@ -242,12 +242,17 @@ static void adjustYIQLimits(double *yiq)
 // Box filter kernel.
 #define BOX_FILTER(w2_, center_, x_) (fabs((x_) - (center_)) < (w2_) ? 1.0 : 0.0)
 
-// Generate lookup texture.
-static void genLookupTex()
+double *yiqs = 0;
+
+// Generate NTSC YIQ lookup table
+void genNTSCLookup()
 {
+	if (yiqs) {
+		return;
+	}
+
 	double *ys = (double*) calloc(3*8 * NUM_PHASES*NUM_COLORS, sizeof(double));
-	double *yiqs = (double*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(double));
-	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
+	yiqs = (double*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(double));
 
 	// Generate temporary lookup containing samplings of separated and normalized YIQ components
 	// for each phase and color combination. Separation is performed using a simulated 1D comb filter.
@@ -331,6 +336,16 @@ static void genLookupTex()
 		yiqs[k+2] = yiq[2];
 	}
 
+	free(ys);
+}
+
+// Generate lookup texture.
+static void genLookupTex()
+{
+	genNTSCLookup();
+
+	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
+
 	// Create lookup texture RGB as bytes by mapping voltages to the min-max range.
 	// The conversion to bytes will lose some precision, which is unnoticeable however.
 	for (int k = 0; k < 3 * LOOKUP_W * NUM_COLORS; k+=3) {
@@ -343,8 +358,6 @@ static void genLookupTex()
 	glActiveTexture(TEX(LOOKUP_I));
 	createTex(&s_p.lookup_tex, LOOKUP_W, NUM_COLORS, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE, result);
 
-	free(ys);
-	free(yiqs);
 	free(result);
 }
 
@@ -932,7 +945,7 @@ void es2Render(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 //		printf("overscan: %02X\n", overscan_color);
 
 		memset(s_p.overscan_pixels, overscan_color, OVERSCAN_W * IDX_H);
-		
+
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, OVERSCAN_W, IDX_H, GL_LUMINANCE, GL_UNSIGNED_BYTE, s_p.overscan_pixels);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, IDX_W-OVERSCAN_W, 0, OVERSCAN_W, IDX_H, GL_LUMINANCE, GL_UNSIGNED_BYTE, s_p.overscan_pixels);
 	}
@@ -955,4 +968,3 @@ void es2Render(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 		passDirect();
 	}
 }
-

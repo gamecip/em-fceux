@@ -59,7 +59,7 @@ typedef struct t_es2
     GLint viewport[4];  // Screen viewport.
 
     GLfloat mvp_mat[4*4]; // Perspective MVP matrix for the meshes.
-   
+
     GLuint downsample_fb[6];  // Framebuffers for downscaling.
     GLuint downsample_tex[6]; // Downsample textures.
     GLuint downsample_prog;   // Shader for downscaling.

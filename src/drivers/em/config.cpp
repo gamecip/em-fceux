@@ -252,9 +252,12 @@ void FCEM_SetController(int idx, double v)
 		}
 		break;
 	default:
+#if 1
+#else
 		if (idx >= FCEM_BRIGHTNESS && idx <= FCEM_NOISE) {
 			es2UpdateController(idx, v);
 		}
+#endif
 		break;
 	}
 }
