@@ -71,19 +71,40 @@ static void AudioCopy()
 		var s_BufferRead = $1;
 		var available = $2;
 
-  		var j = s_Buffer + s_BufferRead - 1;
+		var channelData = FCEM.currentOutputBuffer.getChannelData(0);
+
 // FIXME: tsone: hard-coded SOUND_BUF_MAX
 		var m = 8192 - s_BufferRead;
 		if (m > available) {
 			m = available;
 		}
 
+#if 1
+		// Float32Array.set() version.
+// FIXME: tsone: hard-coded SOUND_HW_BUF_MAX
+		var samples = 2048 - available + 1;
+		available = available - m;
+
+		if (m > 0) {
+			var j = s_Buffer + s_BufferRead;
+			channelData.set(HEAPF32.subarray(j, j + m));
+		}
+		if (available > 0) {
+			channelData.set(HEAPF32.subarray(s_Buffer, s_Buffer + available), m);
+		}
+		m += available - 1;
+		while (--samples) {
+			channelData[++m] = 0;
+		}
+
+#else
+		// Regular version without Float32Array.set().
+		var j = s_Buffer + s_BufferRead - 1;
 // FIXME: tsone: hard-coded SOUND_HW_BUF_MAX
 		var samples = 2048 - available + 1;
 		available = available - m + 1;
 		++m;
 
-		var channelData = FCEM.currentOutputBuffer.getChannelData(0);
 		var i = -1;
 		while (--m) {
 			channelData[++i] = HEAPF32[++j];
@@ -95,6 +116,7 @@ static void AudioCopy()
 		while (--samples) {
 			channelData[++i] = 0;
 		}
+#endif
 	}, (ptrdiff_t) s_Buffer >> 2, bufferRead, available);
 }
 
