@@ -1,19 +1,7 @@
+import glob
 Import('env')
 Export('env')
-
-source_list = Split(
-    """
-    input.cpp
-    config.cpp
-    em.cpp
-    sound.cpp
-    video.cpp
-    splash.cpp
-    es2.cpp
-    es2util.cpp
-    """)
-
-source_list = ['drivers/em/' + s for s in source_list]
+source_list = [ 'drivers/em/' + s for s in glob.glob('*.cpp') ]
 
 # Need to include zlib functions.
 zlib_source_list = Split(

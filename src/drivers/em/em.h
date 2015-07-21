@@ -171,6 +171,10 @@ int KillVideo();
 void RenderVideo(int draw_splash);
 void DrawSplash();
 
+void canvas2DResize(int width, int height);
+void canvas2DRender(uint8 *pixels, uint8 *row_deemp);
+void canvas2DInit();
+
 int LoadGame(const char *path);
 int CloseGame(void);
 uint64 FCEUD_GetTime();

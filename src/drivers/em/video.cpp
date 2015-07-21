@@ -109,27 +109,10 @@ static void Resize(int width, int height)
 
 //	printf("!!!! resize: (%dx%d) '(%dx%d) asp:%f\n", width, height, s_width, s_height, aspect);
 
-	// HACK: emscripten_set_canvas_size() forces canvas size by setting css style
-	// width and height with "!important" flag. Workaround is to set size manually
-	// and remove the style attribute. See Emscripten's updateCanvasDimensions()
-	// in library_browser.js for the faulty code.
 #if 1
-	EM_ASM_INT({
-		var canvas = Module.canvas;
-		canvas.style.setProperty( "width", $0 + "px", "important");
-		canvas.style.setProperty("height", $1 + "px", "important");
-	}, s_width, s_height);
-
+	canvas2DResize(s_width, s_height);
 #else
-	EM_ASM_INT({
-		var canvas = Module.canvas;
-		canvas.width = canvas.widthNative = $0;
-		canvas.height = canvas.heightNative = $1;
-		canvas.style.setProperty( "width", $0 + "px", "important");
-		canvas.style.setProperty("height", $1 + "px", "important");
-	}, s_width, s_height);
-
-	es2SetViewport(s_width, s_height);
+	es2Resize(s_width, s_height);
 #endif
 }
 
@@ -139,26 +122,6 @@ static EM_BOOL FCEM_ResizeCallback(int eventType, const EmscriptenUiEvent *uiEve
 	return 1;
 }
 
-// TODO: tsone: refactor 2dcanvas code to own module?
-#define DOUBLE_SIZE 0
-// Init software canvas rendering.
-extern void genNTSCLookup();
-extern double *yiqs;
-// TODO: tsone: following must match with es2.cpp
-#define NUM_COLORS	(64 * 8)
-#define LOOKUP_W	64
-#define INPUT_H		240
-#define IDX_H		224
-#define INPUT_ROW_OFFS	((INPUT_H-IDX_H) / 2)
-// TODO: tsone: following must match with shaders.h
-static const double c_convMat[] = {
-	1.0,        1.0,        1.0,       // Y
-	0.946882,   -0.274788,  -1.108545, // I
-	0.623557,   -0.635691,  1.709007   // Q
-};
-static uint32 *lookupRGBA = 0;
-static uint32 *tmpBuf = 0;
-
 void RenderVideo(int draw_splash)
 {
 	if (draw_splash) {
@@ -166,111 +129,9 @@ void RenderVideo(int draw_splash)
 	}
 
 #if 1
-#if !DOUBLE_SIZE
-	int k = 256 * INPUT_ROW_OFFS;
-	int m = 0;
-	for (int row = INPUT_ROW_OFFS; row < 224 + INPUT_ROW_OFFS; ++row) {
-		int deemp = deempScan[row];
-		for (int x = 256; x != 0; --x) {
-			tmpBuf[m] = lookupRGBA[XBuf[k] + deemp];
-			++m;
-			++k;
-		}
-	}
-#else
-	int k = 256 * INPUT_ROW_OFFS;
-	int m = 0;
-	for (int y = 0; y < 224; ++y) {
-		int deemp = deempScan[y + INPUT_ROW_OFFS];
-		for (int x = 256; x != 0; --x) {
-			int color = XBuf[k] + deemp;
-			++k;
-			tmpBuf[m] = tmpBuf[m+1] = lookupRGBA[color];
-			m += 2;
-		}
-	}
-
-	k = 2*256 * 224 - 1;
-	m = 2*256 * 2*224 - 1;
-	while (k > 0) {
-		for (int x = 2*256; x != 0; --x) {
-			tmpBuf[m] = tmpBuf[m - 2*256] = tmpBuf[k];
-			--m;
-			--k;
-		}
-		m -= 2 * 256;
-	}
-#endif
-
-	EM_ASM_ARGS({
-		var src = $0;
-		var data = FCEM.image.data;
-		if ((typeof CanvasPixelArray === 'undefined') || !(data instanceof CanvasPixelArray)) {
-			if (FCEM.prevData !== data) {
-				FCEM.data32 = new Int32Array(data.buffer);
-				FCEM.prevData = data;
-			}
-			FCEM.data32.set(HEAP32.subarray(src, src + FCEM.data32.length));
-		} else {
-			// ImageData is CanvasPixelArray which doesn't have buffers.
-			var dst = -1;
-			var val;
-			var num = data.length + 1;
-			while (--num) {
-				val = HEAP32[src++];
-				data[++dst] = val & 0xFF;
-				data[++dst] = (val >> 8) & 0xFF;
-				data[++dst] = (val >> 16) & 0xFF;
-				data[++dst] = 0xFF;
-			}
-		}
-
-		FCEM.ctx.putImageData(FCEM.image, 0, 0);
-	}, (ptrdiff_t) tmpBuf >> 2);
+	canvas2DRender(XBuf, deempScan);
 #else
 	es2Render(XBuf, deempScan, PALRAM[0]);
-#endif
-}
-
-void InitSWCanvas()
-{
-	genNTSCLookup();
-
-	lookupRGBA = (uint32*) malloc(sizeof(uint32) * NUM_COLORS);
-	for (int color = 0; color < NUM_COLORS; ++color) {
-		const int k = 3 * (color*LOOKUP_W + LOOKUP_W-1);
-		double *yiq = &yiqs[k];
-		double rgb[3] = { 0, 0, 0 };
-		for (int x = 0; x < 3; ++x) {
-			for (int y = 0; y < 3; ++y) {
-				rgb[x] += c_convMat[3*y + x] * yiq[y];
-			}
-			rgb[x] = 255.0*rgb[x] + 0.5;
-			rgb[x] = (rgb[x] > 255) ? 255 : (rgb[x] < 0) ? 0 : rgb[x];
-		}
-		lookupRGBA[color] = (int) rgb[0] | ((int) rgb[1] << 8) | ((int) rgb[2] << 16) | 0xFF000000;
-	}
-
-	EM_ASM({
-		var canvas = Module.canvas;
-		FCEM.ctx = Module.createContext(canvas, false, true);
-		FCEM.ctxCanvas = canvas;
-#if !DOUBLE_SIZE
-		FCEM.image = FCEM.ctx.createImageData(256, 224);
-		canvas.width = canvas.widthNative = 256;
-		canvas.height = canvas.heightNative = 224;
-#else
-		canvas.width = canvas.widthNative = 2*256;
-		canvas.height = canvas.heightNative = 2*224;
-		FCEM.image = FCEM.ctx.createImageData(2*256, 2*224);
-#endif
-		FCEM.imageCtx = FCEM.ctx;
-	});
-
-#if !DOUBLE_SIZE
-	tmpBuf = (uint32*) malloc(sizeof(uint32) * 256*224);
-#else
-	tmpBuf = (uint32*) malloc(sizeof(uint32) * 2*256*2*224);
 #endif
 }
 
@@ -293,23 +154,13 @@ int InitVideo()
 
 //	FCEUI_SetShowFPS(1);
 
-	FCEU_printf("Initializing WebGL.\n");
-
 	emscripten_set_resize_callback(0, 0, 0, FCEM_ResizeCallback);
 
 #if 1
-	InitSWCanvas();
+	FCEU_printf("Initializing canvas 2D context.\n");
+	canvas2DInit();
 #else
-	EmscriptenWebGLContextAttributes attr;
-	emscripten_webgl_init_context_attributes(&attr);
-	attr.alpha = attr.antialias = attr.premultipliedAlpha = 0;
-	attr.depth = attr.stencil = attr.preserveDrawingBuffer = attr.preferLowPowerToHighPerformance = attr.failIfMajorPerformanceCaveat = 0;
-	attr.enableExtensionsByDefault = 0;
-	attr.majorVersion = 1;
-	attr.minorVersion = 0;
-	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context(0, &attr);
-	emscripten_webgl_make_context_current(ctx);
-
+	FCEU_printf("Initializing WebGL.\n");
 	es2Init(s_targetAspect);
 #endif
 

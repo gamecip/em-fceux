@@ -23,6 +23,7 @@
 #include <cstring>
 #include <cmath>
 #include <emscripten.h>
+#include <emscripten/html5.h>
 #include "es2util.h"
 #include "meshes.h"
 
@@ -777,8 +778,29 @@ void es2UpdateController(int idx, double v)
 	}
 }
 
-void es2Init(double aspect)
+// On failure, return value < 0, otherwise success.
+static int es2CreateWebGLContext()
 {
+	EmscriptenWebGLContextAttributes attr;
+	emscripten_webgl_init_context_attributes(&attr);
+	attr.alpha = attr.antialias = attr.premultipliedAlpha = 0;
+	attr.depth = attr.stencil = attr.preserveDrawingBuffer = attr.preferLowPowerToHighPerformance = attr.failIfMajorPerformanceCaveat = 0;
+	attr.enableExtensionsByDefault = 0;
+	attr.majorVersion = 1;
+	attr.minorVersion = 0;
+	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context(0, &attr);
+	if (ctx >= 0) {
+		emscripten_webgl_make_context_current(ctx);
+	}
+	return ctx;
+}
+
+int es2Init(double aspect)
+{
+	if (es2CreateWebGLContext() < 0) {
+		return -1;
+	}
+
 	// Build perspective MVP matrix.
 	GLfloat trans[3] = { 0, 0, -2.5 };
 	GLfloat proj[4*4];
@@ -899,6 +921,8 @@ void es2Init(double aspect)
 	// Setup direct shader.
 	s_p.direct_prog = buildShader(direct_vert_src, direct_frag_src, common_src);
 	initUniformsDirect();
+
+	return 0;
 }
 
 void es2Deinit()
@@ -927,8 +951,20 @@ void es2Deinit()
 	free(s_p.overscan_pixels);
 }
 
-void es2SetViewport(int width, int height)
+void es2Resize(int width, int height)
 {
+	// HACK: emscripten_set_canvas_size() forces canvas size by setting css style
+	// width and height with "!important" flag. Workaround is to set size manually
+	// and remove the style attribute. See Emscripten's updateCanvasDimensions()
+	// in library_browser.js for the faulty code.
+	EM_ASM_INT({
+		var canvas = Module.canvas;
+		canvas.width = canvas.widthNative = $0;
+		canvas.height = canvas.heightNative = $1;
+		canvas.style.setProperty( "width", $0 + "px", "important");
+		canvas.style.setProperty("height", $1 + "px", "important");
+	}, width, height);
+
 	s_p.viewport[2] = width;
 	s_p.viewport[3] = height;
 }
