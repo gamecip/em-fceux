@@ -384,12 +384,14 @@ req.addEventListener('progress', function(event) {
 }, false);
 req.addEventListener('load', function(event) {
 	var e = event.target;
-	var s = document.createElement("script");
-	s.innerHTML = e.responseText;
+	var blob = new Blob([ e.responseText ]);
+	var s = document.createElement('script');
+	var url = URL.createObjectURL(blob);
+	s.onload = s.onerror = function() {
+		URL.revokeObjectURL(url);
+	}
+	s.src = url;
 	document.documentElement.appendChild(s);
-
-// TODO: tsone: add action when script is loaded?
-//	s.addEventListener("load", function() {});
 }, false);
 req.open("GET", "fceux.js", true);
 req.send();
