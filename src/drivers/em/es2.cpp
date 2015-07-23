@@ -227,9 +227,8 @@ static void comb1D(double *result, double level0, double level1, double x)
 //	result[1] = 1.333*c * cos(a);
 //	result[2] = 1.333*c * sin(a);
 // TODO: tsone: old scalers? seem to over-saturate. no idea where these from
-	result[1] = 1.414*c * cos(a);
-	result[2] = 1.414*c * sin(a);
-//	result[2] = 1.480*c * sin(a);
+	result[1] = 1.400*c * cos(a); // <- Reduce this scaler to make image less "warm".
+	result[2] = 1.400*c * sin(a);
 }
 
 static void adjustYIQLimits(double *yiq)
@@ -740,7 +739,7 @@ void es2UpdateController(int idx, double v)
 		break;
 	case FCEM_GAMMA:
 		glUseProgram(s_p.rgb_prog);
-		v = 2.4/2.2 + 0.3*GetController(FCEM_GAMMA);
+		v = GAMMA_NTSC/GAMMA_SRGB + 0.3*GetController(FCEM_GAMMA);
 		glUniform1f(s_u._rgb_gamma_loc, v);
 		break;
 	case FCEM_NOISE:

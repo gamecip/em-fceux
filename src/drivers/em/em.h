@@ -117,6 +117,9 @@ enum FCEM_Controller {
 #define NTSC_FPS 60.0988
 #define PAL_FPS  50.0069
 
+#define GAMMA_NTSC 2.44
+#define GAMMA_SRGB 2.2
+
 // The rate of output and emulated (internal) audio (frequency, in Hz).
 extern int em_sound_rate;
 // Number of audio samples per frame.

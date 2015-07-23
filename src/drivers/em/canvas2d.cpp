@@ -19,6 +19,7 @@
  */
 #include "em.h"
 #include <emscripten.h>
+#include <math.h>
 
 
 // Possible values: 1 or 2, corresponding to 1x and 2x.
@@ -109,6 +110,7 @@ void canvas2DInit()
 {
 	genNTSCLookup();
 
+	const double gamma = GAMMA_NTSC / GAMMA_SRGB;
 	lookupRGBA = (uint32*) malloc(sizeof(uint32) * NUM_COLORS);
 	for (int color = 0; color < NUM_COLORS; ++color) {
 		const int k = 3 * (color*LOOKUP_W + LOOKUP_W-1);
@@ -118,8 +120,9 @@ void canvas2DInit()
 			for (int y = 0; y < 3; ++y) {
 				rgb[x] += c_convMat[3*y + x] * yiq[y];
 			}
+			rgb[x] = (rgb[x] > 1) ? 1 : (rgb[x] < 0) ? 0 : rgb[x];
+			rgb[x] = pow(rgb[x], gamma);
 			rgb[x] = 255.0*rgb[x] + 0.5;
-			rgb[x] = (rgb[x] > 255) ? 255 : (rgb[x] < 0) ? 0 : rgb[x];
 		}
 		lookupRGBA[color] = (int) rgb[0] | ((int) rgb[1] << 8) | ((int) rgb[2] << 16) | 0xFF000000;
 	}
