@@ -32,9 +32,12 @@ extern uint8 deempScan[240];
 extern uint8 PALRAM[0x20];
 extern Config *g_config;
 
+int webgl_supported = 0;
+
 static int s_srendline, s_erendline;
 static int s_tlines;
 static int s_inited;
+static int s_webgl = -1;
 
 static int s_width, s_height;
 // Aspect is adjusted with CRT TV pixel aspect to get proper look.
@@ -106,14 +109,28 @@ static void Resize(int width, int height)
 	s_width = new_width;
 	s_height = new_height;
 
-
 //	printf("!!!! resize: (%dx%d) '(%dx%d) asp:%f\n", width, height, s_width, s_height, aspect);
 
-#if 1
-	canvas2DResize(s_width, s_height);
-#else
-	es2Resize(s_width, s_height);
-#endif
+	// HACK: emscripten_set_canvas_size() forces canvas size by setting css style
+	// width and height with "!important" flag. Workaround is to set size manually
+	// and remove the style attribute. See Emscripten's updateCanvasDimensions()
+	// in library_browser.js for the faulty code.
+	EM_ASM_INT({
+		var canvas = Module.canvas2D;
+		canvas.style.setProperty( "width", $0 + "px", "important");
+		canvas.style.setProperty("height", $1 + "px", "important");
+
+		if ($2) {
+			canvas = Module.canvas3D;
+			canvas.width = canvas.widthNative = $0;
+			canvas.height = canvas.heightNative = $1;
+			canvas.style.setProperty( "width", $0 + "px", "important");
+			canvas.style.setProperty("height", $1 + "px", "important");
+		}
+
+	}, s_width, s_height, webgl_supported);
+
+	es2SetViewport(s_width, s_height);
 }
 
 static EM_BOOL FCEM_ResizeCallback(int eventType, const EmscriptenUiEvent *uiEvent, void *userData)
@@ -128,11 +145,34 @@ void RenderVideo(int draw_splash)
 		DrawSplash();
 	}
 
-#if 1
-	canvas2DRender(XBuf, deempScan);
-#else
-	es2Render(XBuf, deempScan, PALRAM[0]);
-#endif
+	if (s_webgl) {
+		es2Render(XBuf, deempScan, PALRAM[0]);
+	} else {
+		canvas2DRender(XBuf, deempScan);
+	}
+}
+
+void EnableWebGL(int enable)
+{
+	enable = enable ? webgl_supported : 0;
+
+	EM_ASM_ARGS({
+		if ($0) {
+			Module.canvas = Module.canvas3D;
+			Module.ctx = Module.ctx3D;
+			Module.canvas3D.style.display = 'block';
+			Module.canvas2D.style.display = 'none';
+		} else {
+			Module.canvas = Module.canvas2D;
+			Module.ctx = Module.ctx2D;
+			Module.canvas3D.style.display = 'none';
+			Module.canvas2D.style.display = 'block';
+		}
+
+		Module.useWebGL = $0;
+	}, enable);
+
+	s_webgl = enable;
 }
 
 // Return 0 on success, -1 on failure.
@@ -146,23 +186,28 @@ int InitVideo()
 	FCEUI_GetCurrentVidSystem(&s_srendline, &s_erendline);
 	s_tlines = s_erendline - s_srendline + 1;
 
+//	FCEUI_SetShowFPS(1);
+
+	emscripten_set_resize_callback(0, 0, 0, FCEM_ResizeCallback);
+
+	FCEU_printf("Initializing canvas 2D context.\n");
+	canvas2DInit();
+
+	EM_ASM({
+		Module.canvas2D = Module.canvas;
+		Module.ctx2D = Module.ctx;
+		Module.canvas = Module.canvas3D;
+		Module.ctx = null;
+	});
+
+	FCEU_printf("Initializing WebGL.\n");
+	webgl_supported = es2Init(s_targetAspect);
+
 	// HACK: Manually resize to cover the window inner size.
 	// Apparently there's no way to do this with Emscripten...?
 	s_width = EM_ASM_INT_V({ return window.innerWidth; });
 	s_height = EM_ASM_INT_V({ return window.innerHeight; });
 	Resize(s_width, s_height);
-
-//	FCEUI_SetShowFPS(1);
-
-	emscripten_set_resize_callback(0, 0, 0, FCEM_ResizeCallback);
-
-#if 1
-	FCEU_printf("Initializing canvas 2D context.\n");
-	canvas2DInit();
-#else
-	FCEU_printf("Initializing WebGL.\n");
-	es2Init(s_targetAspect);
-#endif
 
 	s_inited = 1;
 	return 0;

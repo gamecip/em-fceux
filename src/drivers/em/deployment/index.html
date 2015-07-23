@@ -50,7 +50,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   <img class="preload" alt="" src="img/cart.gif" />
 </div>
 
-<canvas class="emscripten" id="canvas" hidden oncontextmenu="event.preventDefault()"></canvas>
+<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+<canvas class="emscripten" id="canvas3D" oncontextmenu="event.preventDefault()"></canvas>
 
 <div id="loader">
   <noscript id="noscript">
@@ -88,6 +89,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
       <tr><td>Controller Port 1<td><select disabled><option>Gamepad</option></select>
       <tr><td>Controller Port 2<td><select id="port2" onchange="FCEM.setLocalController(PORT2, this.value)"><option value="0">Gamepad</option><option value="1">Zapper</option></select>
       <tr><td>Video System<td><select id="video_system" onchange="FCEM.setLocalController(VIDEO_SYSTEM, this.value)"><option value="-1">(Auto)</option><option value="0">NTSC</option><option value="1">PAL</option></select>
+      <tr><td>Use WebGL<td><input id="webgl_enabled" type="checkbox" oninput="FCEM.setLocalController(WEBGL_ENABLED, this.checked)" onchange="FCEM.setLocalController(WEBGL_ENABLED, this.checked)"/>
     </table>
     <p><input type="button" value="Reset to Defaults" onclick="FCEM.setupControllers(true)" />
     <p><i><small>* NTSC composite signal path emulation.</small></i>

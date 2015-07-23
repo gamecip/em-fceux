@@ -79,7 +79,7 @@ typedef struct t_es2
 int es2Init(double aspect);
 void es2UpdateController(int idx, double v);
 void es2Deinit();
-void es2Resize(int width, int height);
+void es2SetViewport(int width, int height);
 void es2Render(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color);
 
 #endif

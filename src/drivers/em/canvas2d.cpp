@@ -49,19 +49,6 @@ static uint32 *lookupRGBA = 0;
 static uint32 *tmpBuf = 0;
 
 
-void canvas2DResize(int width, int height)
-{
-	// HACK: emscripten_set_canvas_size() forces canvas size by setting css style
-	// width and height with "!important" flag. Workaround is to set size manually
-	// and remove the style attribute. See Emscripten's updateCanvasDimensions()
-	// in library_browser.js for the faulty code.
-	EM_ASM_INT({
-		var canvas = Module.canvas;
-		canvas.style.setProperty( "width", $0 + "px", "important");
-		canvas.style.setProperty("height", $1 + "px", "important");
-	}, width, height);
-}
-
 void canvas2DRender(uint8 *pixels, uint8* row_deemp)
 {
 #if CANVAS_SCALER == 1
@@ -139,12 +126,10 @@ void canvas2DInit()
 
 	EM_ASM_ARGS({
 		var canvas = Module.canvas;
-		FCEM.ctx = Module.createContext(canvas, false, true);
-		FCEM.ctxCanvas = canvas;
 		canvas.width = canvas.widthNative = $0;
 		canvas.height = canvas.heightNative = $1;
-		FCEM.image = FCEM.ctx.createImageData($0, $1);
-		FCEM.imageCtx = FCEM.ctx;
+		FCEM.ctx = Module.createContext(canvas, false, true);
+		FCEM.image = FCEM.ctx.getImageData(0, 0, $0, $1);
 	}, CANVAS_W, CANVAS_H);
 
 	tmpBuf = (uint32*) malloc(sizeof(uint32) * CANVAS_W*CANVAS_H);

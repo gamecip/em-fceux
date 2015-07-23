@@ -16,5 +16,6 @@ CONTROLLER( 9,  0.4, CONVERGENCE,  "convergence")
 CONTROLLER(10,  0.3, NOISE,        "noise")
 CONTROLLER(11,  1.0, PORT2,        "port2")
 CONTROLLER(12, -1.0, VIDEO_SYSTEM, "video_system")
+CONTROLLER(13,  1.0, WEBGL_ENABLED,"webgl_enabled")
 CONTROLLER_POST
 

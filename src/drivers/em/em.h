@@ -169,9 +169,10 @@ void SilenceSound(int option);
 int InitVideo();
 int KillVideo();
 void RenderVideo(int draw_splash);
+void EnableWebGL(int enable);
+
 void DrawSplash();
 
-void canvas2DResize(int width, int height);
 void canvas2DRender(uint8 *pixels, uint8 *row_deemp);
 void canvas2DInit();
 
