@@ -46,7 +46,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 <body>
 
 <div id="preload">
-  <img class="preload" alt="" src="img/sound_off.gif" />
   <img class="preload" alt="" src="img/cart.gif" />
 </div>
 
@@ -108,15 +107,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 </div>
 
 <input id="helpToggle" type="checkbox" hidden />
-<img id="fullscreenIcon" width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" alt="fullscreen icon"/>
-<img id="soundIcon" width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" alt="sound icon"/>
-<label id="helpIcon" for="helpToggle"><img width="48" height="48" src="img/help.gif" alt="help icon"/></label>
+<div class="icon" id="fullscreenIcon" onclick="Module.requestFullScreen(false, false)"></div>
+<div class="icon" id="soundIcon" onclick="FCEM.toggleSound()"></div>
+<label class="icon" id="helpIcon" for="helpToggle"></label>
 
 <div id="keyBindDiv">
   <div class="dimmer"></div>
   <div class="scrollingContainer">
   <div class="scrollingContent">
-    <img id="keyboardIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
+    <img id="dpadIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
 
     <h3>KEYBOARD BINDINGS</h3>
     <table hidden>
@@ -131,7 +130,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   </div>
   </div>
 </div>
-<img id="keyboardIcon" width="48" height="48" src="img/keyboard.gif" onclick="FCEV.keyBindToggle()" alt="key bindings icon"/>
+<div class="icon" id="dpadIcon" onclick="FCEV.keyBindToggle()"></div>
 
 <div id="catchDiv">
   <div class="dimmer"></div>
@@ -163,7 +162,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     
     <h3>INPUTS</h3>
 
-    <p>Keyboard bindings can be customized by clicking <img src="img/keyboard_sm.gif" width=20 height=20 alt="key bindings icon" /> icon in top right corner of this window.
+    <p>Keyboard bindings can be customized by clicking <img src="img/dpad_sm.gif" width=20 height=20 alt="key bindings icon" /> icon in top right corner of this window.
     <p>Default keyboard bindings are:
     <table>
       <tr><td><b>Input</b><td><b>Key</b>

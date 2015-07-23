@@ -137,7 +137,7 @@ img.preload {
   background: #FCFCFC;
 }
 
-#fullscreenIcon, #soundIcon, #keyboardIcon, #helpIcon,
+#fullscreenIcon, #soundIcon, #dpadIcon, #helpIcon,
 #controllersToggleLabel, #stackToggleLabel,
 .cart {
   cursor: pointer;
@@ -159,10 +159,10 @@ img.preload {
   height: 114px;
   margin-top: -57px;
   margin-right: 0px;
-  background: url('img/right.gif') no-repeat;
+  background: url('img/sheet.gif') no-repeat -16px 0;
 }
 #controllersToggle:checked + #controllersTab #controllersToggleLabel {
-  background: url('img/left.gif') no-repeat;
+  background: url('img/sheet.gif') no-repeat 0 0;
 }
 #controllersToggle:checked ~ #controllersTab {
   left: 0px;
@@ -215,10 +215,10 @@ img.preload {
   height: 114px;
   margin-top: -57px;
   margin-left: 0px;
-  background: url('img/left.gif') no-repeat;
+  background: url('img/sheet.gif') no-repeat 0 0;
 }
 #stackToggle:checked + #stackTab #stackToggleLabel {
-  background: url('img/right.gif') no-repeat;
+  background: url('img/sheet.gif') no-repeat -16px 0;
 }
 #stackToggle:checked + #stackTab #stackContainer {
   width: 416px;
@@ -284,32 +284,33 @@ img.preload {
   height: 54px;
 }
 
-#fullscreenIcon {
+.icon {
   position: fixed;
   top: 0;
+  width: 48px;
+  height: 48px;
+}
+#fullscreenIcon {
   right: 153px;
+  background: url('img/sheet.gif') -32px 0;
 }
 #soundIcon {
-  position: fixed;
-  top: 0;
   right: 105px;
-  background: none;
+  background: url('img/sheet.gif') -32px -48px;
 }
-#keyboardIcon {
-  position: fixed;
-  top: 0;
+#dpadIcon {
   right: 54px;
+  background: url('img/sheet.gif') -80px 0;
 }
-#keyboardIndicator {
+#helpIcon {
+  right: 12px;
+  background: url('img/sheet.gif') -128px 0;
+  z-index: initial;
+}
+#dpadIndicator {
   position: fixed;
   top: 48px;
   right: 54px;
-}
-#helpIcon {
-  position: fixed;
-  top: 0;
-  right: 12px;
-  z-index: initial;
 }
 #helpIndicator {
   position: fixed;

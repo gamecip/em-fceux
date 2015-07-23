@@ -41,7 +41,7 @@ toggleSound : (function() {
 	return function() {
 		FCEM.soundEnabled = !FCEM.soundEnabled;
 		FCEM.silenceSound(!FCEM.soundEnabled);
-		el.src = FCEM.soundEnabled ? 'img/sound_on.gif' : 'img/sound_off.gif';
+		el.style.backgroundPosition = (FCEM.soundEnabled ? '-32' : '-80') + 'px -48px';
 	};
 })(),
   onInitialSyncFromIDB : function(er) {
