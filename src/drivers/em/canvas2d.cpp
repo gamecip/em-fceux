@@ -56,7 +56,7 @@ void canvas2DRender(uint8 *pixels, uint8* row_deemp)
 	int k = 256 * INPUT_ROW_OFFS;
 	int m = 0;
 	for (int row = INPUT_ROW_OFFS; row < 224 + INPUT_ROW_OFFS; ++row) {
-		int deemp = row_deemp[row];
+		int deemp = row_deemp[row] << 1;
 		for (int x = 256; x != 0; --x) {
 			tmpBuf[m] = lookupRGBA[pixels[k] + deemp];
 			++m;
@@ -67,7 +67,7 @@ void canvas2DRender(uint8 *pixels, uint8* row_deemp)
 	int k = 256 * INPUT_ROW_OFFS;
 	int m = 0;
 	for (int row = INPUT_ROW_OFFS; row < 224 + INPUT_ROW_OFFS; ++row) {
-		int deemp = row_deemp[row];
+		int deemp = row_deemp[row] << 1;
 		for (int x = 256; x != 0; --x) {
 			tmpBuf[m] = tmpBuf[m + 1] = tmpBuf[m + CANVAS_W]
 				= tmpBuf[m+1 + CANVAS_W]

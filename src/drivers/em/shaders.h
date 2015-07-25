@@ -98,7 +98,7 @@ DEFINE(CW2)
 
 "void main()\n"
 "{\n"
-	"float deemp = 64.0 * (255.0/511.0) * texture2D(u_deempTex, v_deemp_uv).r;\n"
+	"float deemp = (255.0/511.0) * 2.0 * texture2D(u_deempTex, v_deemp_uv).r;\n"
 	"float subp = mod(floor(NUM_SUBPS*IDX_W * v_uv[int(NUM_TAPS)/2].x), NUM_SUBPS);\n"
 	"vec2 p;\n"
 	"vec2 la;\n"
