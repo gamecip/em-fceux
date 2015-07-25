@@ -2,15 +2,17 @@
 
 em-fceux is an Emscripten port of FCEUX 2.2.2.
 
-More about Emscripten: http://emscripten.org
+Play it here: https://tsone.kapsi.fi/em-fceux/
 
-More about FCEUX: http://www.fceux.com/
+Emscripten project site: http://emscripten.org
+
+FCEUX project site: http://www.fceux.com/
 
 
 ### OVERVIEW ###
 
 The goal of em-fceux is to enable FCEUX in the modern web browsers.
-Primarily this means real-time frame rates and interactivivity at 60 fps,
+This means real-time frame rates and interactivity at around 60 fps,
 high-quality visuals, support for audio, battery-backed save RAM, save
 states and gamepads.
 
@@ -28,7 +30,7 @@ emulate NTSC signal and analog CRT TV output.
 
 New features:
 
-* Emscripten-specific optimizations for 60 fps interactivity in web browsers
+* Optimizations to achieve around 60 fps interactivity in web browsers
 * NTSC composite video emulation
 * CRT TV emulation
 
@@ -42,10 +44,11 @@ Notable supported FCEUX features:
 * Zapper support
 * Support for gamepads/joysticks
 * Custom keyboard bindings
-* Support for .zip and .nsf file formats
+* Support for .nes, .zip and .nsf file formats
 
 Notable *unsupported* FCEUX features:
 
+* New PPU emulation (old PPU emulation is used for performance)
 * FDS disk system
 * VS system
 * Special peripherals: Family Keyboard, Mahjong controller etc.
@@ -55,10 +58,12 @@ Notable *unsupported* FCEUX features:
 
 ### BUILD ###
 
-em-fceux is built under Linux or Unix. First install Emscripten 1.32.0
-(tested) by following instructions in: http://emscripten.org/
+em-fceux is built under Linux or Unix. Windows is not currently supported.
 
-You also need Python 2.7.x and the scons build tool. Their installation
+First install Emscripten 1.32.0 (tested) by following instructions in:
+http://emscripten.org/
+
+Then you also need scons build tool, gzip and Python 2.7.x. Their installation
 depends on the operating system.
 
 Build the source with ./embuild.sh script in the em-fceux directory root.
@@ -70,21 +75,26 @@ Debug build: ./embuild.sh RELEASE=0
 
 ### RUN / DEPLOY ###
 
-After successfull build, the deployment/ directory will contain the
-complete em-fceux "web app". To deploy, simply copy all the contents of
-the deployment/ directory to a web server.
+After successfull build, the src/drivers/em/deployment/ directory will
+contain the em-fceux "binaries": fceux.js, fceux.js.mem, fceux.data and
+their respective gzipped versions. To deploy, copy all the contents of
+the deployment directory to the server. Please modify or omit the
+.htaccess and robots.txt files depending on your site configuration.
 
-To test em-fceux locally, run 'python -m SimpleHTTPServer' in the deployment/
-directory. Then navigate web browser to http://localhost:8000/
+To test em-fceux locally, run 'python -m SimpleHTTPServer' in the
+src/drivers/em/deployment/ directory. Then navigate web browser to
+http://localhost:8000/
 
 Please refer to em-fceux help (the '?' icon) for help.
 
 
 ### CONTACT ###
 
-em-fceux is written by Valtteri "tsone" Heikkilä (tsone at bitbucket.org).
+em-fceux is written and maintained by Valtteri "tsone" Heikkilä.
+Send a bitbucket message to user "tsone" or email rnd at nic dot fi.
 
-FCEUX 2.2.2 is written by the FCEUX project team: http://www.fceux.com/web/contact.html
+FCEUX 2.2.2 is written and maintained by the FCEUX project team:
+http://www.fceux.com/web/contact.html
 
 
 ### TECHNICAL ###
