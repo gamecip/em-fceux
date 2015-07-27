@@ -117,6 +117,9 @@ enum FCEM_Controller {
 #define NTSC_FPS 60.0988
 #define PAL_FPS  50.0069
 
+#define GAMMA_NTSC 2.44
+#define GAMMA_SRGB 2.2
+
 // The rate of output and emulated (internal) audio (frequency, in Hz).
 extern int em_sound_rate;
 // Number of audio samples per frame.
@@ -169,7 +172,12 @@ void SilenceSound(int option);
 int InitVideo();
 int KillVideo();
 void RenderVideo(int draw_splash);
+void EnableWebGL(int enable);
+
 void DrawSplash();
+
+void canvas2DRender(uint8 *pixels, uint8 *row_deemp);
+void canvas2DInit();
 
 int LoadGame(const char *path);
 int CloseGame(void);
@@ -194,6 +202,7 @@ extern uint32 MouseData[3];
 int ButtonConfigBegin();
 void ButtonConfigEnd();
 
+void RegisterCallbacksForCanvas();
 void BindKey(int id, int keyIdx);
 void BindPort(int portIdx, ESI peri);
 void FCEUD_UpdateInput(void);

@@ -46,11 +46,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 <body>
 
 <div id="preload">
-  <img class="preload" alt="" src="img/sound_off.gif" />
   <img class="preload" alt="" src="img/cart.gif" />
+  <span style="font-family:'Roboto';"> </span>
+  <span style="font-family:'RobotoBold';"> </span>
+  <span style="font-family:'RobotoItalic';"> </span>
+  <span style="font-family:'RobotoBoldItalic';"> </span>
 </div>
 
-<canvas class="emscripten" id="canvas" hidden oncontextmenu="event.preventDefault()"></canvas>
+<canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+<canvas class="emscripten" id="canvas3D" oncontextmenu="event.preventDefault()"></canvas>
 
 <div id="loader">
   <noscript id="noscript">
@@ -88,6 +92,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
       <tr><td>Controller Port 1<td><select disabled><option>Gamepad</option></select>
       <tr><td>Controller Port 2<td><select id="port2" onchange="FCEM.setLocalController(PORT2, this.value)"><option value="0">Gamepad</option><option value="1">Zapper</option></select>
       <tr><td>Video System<td><select id="video_system" onchange="FCEM.setLocalController(VIDEO_SYSTEM, this.value)"><option value="-1">(Auto)</option><option value="0">NTSC</option><option value="1">PAL</option></select>
+      <tr><td>Use WebGL<td><input id="webgl_enabled" type="checkbox" oninput="FCEM.setLocalController(WEBGL_ENABLED, this.checked)" onchange="FCEM.setLocalController(WEBGL_ENABLED, this.checked)"/>
     </table>
     <p><input type="button" value="Reset to Defaults" onclick="FCEM.setupControllers(true)" />
     <p><i><small>* NTSC composite signal path emulation.</small></i>
@@ -106,15 +111,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 </div>
 
 <input id="helpToggle" type="checkbox" hidden />
-<img id="fullscreenIcon" width="48" height="48" src="img/fullscreen.gif" onclick="Module.requestFullScreen(false, false)" alt="fullscreen icon"/>
-<img id="soundIcon" width="48" height="48" src="img/sound_on.gif" onclick="FCEM.toggleSound()" alt="sound icon"/>
-<label id="helpIcon" for="helpToggle"><img width="48" height="48" src="img/help.gif" alt="help icon"/></label>
+<div class="icon" id="fullscreenIcon" onclick="Module.requestFullScreen(false, false)"></div>
+<div class="icon" id="soundIcon" onclick="FCEM.toggleSound()"></div>
+<label class="icon" id="helpIcon" for="helpToggle"></label>
 
 <div id="keyBindDiv">
   <div class="dimmer"></div>
   <div class="scrollingContainer">
   <div class="scrollingContent">
-    <img id="keyboardIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
+    <img id="dpadIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
 
     <h3>KEYBOARD BINDINGS</h3>
     <table hidden>
@@ -129,7 +134,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   </div>
   </div>
 </div>
-<img id="keyboardIcon" width="48" height="48" src="img/keyboard.gif" onclick="FCEV.keyBindToggle()" alt="key bindings icon"/>
+<div class="icon" id="dpadIcon" onclick="FCEV.keyBindToggle()"></div>
 
 <div id="catchDiv">
   <div class="dimmer"></div>
@@ -161,7 +166,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     
     <h3>INPUTS</h3>
 
-    <p>Keyboard bindings can be customized by clicking <img src="img/keyboard_sm.gif" width=20 height=20 alt="key bindings icon" /> icon in top right corner of this window.
+    <p>Keyboard bindings can be customized by clicking <img src="img/dpad_sm.gif" width=20 height=20 alt="key bindings icon" /> icon in top right corner of this window.
     <p>Default keyboard bindings are:
     <table>
       <tr><td><b>Input</b><td><b>Key</b>
@@ -199,7 +204,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     Extracting the games and save data from the browser (for backups etc.) is not supported.
     <p>Please refer to <a href="https://bitbucket.org/tsone/em-fceux/">em-fceux repository</a> for more technical information.
     <p>em-fceux and FCEUX are licensed under <a href="gpl-2.0.txt">GNU GPL Version 2</a>.
-    <p>Version: 0.3.0-alpha
+    <p>Version: 0.3.1-alpha
     <br/><br/>
   </div>
   </div>

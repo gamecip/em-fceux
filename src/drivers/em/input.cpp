@@ -381,7 +381,7 @@ static void UpdateMouse()
 	}
 }
 
-static EM_BOOL FCEM_MouseDownCallback(int type, const EmscriptenMouseEvent *event, void *)
+static EM_BOOL MouseDownCallback(int type, const EmscriptenMouseEvent *event, void *)
 {
 	MouseData[0] = event->targetX;
 	MouseData[1] = event->targetY;
@@ -395,6 +395,11 @@ static EM_BOOL FCEM_MouseDownCallback(int type, const EmscriptenMouseEvent *even
 	s_mouseReleaseFC = 3;
 
 	return 1;
+}
+
+void RegisterCallbacksForCanvas()
+{
+	emscripten_set_mousedown_callback("#canvas", 0, 0, MouseDownCallback);
 }
 
 static int getKeyMapIdx(const EmscriptenKeyboardEvent *ev)
@@ -414,7 +419,7 @@ static unsigned int getInput(const EmscriptenKeyboardEvent *ev)
 	return s_key_map[idx];
 }
 
-static EM_BOOL FCEM_KeyCallback(int eventType, const EmscriptenKeyboardEvent *event, void*)
+static EM_BOOL KeyCallback(int eventType, const EmscriptenKeyboardEvent *event, void*)
 {
 	unsigned int input = getInput(event);
 	s_input_state[input] = (eventType == EMSCRIPTEN_EVENT_KEYDOWN);
@@ -442,7 +447,7 @@ void BindPort(int portIdx, ESI peri)
 	FCEUI_SetInput(portIdx, peri, ptr, 0);
 }
 
-void FCEUD_UpdateInput ()
+void FCEUD_UpdateInput()
 {
 	UpdateSystem();
 	UpdateGamepad();
@@ -483,11 +488,9 @@ void FCEUD_SetInput(bool fourscore, bool microphone, ESI, ESI, ESIFC fcexp)
 // TODO: tsone: support fourscore?
 //	FCEUI_SetInputFourscore((eoptions & EO_FOURSCORE) != 0);
 
-	emscripten_set_mousedown_callback("#canvas", 0, 0, FCEM_MouseDownCallback);
-
 	const char *elem = "#window";
-	emscripten_set_keydown_callback(elem, 0, 0, FCEM_KeyCallback);
-	emscripten_set_keyup_callback(elem, 0, 0, FCEM_KeyCallback);
+	emscripten_set_keydown_callback(elem, 0, 0, KeyCallback);
+	emscripten_set_keyup_callback(elem, 0, 0, KeyCallback);
 }
 
 // NOTE: tsone: required for boards/transformer.cpp, must return array of 256 ints...

@@ -1225,7 +1225,7 @@ static void DoLine(void) {
 #ifdef EMSCRIPTEN
 	// Store the deemphasis bits per scanline.
 	if (scanline < 240) {
-		deempScan[scanline] = PPU[1] >> 5;
+		deempScan[scanline] = PPU[1] & 0xE0;
 	}
 #endif
 

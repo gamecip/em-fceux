@@ -229,6 +229,8 @@ void FCEM_BindKey(int id, int keyIdx)
 	BindKey(id, keyIdx);
 }
 
+extern int webgl_supported;
+
 // Set control value.
 void FCEM_SetController(int idx, double v)
 {
@@ -251,8 +253,11 @@ void FCEM_SetController(int idx, double v)
 			FCEUI_SetVidSystem(v);
 		}
 		break;
+	case FCEM_WEBGL_ENABLED:
+		EnableWebGL(v);
+		break;
 	default:
-		if (idx >= FCEM_BRIGHTNESS && idx <= FCEM_NOISE) {
+		if ((idx >= FCEM_BRIGHTNESS) && (idx <= FCEM_NOISE) && webgl_supported) {
 			es2UpdateController(idx, v);
 		}
 		break;

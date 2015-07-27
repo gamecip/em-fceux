@@ -81,16 +81,22 @@ int CloseGame()
 	return 1;
 }
 
-static int DoFrame()
+static void EmulateFrame(int frameskipmode)
 {
 	uint8 *gfx = 0;
 	int32 *sound;
 	int32 ssize;
 
+	FCEUD_UpdateInput();
+	FCEUI_Emulate(&gfx, &sound, &ssize, frameskipmode);
+	WriteSound(sound, ssize);
+}
+
+static int DoFrame()
+{
 	if (NoWaiting) {
 		for (int i = 0; i < TURBO_FRAMESKIPS; ++i) {
-			FCEUI_Emulate(&gfx, &sound, &ssize, 2);
-			WriteSound(sound, ssize);
+			EmulateFrame(2);
 		}
 	}
 
@@ -103,20 +109,17 @@ static int DoFrame()
 		return 0;
 	}
 
-	FCEUD_UpdateInput();
-
 	// Skip frames (video) to fill the audio buffer. Leave two frames free for next requestAnimationFrame in case they come too frequently.
-	if (IsSoundInitialized()) {
-		while (frames > 3) {
-			FCEUI_Emulate(&gfx, &sound, &ssize, 1);
-			WriteSound(sound, ssize);
+	if (IsSoundInitialized() && (frames > 3)) {
+		// Skip only even numbers of frames to correctly display flickering sprites.
+		frames = (frames - 3) & (~1);
+		while (frames > 0) {
+			EmulateFrame(1);
 			--frames;
 		}
 	}
 
-	FCEUI_Emulate(&gfx, &sound, &ssize, 0);
-	WriteSound(sound, ssize);
-
+	EmulateFrame(0);
 	return 1;
 }
 

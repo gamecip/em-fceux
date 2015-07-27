@@ -17,54 +17,65 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-/* Regular */
 @font-face {
-  font-family: 'Roboto';
+  font-family: "Roboto";
   src: url('fonts/Roboto-Regular-webfont.woff');
   font-weight: normal;
-  font-weight: 400;
   font-style: normal;
 }
-/* Italic */
 @font-face {
-  font-family: 'Roboto';
+  font-family: "RobotoItalic";
   src: url('fonts/Roboto-Italic-webfont.woff');
   font-weight: normal;
-  font-weight: 400;
-  font-style: italic;
-}
-/* Bold */
-@font-face {
-  font-family: 'Roboto';
-  src: url('fonts/Roboto-Bold-webfont.woff');
-  font-weight: bold;
-  font-weight: 700;
   font-style: normal;
 }
-/* Bold Italic */
 @font-face {
-  font-family: 'RobotoBoldItalic';
+  font-family: "RobotoBold";
+  src: url('fonts/Roboto-Bold-webfont.woff');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "RobotoBoldItalic";
   src: url('fonts/Roboto-BoldItalic-webfont.woff');
+  font-weight: normal;
+  font-style: normal;
 }
 
 h1, h2, h3 {
+  font-family: "RobotoBold";
+  font-weight: normal;
+  font-style: normal;
   margin-top: 25px;
   margin-bottom: 0px;
-  font-weight: bold;
   margin-left: -23px;
 }
 h4 {
+  font-family: "RobotoBold";
+  font-weight: normal;
+  font-style: normal;
   margin-top: 5px;
   margin-bottom: 4px;
-  font-weight: bold;
 }
 p {
   margin-top: 10px;
   margin-bottom: 13px;
 }
+i {
+  font-family: "RobotoItalic";
+  font-weight: normal;
+  font-style: normal;
+}
+b {
+  font-family: "RobotoBold";
+  font-weight: normal;
+  font-style: normal;
+}
 
 html, body, input, select {
   font-family: "Roboto";
+  font-weight: normal;
+  font-style: normal;
   font-size: 17px;
   line-height: 26px;
 }
@@ -89,10 +100,13 @@ html, body {
 canvas.emscripten {
   position: relative;
   border: 0px none;
+  display: none;
 }
 
 #preload {
-  display: none;
+  visibility: hidden;
+  width: 0;
+  height: 0;
 }
 img.preload {
   width: 1px;
@@ -110,8 +124,8 @@ img.preload {
 }
 #noscript {
   font-family: Arial,Helvetica,sans-serif;
-  font-size: 17px;
   font-weight: bold;
+  font-size: 17px;
   position: absolute;
   top: 50%;
   left: 50%;
@@ -136,7 +150,7 @@ img.preload {
   background: #FCFCFC;
 }
 
-#fullscreenIcon, #soundIcon, #keyboardIcon, #helpIcon,
+#fullscreenIcon, #soundIcon, #dpadIcon, #helpIcon,
 #controllersToggleLabel, #stackToggleLabel,
 .cart {
   cursor: pointer;
@@ -158,10 +172,10 @@ img.preload {
   height: 114px;
   margin-top: -57px;
   margin-right: 0px;
-  background: url('img/right.gif') no-repeat;
+  background: url('img/sheet.gif') no-repeat -16px 0;
 }
 #controllersToggle:checked + #controllersTab #controllersToggleLabel {
-  background: url('img/left.gif') no-repeat;
+  background: url('img/sheet.gif') no-repeat 0 0;
 }
 #controllersToggle:checked ~ #controllersTab {
   left: 0px;
@@ -214,10 +228,10 @@ img.preload {
   height: 114px;
   margin-top: -57px;
   margin-left: 0px;
-  background: url('img/left.gif') no-repeat;
+  background: url('img/sheet.gif') no-repeat 0 0;
 }
 #stackToggle:checked + #stackTab #stackToggleLabel {
-  background: url('img/right.gif') no-repeat;
+  background: url('img/sheet.gif') no-repeat -16px 0;
 }
 #stackToggle:checked + #stackTab #stackContainer {
   width: 416px;
@@ -245,6 +259,8 @@ img.preload {
 
 .label {
   font-family: "RobotoBoldItalic";
+  font-weight: normal;
+  font-style: normal;
   font-size: 16px;
   position: relative;
   text-align: center;
@@ -283,32 +299,33 @@ img.preload {
   height: 54px;
 }
 
-#fullscreenIcon {
+.icon {
   position: fixed;
   top: 0;
+  width: 48px;
+  height: 48px;
+}
+#fullscreenIcon {
   right: 153px;
+  background: url('img/sheet.gif') -32px 0;
 }
 #soundIcon {
-  position: fixed;
-  top: 0;
   right: 105px;
-  background: none;
+  background: url('img/sheet.gif') -32px -48px;
 }
-#keyboardIcon {
-  position: fixed;
-  top: 0;
+#dpadIcon {
   right: 54px;
+  background: url('img/sheet.gif') -80px 0;
 }
-#keyboardIndicator {
+#helpIcon {
+  right: 12px;
+  background: url('img/sheet.gif') -128px 0;
+  z-index: initial;
+}
+#dpadIndicator {
   position: fixed;
   top: 48px;
   right: 54px;
-}
-#helpIcon {
-  position: fixed;
-  top: 0;
-  right: 12px;
-  z-index: initial;
 }
 #helpIndicator {
   position: fixed;
@@ -368,7 +385,9 @@ img.preload {
   text-align: center;
 }
 #catchName, #catchKey {
-  font-weight: 600;
+  font-family: "RobotoBold";
+  font-weight: normal;
+  font-style: normal;
   color: #FC0000;
 }
 

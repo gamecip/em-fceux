@@ -23,6 +23,7 @@
 #include <cstring>
 #include <cmath>
 #include <emscripten.h>
+#include <emscripten/html5.h>
 #include "es2util.h"
 #include "meshes.h"
 
@@ -114,7 +115,7 @@ static const GLfloat mesh_quad_uvs[] = {
 	 0.0f,  0.0f,
 	 1.0f,  0.0f,
 	 0.0f,  1.0f,
-	 1.0f,  1.0f 
+	 1.0f,  1.0f
 };
 static const GLfloat mesh_quad_norms[] = {
 	 0.0f,  0.0f, 1.0f,
@@ -157,9 +158,9 @@ static void updateSharpenKernel()
 	double v = GetController(FCEM_NTSC_EMU) * 0.4 * (GetController(FCEM_SHARPNESS)+0.5);
 	GLfloat sharpen_kernel[] = {
 		-v, -v, -v,
-		1, 0, 0, 
-		2*v, 1+2*v, 2*v, 
-		0, 0, 1, 
+		1, 0, 0,
+		2*v, 1+2*v, 2*v,
+		0, 0, 1,
 		-v, -v, -v
 	};
 	glUniform3fv(s_u._sharpen_kernel_loc, 5, sharpen_kernel);
@@ -226,9 +227,8 @@ static void comb1D(double *result, double level0, double level1, double x)
 //	result[1] = 1.333*c * cos(a);
 //	result[2] = 1.333*c * sin(a);
 // TODO: tsone: old scalers? seem to over-saturate. no idea where these from
-	result[1] = 1.414*c * cos(a);
-	result[2] = 1.414*c * sin(a);
-//	result[2] = 1.480*c * sin(a);
+	result[1] = 1.400*c * cos(a); // <- Reduce this scaler to make image less "warm".
+	result[2] = 1.400*c * sin(a);
 }
 
 static void adjustYIQLimits(double *yiq)
@@ -242,12 +242,17 @@ static void adjustYIQLimits(double *yiq)
 // Box filter kernel.
 #define BOX_FILTER(w2_, center_, x_) (fabs((x_) - (center_)) < (w2_) ? 1.0 : 0.0)
 
-// Generate lookup texture.
-static void genLookupTex()
+double *yiqs = 0;
+
+// Generate NTSC YIQ lookup table
+void genNTSCLookup()
 {
+	if (yiqs) {
+		return;
+	}
+
 	double *ys = (double*) calloc(3*8 * NUM_PHASES*NUM_COLORS, sizeof(double));
-	double *yiqs = (double*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(double));
-	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
+	yiqs = (double*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(double));
 
 	// Generate temporary lookup containing samplings of separated and normalized YIQ components
 	// for each phase and color combination. Separation is performed using a simulated 1D comb filter.
@@ -331,6 +336,16 @@ static void genLookupTex()
 		yiqs[k+2] = yiq[2];
 	}
 
+	free(ys);
+}
+
+// Generate lookup texture.
+static void genLookupTex()
+{
+	genNTSCLookup();
+
+	unsigned char *result = (unsigned char*) calloc(3 * LOOKUP_W * NUM_COLORS, sizeof(unsigned char));
+
 	// Create lookup texture RGB as bytes by mapping voltages to the min-max range.
 	// The conversion to bytes will lose some precision, which is unnoticeable however.
 	for (int k = 0; k < 3 * LOOKUP_W * NUM_COLORS; k+=3) {
@@ -343,8 +358,6 @@ static void genLookupTex()
 	glActiveTexture(TEX(LOOKUP_I));
 	createTex(&s_p.lookup_tex, LOOKUP_W, NUM_COLORS, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE, result);
 
-	free(ys);
-	free(yiqs);
 	free(result);
 }
 
@@ -726,7 +739,7 @@ void es2UpdateController(int idx, double v)
 		break;
 	case FCEM_GAMMA:
 		glUseProgram(s_p.rgb_prog);
-		v = 2.4/2.2 + 0.3*GetController(FCEM_GAMMA);
+		v = GAMMA_NTSC/GAMMA_SRGB + 0.3*GetController(FCEM_GAMMA);
 		glUniform1f(s_u._rgb_gamma_loc, v);
 		break;
 	case FCEM_NOISE:
@@ -764,8 +777,29 @@ void es2UpdateController(int idx, double v)
 	}
 }
 
-void es2Init(double aspect)
+// On failure, return value < 0, otherwise success.
+static int es2CreateWebGLContext()
 {
+	EmscriptenWebGLContextAttributes attr;
+	emscripten_webgl_init_context_attributes(&attr);
+	attr.alpha = attr.antialias = attr.premultipliedAlpha = 0;
+	attr.depth = attr.stencil = attr.preserveDrawingBuffer = attr.preferLowPowerToHighPerformance = attr.failIfMajorPerformanceCaveat = 0;
+	attr.enableExtensionsByDefault = 0;
+	attr.majorVersion = 1;
+	attr.minorVersion = 0;
+	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context(0, &attr);
+	if (ctx > 0) {
+		emscripten_webgl_make_context_current(ctx);
+	}
+	return ctx;
+}
+
+int es2Init(double aspect)
+{
+	if (es2CreateWebGLContext() <= 0) {
+		return 0;
+	}
+
 	// Build perspective MVP matrix.
 	GLfloat trans[3] = { 0, 0, -2.5 };
 	GLfloat proj[4*4];
@@ -886,6 +920,8 @@ void es2Init(double aspect)
 	// Setup direct shader.
 	s_p.direct_prog = buildShader(direct_vert_src, direct_frag_src, common_src);
 	initUniformsDirect();
+
+	return 1;
 }
 
 void es2Deinit()
@@ -932,7 +968,7 @@ void es2Render(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 //		printf("overscan: %02X\n", overscan_color);
 
 		memset(s_p.overscan_pixels, overscan_color, OVERSCAN_W * IDX_H);
-		
+
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, OVERSCAN_W, IDX_H, GL_LUMINANCE, GL_UNSIGNED_BYTE, s_p.overscan_pixels);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, IDX_W-OVERSCAN_W, 0, OVERSCAN_W, IDX_H, GL_LUMINANCE, GL_UNSIGNED_BYTE, s_p.overscan_pixels);
 	}
@@ -955,4 +991,3 @@ void es2Render(GLubyte *pixels, GLubyte *row_deemp, GLubyte overscan_color)
 		passDirect();
 	}
 }
-

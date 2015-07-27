@@ -41,7 +41,7 @@ toggleSound : (function() {
 	return function() {
 		FCEM.soundEnabled = !FCEM.soundEnabled;
 		FCEM.silenceSound(!FCEM.soundEnabled);
-		el.src = FCEM.soundEnabled ? 'img/sound_on.gif' : 'img/sound_off.gif';
+		el.style.backgroundPosition = (FCEM.soundEnabled ? '-32' : '-80') + 'px -48px';
 	};
 })(),
   onInitialSyncFromIDB : function(er) {
@@ -351,6 +351,9 @@ var Module = {
     el.addEventListener("webglcontextlost", function(e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
     return el;
   })(),
+  canvas3D: (function() {
+    return document.getElementById('canvas3D');
+  })(),
   setStatus: function(text) {
     var dl = 'Downloading data...';
 // TODO: tsone: add startswith() method?
@@ -360,7 +363,6 @@ var Module = {
       FCEV.setProgress(0.75 + 0.25*x);
     }
     if (!text) {
-      Module.canvas.hidden = false;
       loaderEl.hidden = true;
     }
   },

@@ -32,10 +32,12 @@ extern uint8 deempScan[240];
 extern uint8 PALRAM[0x20];
 extern Config *g_config;
 
-static int s_curbpp;
+int webgl_supported = 0;
+
 static int s_srendline, s_erendline;
 static int s_tlines;
 static int s_inited;
+static int s_webgl = -1;
 
 static int s_width, s_height;
 // Aspect is adjusted with CRT TV pixel aspect to get proper look.
@@ -90,15 +92,22 @@ void FCEUD_VideoChanged()
 
 static void Resize(int width, int height)
 {
-	double aspect = width / (double) height;
+	int new_width, new_height;
+	const double aspect = width / (double) height;
 
 	if (aspect >= s_targetAspect) {
-		s_width = height * s_targetAspect;
-		s_height = height;
+		new_width = height * s_targetAspect;
+		new_height = height;
 	} else {
-		s_width = width;
-		s_height = width / s_targetAspect;
+		new_width = width;
+		new_height = width / s_targetAspect;
 	}
+
+	if ((new_width == s_width) && (new_height == s_height)) {
+		return;
+	}
+	s_width = new_width;
+	s_height = new_height;
 
 //	printf("!!!! resize: (%dx%d) '(%dx%d) asp:%f\n", width, height, s_width, s_height, aspect);
 
@@ -107,12 +116,19 @@ static void Resize(int width, int height)
 	// and remove the style attribute. See Emscripten's updateCanvasDimensions()
 	// in library_browser.js for the faulty code.
 	EM_ASM_INT({
-		var canvas = Module.canvas;
-		canvas.width = canvas.widthNative = $0 |0;
-		canvas.height = canvas.heightNative = $1 |0;
-		canvas.style.setProperty( "width", ($0 |0) + "px", "important");
-		canvas.style.setProperty("height", ($1 |0) + "px", "important");
-	}, s_width, s_height);
+		var canvas = Module.canvas2D;
+		canvas.style.setProperty( "width", $0 + "px", "important");
+		canvas.style.setProperty("height", $1 + "px", "important");
+
+		if ($2) {
+			canvas = Module.canvas3D;
+			canvas.width = canvas.widthNative = $0;
+			canvas.height = canvas.heightNative = $1;
+			canvas.style.setProperty( "width", $0 + "px", "important");
+			canvas.style.setProperty("height", $1 + "px", "important");
+		}
+
+	}, s_width, s_height, webgl_supported);
 
 	es2SetViewport(s_width, s_height);
 }
@@ -123,13 +139,40 @@ static EM_BOOL FCEM_ResizeCallback(int eventType, const EmscriptenUiEvent *uiEve
 	return 1;
 }
 
-
 void RenderVideo(int draw_splash)
 {
 	if (draw_splash) {
 		DrawSplash();
 	}
-	es2Render(XBuf, deempScan, PALRAM[0]);
+
+	if (s_webgl) {
+		es2Render(XBuf, deempScan, PALRAM[0]);
+	} else {
+		canvas2DRender(XBuf, deempScan);
+	}
+}
+
+void EnableWebGL(int enable)
+{
+	enable = enable ? webgl_supported : 0;
+
+	EM_ASM_ARGS({
+		if ($0) {
+			Module.canvas = Module.canvas3D;
+			Module.ctx = Module.ctx3D;
+			Module.canvas3D.style.display = 'block';
+			Module.canvas2D.style.display = 'none';
+		} else {
+			Module.canvas = Module.canvas2D;
+			Module.ctx = Module.ctx2D;
+			Module.canvas3D.style.display = 'none';
+			Module.canvas2D.style.display = 'block';
+		}
+
+		Module.useWebGL = $0;
+	}, enable);
+
+	s_webgl = enable;
 }
 
 // Return 0 on success, -1 on failure.
@@ -143,31 +186,32 @@ int InitVideo()
 	FCEUI_GetCurrentVidSystem(&s_srendline, &s_erendline);
 	s_tlines = s_erendline - s_srendline + 1;
 
+//	FCEUI_SetShowFPS(1);
+
+	emscripten_set_resize_callback(0, 0, 0, FCEM_ResizeCallback);
+
+	FCEU_printf("Initializing canvas 2D context.\n");
+	canvas2DInit();
+	RegisterCallbacksForCanvas();
+
+	EM_ASM({
+		Module.canvas2D = Module.canvas;
+		Module.ctx2D = Module.ctx;
+		Module.canvas = Module.canvas3D;
+		Module.ctx = null;
+	});
+
+	FCEU_printf("Initializing WebGL.\n");
+	webgl_supported = es2Init(s_targetAspect);
+	if (webgl_supported) {
+		RegisterCallbacksForCanvas();
+	}
+
 	// HACK: Manually resize to cover the window inner size.
 	// Apparently there's no way to do this with Emscripten...?
 	s_width = EM_ASM_INT_V({ return window.innerWidth; });
 	s_height = EM_ASM_INT_V({ return window.innerHeight; });
 	Resize(s_width, s_height);
-
-//	FCEUI_SetShowFPS(1);
-
-	FCEU_printf("Initializing WebGL.\n");
-
-	emscripten_set_resize_callback(0, 0, 0, FCEM_ResizeCallback);
-
-	EmscriptenWebGLContextAttributes attr;
-	emscripten_webgl_init_context_attributes(&attr);
-	attr.alpha = attr.antialias = attr.premultipliedAlpha = 0;
-	attr.depth = attr.stencil = attr.preserveDrawingBuffer = attr.preferLowPowerToHighPerformance = attr.failIfMajorPerformanceCaveat = 0;
-	attr.enableExtensionsByDefault = 0;
-	attr.majorVersion = 1;
-	attr.minorVersion = 0;
-	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context(0, &attr);
-	emscripten_webgl_make_context_current(ctx);
-
-	s_curbpp = 32;
-
-	es2Init(s_targetAspect);
 
 	s_inited = 1;
 	return 0;
