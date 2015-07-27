@@ -110,8 +110,10 @@ static int DoFrame()
 	}
 
 	// Skip frames (video) to fill the audio buffer. Leave two frames free for next requestAnimationFrame in case they come too frequently.
-	if (IsSoundInitialized()) {
-		while (frames > 3) {
+	if (IsSoundInitialized() && (frames > 3)) {
+		// Skip only even numbers of frames to correctly display flickering sprites.
+		frames = (frames - 3) & (~1);
+		while (frames > 0) {
 			EmulateFrame(1);
 			--frames;
 		}
