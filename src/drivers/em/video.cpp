@@ -192,6 +192,7 @@ int InitVideo()
 
 	FCEU_printf("Initializing canvas 2D context.\n");
 	canvas2DInit();
+	RegisterCallbacksForCanvas();
 
 	EM_ASM({
 		Module.canvas2D = Module.canvas;
@@ -202,6 +203,9 @@ int InitVideo()
 
 	FCEU_printf("Initializing WebGL.\n");
 	webgl_supported = es2Init(s_targetAspect);
+	if (webgl_supported) {
+		RegisterCallbacksForCanvas();
+	}
 
 	// HACK: Manually resize to cover the window inner size.
 	// Apparently there's no way to do this with Emscripten...?

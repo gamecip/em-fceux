@@ -202,6 +202,7 @@ extern uint32 MouseData[3];
 int ButtonConfigBegin();
 void ButtonConfigEnd();
 
+void RegisterCallbacksForCanvas();
 void BindKey(int id, int keyIdx);
 void BindPort(int portIdx, ESI peri);
 void FCEUD_UpdateInput(void);
