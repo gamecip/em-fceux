@@ -447,7 +447,7 @@ void BindPort(int portIdx, ESI peri)
 	FCEUI_SetInput(portIdx, peri, ptr, 0);
 }
 
-void FCEUD_UpdateInput ()
+void FCEUD_UpdateInput()
 {
 	UpdateSystem();
 	UpdateGamepad();
