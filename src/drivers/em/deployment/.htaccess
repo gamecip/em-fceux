@@ -14,29 +14,34 @@ RewriteCond %{HTTP:Accept-Encoding} gzip
 RewriteCond %{REQUEST_FILENAME}.gz -f
 RewriteRule (.*\.(css|js|mem|data))$ $1\.gz [L]
 
-#Set content type to javaScript and encoding to gzip
+# Set content type to javaScript and encoding to gzip
 <FilesMatch ".*\.js\.gz$">
-        ForceType application/x-javascript
-        Header set Content-Encoding gzip
+    ForceType application/x-javascript
+    Header set Content-Encoding gzip
 </FilesMatch>
 
-#Set content type to css and encoding to gzip
+# Set content type to css and encoding to gzip
 <FilesMatch ".*\.css\.gz$">
-        ForceType text/css
-        Header set Content-Encoding gzip
+    ForceType text/css
+    Header set Content-Encoding gzip
 </FilesMatch>
 
-#Set content type to javascript and encoding to gzip
+# Set content type to javascript and encoding to gzip
 <FilesMatch ".*\.mem\.gz$">
-        ForceType application/javascript
-        Header set Content-Encoding gzip
+    ForceType application/javascript
+    Header set Content-Encoding gzip
 </FilesMatch>
 
-#Set data files encoding to gzip
+# Set data files encoding to gzip
 <FilesMatch ".*\.data\.gz$">
-        ForceType text/plain
-        Header set Content-Encoding gzip
+    ForceType text/plain
+    Header set Content-Encoding gzip
 </FilesMatch>
+
+# Set index.html to revalidate
+<filesMatch "index\.html$">
+    Header set Cache-Control "max-age=604800, must-revalidate"
+</filesMatch>
 
 # Tell caching proxy servers to cache the file based on both
 # browser type and encoding
