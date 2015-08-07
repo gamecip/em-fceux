@@ -19,25 +19,25 @@
  */
 @font-face {
   font-family: "Roboto";
-  src: url('fonts/Roboto-Regular-webfont.woff');
+  src: url('fonts/{{Roboto-Regular-webfont.woff}}');
   font-weight: normal;
   font-style: normal;
 }
 @font-face {
   font-family: "RobotoItalic";
-  src: url('fonts/Roboto-Italic-webfont.woff');
+  src: url('fonts/{{Roboto-Italic-webfont.woff}}');
   font-weight: normal;
   font-style: normal;
 }
 @font-face {
   font-family: "RobotoBold";
-  src: url('fonts/Roboto-Bold-webfont.woff');
+  src: url('fonts/{{Roboto-Bold-webfont.woff}}');
   font-weight: normal;
   font-style: normal;
 }
 @font-face {
   font-family: "RobotoBoldItalic";
-  src: url('fonts/Roboto-BoldItalic-webfont.woff');
+  src: url('fonts/{{Roboto-BoldItalic-webfont.woff}}');
   font-weight: normal;
   font-style: normal;
 }
@@ -172,10 +172,10 @@ img.preload {
   height: 114px;
   margin-top: -57px;
   margin-right: 0px;
-  background: url('img/sheet.gif') no-repeat -16px 0;
+  background: url('img/{{sheet.gif}}') no-repeat -16px 0;
 }
 #controllersToggle:checked + #controllersTab #controllersToggleLabel {
-  background: url('img/sheet.gif') no-repeat 0 0;
+  background: url('img/{{sheet.gif}}') no-repeat 0 0;
 }
 #controllersToggle:checked ~ #controllersTab {
   left: 0px;
@@ -228,10 +228,10 @@ img.preload {
   height: 114px;
   margin-top: -57px;
   margin-left: 0px;
-  background: url('img/sheet.gif') no-repeat 0 0;
+  background: url('img/{{sheet.gif}}') no-repeat 0 0;
 }
 #stackToggle:checked + #stackTab #stackToggleLabel {
-  background: url('img/sheet.gif') no-repeat -16px 0;
+  background: url('img/{{sheet.gif}}') no-repeat -16px 0;
 }
 #stackToggle:checked + #stackTab #stackContainer {
   width: 416px;
@@ -284,14 +284,14 @@ img.preload {
   height: 21px;
   top: -15px;
   left: 372px;
-  background: url('img/x.gif') no-repeat;
+  background: url('img/{{x.gif}}') no-repeat;
 }
 .cartRow {
   display: table-row;
   width: 396px;
   height: 54px;
   vertical-align: bottom;
-  background: url('img/cart.gif') no-repeat;
+  background: url('img/{{cart.gif}}') no-repeat;
 }
 .cart {
   display: table-cell;
@@ -307,19 +307,19 @@ img.preload {
 }
 #fullscreenIcon {
   right: 153px;
-  background: url('img/sheet.gif') -32px 0;
+  background: url('img/{{sheet.gif}}') -32px 0;
 }
 #soundIcon {
   right: 105px;
-  background: url('img/sheet.gif') -32px -48px;
+  background: url('img/{{sheet.gif}}') -32px -48px;
 }
 #dpadIcon {
   right: 54px;
-  background: url('img/sheet.gif') -80px 0;
+  background: url('img/{{sheet.gif}}') -80px 0;
 }
 #helpIcon {
   right: 12px;
-  background: url('img/sheet.gif') -128px 0;
+  background: url('img/{{sheet.gif}}') -128px 0;
   z-index: initial;
 }
 #dpadIndicator {

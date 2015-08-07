@@ -46,7 +46,7 @@ print env['LINKFLAGS']
 if env['PLATFORM'] == 'win32':
   fceux = env.Program('fceux.exe', file_list)
 elif env['EMSCRIPTEN']:
-  target = 'drivers/em/deployment/fceux'
+  target = 'drivers/em/site/fceux'
   fceux = env.Program(target, file_list)
   env.Depends([ target+'.data', target+'.js.mem' ], fceux)
 else:

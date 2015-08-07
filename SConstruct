@@ -243,19 +243,7 @@ else:
 
 Export('env')
 fceux = SConscript('src/SConscript')
-if env['EMSCRIPTEN']:
-  target = str(fceux[0])
-  target_dir = os.path.dirname(target)
-  gzip_src = [
-    target,
-    target + '.mem',
-    target[:-3] + '.data',
-    os.path.join(target_dir, 'style.css'),
-    os.path.join(target_dir, 'loader.js'),
-  ]
-  for f in gzip_src:
-    env.Command(f+'.gz', f, 'gzip --best -c $SOURCE > $TARGET')
-else:
+if not env['EMSCRIPTEN']:
   env.Program(target="fceux-net-server", source=["fceux-server/server.cpp", "fceux-server/md5.cpp", "fceux-server/throttle.cpp"])
 
   # Installation rules

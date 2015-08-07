@@ -395,7 +395,7 @@ req.addEventListener('load', function(event) {
 	s.src = url;
 	document.documentElement.appendChild(s);
 }, false);
-req.open("GET", "fceux.js", true);
+req.open("GET", "{{fceux.js}}", true);
 req.send();
 
 function dragHandler(text) {

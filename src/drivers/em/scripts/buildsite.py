@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys, os, time, subprocess, random, re, shutil
+import sys, os, time, subprocess, random, re, shutil, gzip
 
 
 dstdir = 'deploytmp'
@@ -57,6 +57,16 @@ def setupOutput(records, srcdir, outdir):
 
 	return records
 
+def createMapping(records):
+	result = {}
+	for r in records:
+		if r.file in result:
+			print 'ERROR: duplicate filename found: %s' % (r.file)
+			exit(2)
+		result[r.file] = r.hashed
+
+	return result
+
 def _doRegexpReplace(r, re, func):
 	f = open(r.getPath(), 'r')
 	tmp = f.read()
@@ -69,8 +79,8 @@ def _doRegexpReplace(r, re, func):
 
 # Process template file with {{filename}} markups
 re_template = re.compile('{{([^}]*)}}')
-def doTemplate(r, file2hashed):
-	_doRegexpReplace(r, re_template, lambda x: file2hashed[x.group(1)])
+def doTemplate(r, mapping):
+	_doRegexpReplace(r, re_template, lambda x: mapping[x.group(1)])
 
 # Process fceux.js file by replacing references to data and mem files
 re_special = re.compile('(?<=\Wfceux)()(?=\.(data|js\.mem))')
@@ -82,17 +92,11 @@ def doCopy(r):
 	ensureDir(r.outpath)
 	shutil.copy(r.getPath(), r.outpath)
 
-def processRecords(records, templated, special, fallback_hash):
-	file2hashed = {}
-	for r in records:
-		if r.file in file2hashed:
-			print 'ERROR: duplicate filename found: %s' % (r.file)
-			exit(2)
-		file2hashed[r.file] = r.hashed
+def processRecords(records, mapping, templated, special, fallback_hash):
 	
 	for r in records:
 		if r.file in templated:
-			doTemplate(r, file2hashed)
+			doTemplate(r, mapping)
 			print 'INFO: template: %s -> %s' % (r.getPath(), r.outpath)
 		elif r.file in special:
 			doSpecial(r, fallback_hash)
@@ -107,6 +111,13 @@ def ensureDir(path):
 		print 'INFO: created dir(s): %s' % (path)
 		os.makedirs(path)
 
+def compressRecords(records, mapping, compress):
+	for r in records:
+		if r.file not in compress:
+			continue
+		dst = r.outpath + '.gz'
+		with open(r.outpath, 'rb') as fi, gzip.open(dst, 'wb') as fo:
+			shutil.copyfileobj(fi, fo)
 
 def build(srcdir, outdir):
 	srcdir = os.path.join(os.path.normpath(srcdir), '')
@@ -119,9 +130,11 @@ def build(srcdir, outdir):
 	print 'INFO: fallback hash: %s' % (fallback_hash)
 
 	records = createRecords(srcdir)
-	records = makeHashed(records, [ 'index.html' ], fallback_hash)
+	records = makeHashed(records, [ 'index.html', 'gpl-2.0.txt' ], fallback_hash)
 	records = setupOutput(records, srcdir, outdir)
-	processRecords(records, [ 'index.html', 'style.css', 'loader.js' ], [ 'fceux.js' ], fallback_hash)
+	mapping = createMapping(records)
+	processRecords(records, mapping, [ 'index.html', 'style.css', 'loader.js' ], [ 'fceux.js' ], fallback_hash)
+	compressRecords(records, mapping, [ 'fceux.js', 'fceux.js.mem', 'fceux.data', 'style.css', 'loader.js' ])
 
 if __name__ == '__main__':
 	build(sys.argv[1], sys.argv[2])

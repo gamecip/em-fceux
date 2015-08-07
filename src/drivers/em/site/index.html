@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 <meta property="og:description" content="em-fceux is a web version of the FCEUX 8-bit Nintendo Entertainment System (NES) emulator. To play a game, simply drag and drop a ROM file on the em-fceux window! Enjoy!" />
 <!-- NOTE: Following URLs must be absolute -->
 <meta property="og:url" content="https://tsone.kapsi.fi/em-fceux/" />
-<meta property="og:image" content="https://tsone.kapsi.fi/em-fceux/img/preview.png" />
+<meta property="og:image" content="https://tsone.kapsi.fi/em-fceux/img/{{preview.png}}" />
 
 <title>em-fceux</title>
 
@@ -37,16 +37,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 <link rel="license" href="gpl-2.0.txt" />
 
-<link rel="icon" type="image/png" href="img/favicon-48.png" />
-<link rel="apple-touch-icon" href="img/favicon-60.png">
-<link rel="apple-touch-icon" sizes="120x120" href="img/favicon-120.png" />
+<link rel="icon" type="image/png" href="img/{{favicon-48.png}}" />
+<link rel="apple-touch-icon" href="img/{{favicon-60.png}}">
+<link rel="apple-touch-icon" sizes="120x120" href="img/{{favicon-120.png}}" />
 
-<link href="style.css" rel="stylesheet" />
+<link href="{{style.css}}" rel="stylesheet" />
 </head>
 <body>
 
 <div id="preload">
-  <img class="preload" alt="" src="img/cart.gif" />
+  <img class="preload" alt="" src="img/{{cart.gif}}" />
   <span style="font-family:'Roboto';"> </span>
   <span style="font-family:'RobotoBold';"> </span>
   <span style="font-family:'RobotoItalic';"> </span>
@@ -119,7 +119,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   <div class="dimmer"></div>
   <div class="scrollingContainer">
   <div class="scrollingContent">
-    <img id="dpadIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
+    <img id="dpadIndicator" width="48" height="48" src="img/{{indicator.gif}}" alt="flashing indicator" />
 
     <h3>KEYBOARD BINDINGS</h3>
     <table hidden>
@@ -151,7 +151,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   <div class="dimmer"></div>
   <div class="scrollingContainer">
   <div class="scrollingContent">
-    <img id="helpIndicator" width="48" height="48" src="img/indicator.gif" alt="flashing indicator" />
+    <img id="helpIndicator" width="48" height="48" src="img/{{indicator.gif}}" alt="flashing indicator" />
 
     <h2>EM-FCEUX</h2>
     <p>em-fceux is an <a href="http://emscripten.org/">Emscripten</a> port of <a href="http://www.fceux.com/">FCEUX</a>.
@@ -160,13 +160,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     <h3>INSTRUCTIONS</h3>
     <p>To play a game, drag and drop it (ROM file etc.) on this browser window.
     Played games are added to the game stack on the right. Play the game again by clicking it on the stack.
-    <p>To remove a game, click <img src="img/x.gif" width=19 height=19 alt="X icon"/> on the game.
+    <p>To remove a game, click <img src="img/{{x.gif}}" width=19 height=19 alt="X icon"/> on the game.
     This doesn't remove save data however. Built-in games cannot be removed.
     <p>Supported file formats are: <i>.nes, .nsf, .zip</i>
     
     <h3>INPUTS</h3>
 
-    <p>Keyboard bindings can be customized by clicking <img src="img/dpad_sm.gif" width=20 height=20 alt="key bindings icon" /> icon in top right corner of this window.
+    <p>Keyboard bindings can be customized by clicking <img src="img/{{dpad_sm.gif}}" width=20 height=20 alt="key bindings icon" /> icon in top right corner of this window.
     <p>Default keyboard bindings are:
     <table>
       <tr><td><b>Input</b><td><b>Key</b>
@@ -210,8 +210,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   </div>
 </div>
 
-<script src="config.js"></script>
-<script src="loader.js"></script>
+<script src="{{config.js}}"></script>
+<script src="{{loader.js}}"></script>
 <script src="//cdn.webglstats.com/stat.js" defer="defer" async="async"></script>
 </body>
 </html>
