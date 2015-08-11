@@ -38,6 +38,71 @@ DEFINE(M_PI)
 "}\n";
 
 static const char* rgb_vert_src =
+DEFINE(IDX_W)
+DEFINE(IDX_H)
+DEFINE(NOISE_W)
+DEFINE(NOISE_H)
+"attribute vec4 a_0;\n"
+"attribute vec2 a_2;\n"
+"uniform vec2 u_noiseRnd;\n"
+"varying vec2 v_uv;\n"
+"varying vec2 v_deemp_uv;\n"
+"varying vec2 v_noiseUV;\n"
+"void main()\n"
+"{\n"
+	"v_uv = a_2;\n"
+	"v_deemp_uv = vec2(v_uv.y, 0.0);\n"
+	"v_noiseUV = vec2(IDX_W/NOISE_W, IDX_H/NOISE_H)*a_2 + u_noiseRnd;\n"
+	"gl_Position = a_0;\n"
+"}\n";
+static const char* rgb_frag_src =
+DEFINE(NUM_SUBPS)
+DEFINE(NUM_TAPS)
+DEFINE(LOOKUP_W)
+DEFINE(IDX_W)
+DEFINE(YW2)
+DEFINE(CW2)
+"uniform sampler2D u_idxTex;\n"
+"uniform sampler2D u_deempTex;\n"
+"uniform sampler2D u_lookupTex;\n"
+"uniform sampler2D u_noiseTex;\n"
+"uniform vec3 u_mins;\n"
+"uniform vec3 u_maxs;\n"
+"uniform float u_brightness;\n"
+"uniform float u_contrast;\n"
+"uniform float u_color;\n"
+"uniform float u_gamma;\n"
+"uniform float u_noiseAmp;\n"
+"varying vec2 v_uv;\n"
+"varying vec2 v_deemp_uv;\n"
+"varying vec2 v_noiseUV;\n"
+"const mat3 c_convMat = mat3(\n"
+	"1.0,        1.0,        1.0,\n"       // Y
+	"0.946882,   -0.274788,  -1.108545,\n" // I
+	"0.623557,   -0.635691,  1.709007\n"   // Q
+");\n"
+"#define RESCALE(v_) ((v_) * (u_maxs-u_mins) + u_mins)\n"
+
+"void main()\n"
+"{\n"
+	"float deemp = (255.0/511.0) * 2.0 * texture2D(u_deempTex, v_deemp_uv).r;\n"
+	"float uv_y = (255.0/511.0) * texture2D(u_idxTex, v_uv).r + deemp;\n"
+	// Snatch in RGB PPU; uv.x is already calculated, so just read from lookup tex with u=1.0.
+	"vec3 yiq = RESCALE(texture2D(u_lookupTex, vec2(1.0, uv_y)).rgb);\n"
+	// Add noise to YIQ color, boost/reduce color and convert to RGB.
+	"yiq.r += u_noiseAmp * (texture2D(u_noiseTex, v_noiseUV).r - 0.5);\n"
+	"yiq.gb *= u_color;\n"
+	"vec3 result = clamp(c_convMat * yiq, 0.0, 1.0);\n"
+	// Gamma convert RGB from NTSC space to space similar to sRGB.
+	"result = pow(result, vec3(u_gamma));\n"
+	// NOTE: While this seems to be wrong (after gamma), it works well in practice...?
+	"result = clamp(u_contrast * result + u_brightness, 0.0, 1.0);\n"
+	// Write linear color (banding is not visible for pixelated graphics).
+// TODO: test encode gamma
+	"gl_FragColor = vec4(result, 1.0);\n"
+"}\n";
+
+static const char* ntsc_vert_src =
 DEFINE(NUM_TAPS)
 DEFINE(IDX_W)
 DEFINE(IDX_H)
@@ -62,7 +127,7 @@ DEFINE(NOISE_H)
 	"v_noiseUV = vec2(IDX_W/NOISE_W, IDX_H/NOISE_H)*a_2 + u_noiseRnd;\n"
 	"gl_Position = a_0;\n"
 "}\n";
-static const char* rgb_frag_src =
+static const char* ntsc_frag_src =
 DEFINE(NUM_SUBPS)
 DEFINE(NUM_TAPS)
 DEFINE(LOOKUP_W)
@@ -78,7 +143,6 @@ DEFINE(CW2)
 "uniform float u_brightness;\n"
 "uniform float u_contrast;\n"
 "uniform float u_color;\n"
-"uniform float u_rgbppu;\n"
 "uniform float u_gamma;\n"
 "uniform float u_noiseAmp;\n"
 "varying vec2 v_uv[int(NUM_TAPS)];\n"
@@ -107,14 +171,11 @@ DEFINE(CW2)
 	"SMP(0);\n"
 	"SMP(1);\n"
 	"SMP(2);\n"
-	// Snatch in RGB PPU; uv.x is already calculated, so just read from lookup tex with u=1.0.
-	"vec3 rgbppu = RESCALE(texture2D(u_lookupTex, vec2(1.0, uv.y)).rgb);\n"
 	"SMP(3);\n"
 	"SMP(4);\n"
 	// Working multiplier for filtered chroma to match PPU is 2/5 (for CW2=12).
 	// Is this because color fringing with composite?
 	"yiq *= (8.0/2.0) / vec3(YW2, CW2-2.0, CW2-2.0);\n"
-	"yiq = mix(yiq, rgbppu, u_rgbppu);\n"
 	"yiq.r += u_noiseAmp * (texture2D(u_noiseTex, v_noiseUV).r - 0.5);\n"
 	"yiq.gb *= u_color;\n"
 	"vec3 result = clamp(c_convMat * yiq, 0.0, 1.0);\n"

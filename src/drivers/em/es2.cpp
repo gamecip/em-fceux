@@ -404,10 +404,42 @@ static void updateUniformsDebug()
 }
 #endif
 
+static void setUnifRGB1i(es2_unif id, GLint v)
+{
+	glUseProgram(s_p.rgb_prog);
+	glUniform1i(s_u.u[id], v);
+	glUseProgram(s_p.ntsc_prog);
+	glUniform1i(s_u.u[U_COUNT + id], v);
+}
+
+static void setUnifRGB3fv(es2_unif id, GLfloat *v)
+{
+	glUseProgram(s_p.rgb_prog);
+	glUniform3fv(s_u.u[id], 1, v);
+	glUseProgram(s_p.ntsc_prog);
+	glUniform3fv(s_u.u[U_COUNT + id], 1, v);
+}
+
+static void setUnifRGB1f(es2_unif id, double v)
+{
+	glUseProgram(s_p.rgb_prog);
+	glUniform1f(s_u.u[id], v);
+	glUseProgram(s_p.ntsc_prog);
+	glUniform1f(s_u.u[U_COUNT + id], v);
+}
+
+static void setUnifRGB2f(es2_unif id, double a, double b)
+{
+	glUseProgram(s_p.rgb_prog);
+	glUniform2f(s_u.u[id], a, b);
+	glUseProgram(s_p.ntsc_prog);
+	glUniform2f(s_u.u[U_COUNT + id], a, b);
+}
+
 static void updateUniformsRGB()
 {
 	DBG(updateUniformsDebug())
-	glUniform2f(s_u._rgb_noiseRnd_loc, rand01(), rand01());
+	setUnifRGB2f(U_NOISE_RND, rand01(), rand01());
 }
 
 static void updateUniformsSharpen()
@@ -460,31 +492,29 @@ static void updateUniformsDirect()
 	DBG(updateUniformsDebug())
 }
 
+static const char* s_unif_names[] =
+{
+#define U(prog_, id_, name_) "u_" # name_,
+#include "es2unif.inc.hpp"
+#undef U
+};
+
+
 static void initUniformsRGB()
 {
-	GLint k;
-	GLuint prog = s_p.rgb_prog;
+	for (int i = 0; i < U_COUNT; i++) {
+		s_u.u[i] = glGetUniformLocation(s_p.rgb_prog, s_unif_names[i]);
+		s_u.u[U_COUNT + i] = glGetUniformLocation(s_p.ntsc_prog, s_unif_names[i]);
+	}
 
-	k = glGetUniformLocation(prog, "u_idxTex");
-	glUniform1i(k, IDX_I);
-	k = glGetUniformLocation(prog, "u_deempTex");
-	glUniform1i(k, DEEMP_I);
-	k = glGetUniformLocation(prog, "u_lookupTex");
-	glUniform1i(k, LOOKUP_I);
-	k = glGetUniformLocation(prog, "u_noiseTex");
-	glUniform1i(k, NOISE_I);
-	k = glGetUniformLocation(prog, "u_mins");
-	glUniform3fv(k, 1, s_p.yiq_mins);
-	k = glGetUniformLocation(prog, "u_maxs");
-	glUniform3fv(k, 1, s_p.yiq_maxs);
+	setUnifRGB1i(U_IDX_TEX, IDX_I);
+	setUnifRGB1i(U_DEEMP_TEX, DEEMP_I);
+	setUnifRGB1i(U_LOOKUP_TEX, LOOKUP_I);
+	setUnifRGB1i(U_NOISE_TEX, NOISE_I);
 
-	s_u._rgb_brightness_loc = glGetUniformLocation(prog, "u_brightness");
-	s_u._rgb_contrast_loc = glGetUniformLocation(prog, "u_contrast");
-	s_u._rgb_color_loc = glGetUniformLocation(prog, "u_color");
-	s_u._rgb_rgbppu_loc = glGetUniformLocation(prog, "u_rgbppu");
-	s_u._rgb_gamma_loc = glGetUniformLocation(prog, "u_gamma");
-	s_u._rgb_noiseAmp_loc = glGetUniformLocation(prog, "u_noiseAmp");
-	s_u._rgb_noiseRnd_loc = glGetUniformLocation(prog, "u_noiseRnd");
+	setUnifRGB3fv(U_MINS, s_p.yiq_mins);
+	setUnifRGB3fv(U_MAXS, s_p.yiq_maxs);
+
 	updateUniformsRGB();
 }
 
@@ -631,14 +661,20 @@ static void passRGB()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, s_p.rgb_fb);
 	glViewport(0, 0, RGB_W, IDX_H);
-	glUseProgram(s_p.rgb_prog);
 	updateUniformsRGB();
 
 	if (GetController(FCEM_CRT_ENABLED)) {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE_MINUS_CONSTANT_COLOR, GL_CONSTANT_COLOR);
 	}
+
+	if (GetController(FCEM_NTSC_EMU)) {
+		glUseProgram(s_p.ntsc_prog);
+	} else {
+		glUseProgram(s_p.rgb_prog);
+	}
 	meshRender(&s_p.quad_mesh);
+
 	glDisable(GL_BLEND);
 }
 
@@ -714,38 +750,31 @@ void es2UpdateController(int idx, double v)
 {
 	switch (idx) {
 	case FCEM_BRIGHTNESS:
-		glUseProgram(s_p.rgb_prog);
 		v = 0.15 * v;
-		glUniform1f(s_u._rgb_brightness_loc, v);
+		setUnifRGB1f(U_BRIGHTNESS, v);
 		break;
 	case FCEM_CONTRAST:
-		glUseProgram(s_p.rgb_prog);
 		v = 1.0 + 0.4*GetController(FCEM_CONTRAST);
-		glUniform1f(s_u._rgb_contrast_loc, v);
+		setUnifRGB1f(U_CONTRAST, v);
 		break;
 	case FCEM_COLOR:
-		glUseProgram(s_p.rgb_prog);
 		v = 1.0 + GetController(FCEM_COLOR);
-		glUniform1f(s_u._rgb_color_loc, v);
+		setUnifRGB1f(U_COLOR, v);
 		break;
 	case FCEM_NTSC_EMU:
-		glUseProgram(s_p.rgb_prog);
 		v = GetController(FCEM_NTSC_EMU);
-		glUniform1f(s_u._rgb_rgbppu_loc, !v);
 		updateSharpenKernel();
 		// Stretch pass smoothen UV offset; smoothen if NTSC emulation is enabled.
 		glUseProgram(s_p.stretch_prog);
 		glUniform2f(s_u._stretch_smoothenOffs_loc, 0, v * -0.25/IDX_H);
 		break;
 	case FCEM_GAMMA:
-		glUseProgram(s_p.rgb_prog);
 		v = GAMMA_NTSC/GAMMA_SRGB + 0.3*GetController(FCEM_GAMMA);
-		glUniform1f(s_u._rgb_gamma_loc, v);
+		setUnifRGB1f(U_GAMMA, v);
 		break;
 	case FCEM_NOISE:
-		glUseProgram(s_p.rgb_prog);
 		v = GetController(FCEM_CRT_ENABLED) * 0.08 * GetController(FCEM_NOISE)*GetController(FCEM_NOISE);
-		glUniform1f(s_u._rgb_noiseAmp_loc, v);
+		setUnifRGB1f(U_NOISE_AMP, v);
 		break;
 	case FCEM_CONVERGENCE:
 		glUseProgram(s_p.sharpen_prog);
@@ -842,6 +871,9 @@ int es2Init(double aspect)
 	glActiveTexture(TEX(RGB_I));
 	createFBTex(&s_p.rgb_tex, &s_p.rgb_fb, RGB_W, IDX_H, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
 	s_p.rgb_prog = buildShader(rgb_vert_src, rgb_frag_src, common_src);
+//	s_p.ntsc_prog = buildShader(rgb_vert_src, rgb_frag_src, common_src);
+//	s_p.rgb_prog = buildShader(ntsc_vert_src, ntsc_frag_src, common_src);
+	s_p.ntsc_prog = buildShader(ntsc_vert_src, ntsc_frag_src, common_src);
 	initUniformsRGB();
 
 	// Setup sharpen framebuffer.
@@ -938,6 +970,7 @@ void es2Deinit()
 	deleteTex(&s_p.lookup_tex);
 	deleteTex(&s_p.noise_tex);
 	deleteShader(&s_p.rgb_prog);
+	deleteShader(&s_p.ntsc_prog);
 	deleteShader(&s_p.sharpen_prog);
 	deleteShader(&s_p.stretch_prog);
 	deleteShader(&s_p.screen_prog);

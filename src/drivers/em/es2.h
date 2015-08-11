@@ -2,16 +2,18 @@
 #define _ES2_H_
 #include "es2util.h"
 
+typedef enum t_es2_unif {
+U_NONE = -1,
+#define U(prog_, id_, name_) U_ ## id_,
+#include "es2unif.inc.hpp"
+#undef U
+U_COUNT
+} es2_unif;
+
 // Uniform locations.
 typedef struct t_es2_uniforms
 {
-	GLint _rgb_brightness_loc;
-	GLint _rgb_contrast_loc;
-	GLint _rgb_color_loc;
-	GLint _rgb_rgbppu_loc;
-	GLint _rgb_gamma_loc;
-	GLint _rgb_noiseAmp_loc;
-	GLint _rgb_noiseRnd_loc;
+	GLint u[2 * U_COUNT];
 
 	GLint _downsample_offsets_loc;
 	GLint _downsample_downsampleTex_loc;
@@ -36,7 +38,9 @@ typedef struct t_es2
 
     GLuint rgb_fb;      // Framebuffer for output RGB texture generation.
     GLuint rgb_tex;     // Output RGB texture.
-    GLuint rgb_prog;    // Shader for RGB.
+    GLuint rgb_prog;    // Shader for RGB generation.
+
+    GLuint ntsc_prog;    // Shader for NTSC emulation.
 
     GLuint sharpen_fb;  // Framebuffer for sharpened RGB texture.
     GLuint sharpen_tex; // Sharpened RGB texture.
