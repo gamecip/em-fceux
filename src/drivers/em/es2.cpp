@@ -870,22 +870,20 @@ int es2Init(double aspect)
 	// Configure RGB framebuffer.
 	glActiveTexture(TEX(RGB_I));
 	createFBTex(&s_p.rgb_tex, &s_p.rgb_fb, RGB_W, IDX_H, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
-	s_p.rgb_prog = buildShader(rgb_vert_src, rgb_frag_src, common_src);
-//	s_p.ntsc_prog = buildShader(rgb_vert_src, rgb_frag_src, common_src);
-//	s_p.rgb_prog = buildShader(ntsc_vert_src, ntsc_frag_src, common_src);
-	s_p.ntsc_prog = buildShader(ntsc_vert_src, ntsc_frag_src, common_src);
+	s_p.rgb_prog = buildShaderFile("/data/rgb.vert", "/data/rgb.frag", common_src);
+	s_p.ntsc_prog = buildShaderFile("/data/ntsc.vert", "/data/ntsc.frag", common_src);
 	initUniformsRGB();
 
 	// Setup sharpen framebuffer.
 	glActiveTexture(TEX(SHARPEN_I));
 	createFBTex(&s_p.sharpen_tex, &s_p.sharpen_fb, SCREEN_W, IDX_H, GL_RGB, GL_NEAREST, GL_CLAMP_TO_EDGE);
-	s_p.sharpen_prog = buildShader(sharpen_vert_src, sharpen_frag_src, common_src);
+	s_p.sharpen_prog = buildShaderFile("/data/sharpen.vert", "/data/sharpen.frag", common_src);
 	initUniformsSharpen();
 
 	// Setup stretch framebuffer.
 	glActiveTexture(TEX(STRETCH_I));
 	createFBTex(&s_p.stretch_tex, &s_p.stretch_fb, SCREEN_W, SCREEN_H, GL_RGB, GL_LINEAR, GL_CLAMP_TO_EDGE);
-	s_p.stretch_prog = buildShader(stretch_vert_src, stretch_frag_src, common_src);
+	s_p.stretch_prog = buildShaderFile("/data/stretch.vert", "/data/stretch.frag", common_src);
 	initUniformsStretch();
 
 	// Setup screen/TV framebuffer.
@@ -901,16 +899,16 @@ int es2Init(double aspect)
 	}
 
 	// Setup downsample shader.
-	s_p.downsample_prog = buildShader(downsample_vert_src, downsample_frag_src, common_src);
+	s_p.downsample_prog = buildShaderFile("/data/downsample.vert", "/data/downsample.frag", common_src);
 	initUniformsDownsample();
 
 	// Setup screen shader.
-	s_p.screen_prog = buildShader(screen_vert_src, screen_frag_src, common_src);
+	s_p.screen_prog = buildShaderFile("/data/screen.vert", "/data/screen.frag", common_src);
 	createMesh(&s_p.screen_mesh, mesh_screen_vert_num, ARRAY_SIZE(mesh_screen_varrays), mesh_screen_varrays, 3*mesh_screen_face_num, mesh_screen_faces);
 	initUniformsScreen();
 
 	// Setup TV shader.
-	s_p.tv_prog = buildShader(tv_vert_src, tv_frag_src, common_src);
+	s_p.tv_prog = buildShaderFile("/data/tv.vert", "/data/tv.frag", common_src);
 // TODO: tsone: generate distances to crt screen edges
 	int num_edges = 0;
 	int *edges = createUniqueEdges(&num_edges, mesh_screen_vert_num, 3*mesh_screen_face_num, mesh_screen_faces);
@@ -946,11 +944,11 @@ int es2Init(double aspect)
 	initUniformsTV();
 
 	// Setup combine shader.
-	s_p.combine_prog = buildShader(combine_vert_src, combine_frag_src, common_src);
+	s_p.combine_prog = buildShaderFile("/data/combine.vert", "/data/combine.frag", common_src);
 	initUniformsCombine();
 
 	// Setup direct shader.
-	s_p.direct_prog = buildShader(direct_vert_src, direct_frag_src, common_src);
+	s_p.direct_prog = buildShaderFile("/data/direct.vert", "/data/direct.frag", common_src);
 	initUniformsDirect();
 
 	return 1;

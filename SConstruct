@@ -61,7 +61,7 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   ]
   exports = '-s EXPORTED_FUNCTIONS=\'["_' + '","_'.join(exportsList) + '"]\''
   env.Append(LINKFLAGS = exports)
-  env.Append(LINKFLAGS = '--preload-file src/drivers/em/assets/games/@/default/')
+  env.Append(LINKFLAGS = '--preload-file src/drivers/em/assets/data/@/data/')
 else:
   env['EMSCRIPTEN'] = 0
 

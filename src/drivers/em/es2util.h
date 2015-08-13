@@ -39,9 +39,8 @@ double vec3ClosestOnSegment(GLfloat *result, const GLfloat *p, const GLfloat *a,
 void mat4Persp(GLfloat *p, double fovy, double aspect, double zNear, double zFar);
 void mat4Trans(GLfloat *p, GLfloat *trans);
 void mat4Mul(GLfloat *p, const GLfloat *a, const GLfloat *b);
-GLuint compileShader(GLenum type, const char *src);
-GLuint linkShader(GLuint vert_shader, GLuint frag_shader);
 GLuint buildShader(const char *vert_src, const char *frag_src, const char *prepend_src);
+GLuint buildShaderFile(const char *vert_fn, const char *frag_fn, const char *prepend_src);
 void deleteShader(GLuint *prog);
 void createBuffer(GLuint *buf, GLenum binding, GLsizei size, const void *data);
 void deleteBuffer(GLuint *buf);

@@ -148,7 +148,7 @@ void mat4Mul(GLfloat *p, const GLfloat *a, const GLfloat *b)
     }
 }
 
-GLuint compileShader(GLenum type, const char *src)
+static GLuint compileShader(GLenum type, const char *src)
 {
     GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &src, 0);
@@ -172,11 +172,10 @@ GLuint compileShader(GLenum type, const char *src)
         printf("Shader source:\n%s\n", src);
     }
 
-
     return shader;
 }
 
-GLuint linkShader(GLuint vert_shader, GLuint frag_shader)
+static GLuint linkShader(GLuint vert_shader, GLuint frag_shader)
 {
     GLuint prog = glCreateProgram();
     glAttachShader(prog, vert_shader);
@@ -219,6 +218,36 @@ GLuint buildShader(const char *vert_src, const char *frag_src, const char *prepe
         free((char*) frag_src);
     }
     return result;
+}
+
+static char *readShaderFile(const char *fn)
+{
+	FILE *f = fopen(fn, "rb");
+	if (!f) {
+        	printf("ERROR: Can't read shader file: %s\n", fn);
+		return 0;
+	}
+	fseek(f, 0, SEEK_END);
+	const size_t size = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	char *result = (char*) malloc(size + 1);
+	fread(result, 1, size, f);
+	fclose(f);
+	result[size] = '\0';
+	return result;
+}
+
+GLuint buildShaderFile(const char *vert_fn, const char *frag_fn, const char *prepend_src)
+{
+	char *vert_src = readShaderFile(vert_fn);
+	char *frag_src = readShaderFile(frag_fn);
+	GLuint ret = 0;
+	if (vert_src && frag_src) {
+		ret = buildShader(vert_src, frag_src, prepend_src);
+	}
+	free(vert_src);
+	free(frag_src);
+	return ret;
 }
 
 void deleteShader(GLuint *prog)

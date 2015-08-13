@@ -54,7 +54,7 @@ toggleSound : (function() {
       FS.mkdir('/fceux/rom');
     } catch (e) {
     }
-    // var savs = findFiles('/default/'); 
+    // var savs = findFiles('/data/'); 
     // savs.forEach(function(x) { console.log('!!!! sav: ' + x); });
     FCEM.updateGames();
     FCEM.updateStack();
@@ -90,7 +90,7 @@ toggleSound : (function() {
       });
     };
 
-    addGamesIn('/default/', false);
+    addGamesIn('/data/games/', false);
     addGamesIn('/fceux/rom/', true);
 
     // sort in alphabetic order and assign as new games list
