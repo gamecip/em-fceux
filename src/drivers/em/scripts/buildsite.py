@@ -137,4 +137,10 @@ def build(srcdir, outdir):
 	compressRecords(records, mapping, [ 'fceux.js', 'fceux.js.mem', 'fceux.data', 'style.css', 'loader.js' ])
 
 if __name__ == '__main__':
+	if len(sys.argv) < 3:
+		print 'tool to generate a versioned site for em-fceux\n'
+		print 'usage: buildsite.py <srcdir> <dstdir>\n'
+		print 'srcdir - source site tree w/ index.html, generated fceux.* javascript files etc.'
+		print 'dstdir - directory to generate the versioned site'
+		exit(1)
 	build(sys.argv[1], sys.argv[2])
