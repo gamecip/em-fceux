@@ -226,7 +226,7 @@ if env['RELEASE']:
   if env['EMSCRIPTEN']:
     common = ' -flto -Oz'
     common += ' --llvm-opts 3'
-    common += ' --llvm-lto 3'
+    common += ' --llvm-lto 1'
     common += ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
     common += ' -s DISABLE_EXCEPTION_CATCHING=1'
     common += ' -s ASSERTIONS=0'
