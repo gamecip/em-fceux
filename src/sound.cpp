@@ -1232,6 +1232,9 @@ void SetSoundVariables(void)
 {
   int x;
 
+  FCEU_ARRAY_EM(wlookup1, uint32, 32);
+  FCEU_ARRAY_EM(wlookup2, uint32, 203);
+
   fhinc=PAL?16626:14915;  // *2 CPU clock rate
   fhinc*=24;
 

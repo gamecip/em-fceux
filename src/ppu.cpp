@@ -350,7 +350,12 @@ static uint32 scanlines_per_frame;
 
 uint8 PPU[4];
 uint8 PPUSPL;
+#ifdef EMSCRIPTEN
+uint8 NTARAM[0x800], PALRAM[0x20], SPRAM[0x100];
+uint32 SPRBUF[0x100 / 4];
+#else
 uint8 NTARAM[0x800], PALRAM[0x20], SPRAM[0x100], SPRBUF[0x100];
+#endif
 uint8 UPALRAM[0x03];//for 0x4/0x8/0xC addresses in palette, the ones in
 					//0x20 are 0 to not break fceu rendering.
 
@@ -1381,7 +1386,11 @@ static void FetchSpriteData(void) {
 					dst.x = spr->x;
 					dst.atr = spr->atr;
 
+#ifdef EMSCRIPTEN
+					SPRBUF[ns] = *(uint32*)&dst;
+#else
 					*(uint32*)&SPRBUF[ns << 2] = *(uint32*)&dst;
+#endif
 				}
 
 				ns++;
@@ -1437,8 +1446,11 @@ static void FetchSpriteData(void) {
 					dst.x = spr->x;
 					dst.atr = spr->atr;
 
-
+#ifdef EMSCRIPTEN
+					SPRBUF[ns] = *(uint32*)&dst;
+#else
 					*(uint32*)&SPRBUF[ns << 2] = *(uint32*)&dst;
+#endif
 				}
 
 				ns++;
@@ -1467,7 +1479,13 @@ static void RefreshSprites(void) {
 	spork = 0;
 	if (!numsprites) return;
 
+#ifdef EMSCRIPTEN
+	for (int i = 256-1; i >= 0; --i) {
+		sprlinebuf[i] = 0x80;
+	}
+#else
 	FCEU_dwmemset(sprlinebuf, 0x80808080, 256);
+#endif
 	numsprites--;
 	spr = (SPRB*)SPRBUF + numsprites;
 
@@ -1585,7 +1603,32 @@ static void CopySprites(uint8 *target) {
 
 	if (!rendersprites) return;	//User asked to not display sprites.
 
- loopskie:
+#ifdef EMSCRIPTEN
+	do {
+		uint8 t0 = sprlinebuf[n];
+		uint8 t1 = sprlinebuf[n+1];
+		uint8 t2 = sprlinebuf[n+2];
+		uint8 t3 = sprlinebuf[n+3];
+
+		if (0x80808080 != (t0 | (t1<<8) | (t2<<16) | (t3<<24))) {
+			if (((~t0) & 0x80) && (((~t0) | P[n]) & 0x40)) {	// Normal sprite || behind bg sprite
+				P[n] = t0;
+			}
+			if (((~t1) & 0x80) && (((~t1) | P[n + 1]) & 0x40)) {	// Normal sprite || behind bg sprite
+				P[n + 1] = t1;
+			}
+			if (((~t2) & 0x80) && (((~t2) | P[n + 2]) & 0x40)) {	// Normal sprite || behind bg sprite
+				P[n + 2] = t2;
+			}
+			if (((~t3) & 0x80) && (((~t3) | P[n + 3]) & 0x40)) {	// Normal sprite || behind bg sprite
+				P[n + 3] = t3;
+			}
+		}
+
+		n += 4;
+	} while (n);
+#else
+loopskie:
 	{
 		uint32 t = *(uint32*)(sprlinebuf + n);
 
@@ -1644,6 +1687,7 @@ static void CopySprites(uint8 *target) {
 	}
 	n += 4;
 	if (n) goto loopskie;
+#endif
 }
 
 void FCEUPPU_SetVideoSystem(int w) {

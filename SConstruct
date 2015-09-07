@@ -37,6 +37,11 @@ AddOption('--prefix', dest='prefix', type='string', nargs=1, action='store', met
 prefix = GetOption('prefix')
 env = Environment(options = opts)
 
+if not env['RELEASE']:
+  env['DEBUG'] = 1
+elif env['DEBUG']:
+  env['DEBUG'] = 0
+
 if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   env['EMSCRIPTEN'] = 1
   env['GTK'] = 0
@@ -218,20 +223,26 @@ print "base CCFLAGS:",env['CCFLAGS']
 
 if env['DEBUG']:
   env.Append(CPPDEFINES=["_DEBUG"], CCFLAGS = ['-g', '-O0'])
-else:
   if env['EMSCRIPTEN']:
-    env.Append(LINKFLAGS = '-strip-all')
+    common = ''
+    common += ' -s ASSERTIONS=2 -s SAFE_HEAP=1 -s ALIASING_FUNCTION_POINTERS=0'
+    common += ' -s DEMANGLE_SUPPORT=1'
+    common += ' -s OUTLINING_LIMIT=100000'
+    env.Append(CCFLAGS = common, LINKFLAGS = common)
 
 if env['RELEASE']:
   if env['EMSCRIPTEN']:
-    common = ' -flto -Oz'
+    common = ''
+    common += ' -flto -Oz'
     common += ' --llvm-opts 3'
     common += ' --llvm-lto 1'
     common += ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
     common += ' -s DISABLE_EXCEPTION_CATCHING=1'
     common += ' -s ASSERTIONS=0'
+    common += ' -s OUTLINING_LIMIT=100000'
     env.Append(CCFLAGS = common)
     env.Append(LINKFLAGS = common)
+    env.Append(LINKFLAGS = '-strip-all')
   else:
     env.Append(CCFLAGS = ['-O2'])
     env.Append(LINKFLAGS = ['-O2'])
