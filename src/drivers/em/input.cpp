@@ -57,10 +57,21 @@ static void UpdateTopRider (void);
 static uint32 JSreturn = 0;
 static int s_rapidFireFrame = 0;
 
+// TODO: rearrange
+typedef struct t_FCEM_GamepadBinding
+{
+	uint8 gamepad_idx; // Gamepad index. 0xFF means input is disabled.
+	// Binding type.
+	// Bits: 0-5=index of button/axis, 6=is axis, 7=is positive axis.
+	uint8 flags;
+} FCEM_GamepadBinding;
+
 // Mapping from an html5 key code to an input.
 static unsigned int* s_key_map = 0;
+// Bindings from html5 gamepad button/axis to an input. Count of bindings is FCEM_INPUT_COUNT.
+static FCEM_GamepadBinding* s_gamepad_bindings = 0;
 // Input buttons state. Set to 1 if mapped keyboard key is down, otherwise 0.
-static bool* s_input_state = 0;
+static uint8* s_input_state = 0;
 
 // Frame counter for zeroing mouse buttons.
 static int s_mouseReleaseFC = 0;
@@ -72,13 +83,13 @@ static int g_fkbEnabled = 0;
 
 static bool IsInput(unsigned int input)
 {
-	return s_input_state[input];
+	return (0 != s_input_state[input]);
 }
 
 static bool IsInputOnce(unsigned int input)
 {
-	bool result = s_input_state[input];
-	s_input_state[input] = false;
+	bool result = IsInput(input);
+	s_input_state[input] = 0;
 	return result;
 }
 
@@ -271,34 +282,22 @@ static void UpdateSystem()
 #endif
 }
 
-// TODO: tsone: test buttons for connected gamepad devices (in browser)
-// idx 0..9 matches: a, b, select, start, up, down, left, right, turbo a, turbo b
-static int FCEM_TestGamepadButton(const EmscriptenGamepadEvent *p, int idx)
+static bool IsGamepadAxis(const EmscriptenGamepadEvent *p, int idx, int positive_axis)
 {
-    if (!p->connected) {
-        return 0;
-    }
-    if (idx >= 8) {
-        // Turbo A, Turbo B.
-        idx = idx - 4;
-        return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] >= GAMEPAD_THRESHOLD)));
-    } else if (idx >= 4) {
-        // Up, down, left, right.
-        const int positive_axis = idx & 1;
-        idx = !((idx & 0x02) >> 1);
-        if (idx < p->numAxes) {
-            if (positive_axis) {
-                return p->axis[idx] >= GAMEPAD_THRESHOLD;
-            } else {
-                return p->axis[idx] <= -GAMEPAD_THRESHOLD;
-            }
-        } else {
-            return 0;
-        }
-    } else {
-        // A, B, Select, Start.
-        return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] >= GAMEPAD_THRESHOLD)));
-    }
+	if (idx < p->numAxes) {
+		if (positive_axis) {
+			return p->axis[idx] >= GAMEPAD_THRESHOLD;
+		} else {
+			return p->axis[idx] <= -GAMEPAD_THRESHOLD;
+		}
+	} else {
+		return false;
+	}
+}
+
+static bool IsGamepadButton(const EmscriptenGamepadEvent *p, int idx)
+{
+	return ((idx < p->numButtons) && (p->digitalButton[idx] || (p->analogButton[idx] >= GAMEPAD_THRESHOLD)));
 }
 
 static void UpdateGamepad(void)
@@ -321,13 +320,35 @@ static void UpdateGamepad(void)
 		}
 	}
 
+// TODO: transfer gamepad state to inputs
+	for (i = FCEM_INPUT_COUNT - 1; i >= 0; --i) {
+// TODO: make a function for this?
+		const FCEM_GamepadBinding *p = &s_gamepad_bindings[i];
+		if (p->gamepad_idx < 4) {
+			bool set;
+			if (p->flags < (1<<6)) {
+				// Handle button.
+				set = IsGamepadButton(&gamepads[p->gamepad_idx], p->flags);
+			} else {
+				// Handle axis.
+				set = IsGamepadAxis(&gamepads[p->gamepad_idx], p->flags & ((1<<6)-1), p->flags & (1<<7));
+			}
+// TODO: clarify this, set bit1 to signify gamepad is set
+			if (set) {
+				s_input_state[i] |= (1<<1);
+			} else {
+				s_input_state[i] &= ~(1<<1);
+			}
+		}
+	}
+
 	for (i = 0; i < 4; ++i) {
 		bool left = false;
 		bool up = false;
                 int inputBase = FCEM_GAMEPAD + FCEM_GAMEPAD_SIZE*i;
 
 		for (x = 0; x < 8; ++x) {
-			if (FCEM_TestGamepadButton(&gamepads[i], x) || IsInput(inputBase + x)) {
+			if (IsInput(inputBase + x)) {
 				if (opposite_dirs == 0) {
 					// test for left+right and up+down
 					if(x == 4) {
@@ -362,7 +383,7 @@ static void UpdateGamepad(void)
 		// rapid-fire a, rapid-fire b
 		if (s_rapidFireFrame) {
 			for (x = 0; x < 2; ++x) {
-   				if (FCEM_TestGamepadButton(&gamepads[i], 8+x) || IsInput(inputBase+8+x)) {
+   				if (IsInput(inputBase+8+x)) {
 					JS |= (1 << x) << (i << 3);
 				}
 			}
@@ -422,8 +443,15 @@ static unsigned int getInput(const EmscriptenKeyboardEvent *ev)
 static EM_BOOL KeyCallback(int eventType, const EmscriptenKeyboardEvent *event, void*)
 {
 	unsigned int input = getInput(event);
-	s_input_state[input] = (eventType == EMSCRIPTEN_EVENT_KEYDOWN);
-	s_input_state[FCEM_NULL] = false; // Disable NULL input.
+// TODO: clarify this a bit?
+//	s_input_state[input] = (eventType == EMSCRIPTEN_EVENT_KEYDOWN);
+	if (eventType == EMSCRIPTEN_EVENT_KEYDOWN) {
+		s_input_state[input] |= (1<<0);
+	} else {
+		s_input_state[input] &= ~(1<<0);
+	}
+// TODO: this may be in the wrong place?
+	s_input_state[FCEM_NULL] = 0; // Disable NULL input.
 	return 1;
 }
 
@@ -473,10 +501,33 @@ void FCEUD_SetInput(bool fourscore, bool microphone, ESI, ESI, ESIFC fcexp)
 	replaceP2StartWithMicrophone = microphone;
 
 	// Init input state array. Fills it with zeroes.
-	FCEU_ARRAY_EM(s_input_state, bool, FCEM_INPUT_COUNT);
+	FCEU_ARRAY_EM(s_input_state, uint8, FCEM_INPUT_COUNT);
 
 	// Init key map. Fills it with zeroes.
 	FCEU_ARRAY_EM(s_key_map, unsigned int, FCEM_KEY_MAP_SIZE);
+
+	// Init gamepad map. Fills it with zeroes.
+	FCEU_ARRAY_EM(s_gamepad_bindings, FCEM_GamepadBinding, FCEM_INPUT_COUNT);
+
+// TODO: init gamepad to default state
+	for (int i = FCEM_INPUT_COUNT - 1; i >= 0; --i) {
+		s_gamepad_bindings[i].gamepad_idx = 0xFF;
+	}
+#define SETGP(inp_, gp_, flags_) \
+	s_gamepad_bindings[(inp_)].gamepad_idx = (gp_); \
+	s_gamepad_bindings[(inp_)].flags = (flags_);
+#define GPBTN(inp_, gp_, btn_) SETGP((inp_), (gp_), (btn_))
+#define GPAXIS(inp_, gp_, axis_, pos_) SETGP((inp_), (gp_), (axis_) | (1<<6) | ((pos_) ? 1<<7 : 0))
+	GPBTN(FCEM_GAMEPAD0_A, 0, 0);
+	GPBTN(FCEM_GAMEPAD0_B, 0, 1);
+	GPBTN(FCEM_GAMEPAD0_SELECT, 0, 2);
+	GPBTN(FCEM_GAMEPAD0_START, 0, 3);
+	GPAXIS(FCEM_GAMEPAD0_UP, 0, 1, 0);
+	GPAXIS(FCEM_GAMEPAD0_DOWN, 0, 1, 1);
+	GPAXIS(FCEM_GAMEPAD0_LEFT, 0, 0, 0);
+	GPAXIS(FCEM_GAMEPAD0_RIGHT, 0, 0, 1);
+	GPBTN(FCEM_GAMEPAD0_TURBO_A, 0, 4);
+	GPBTN(FCEM_GAMEPAD0_TURBO_B, 0, 5);
 
 // TODO: tsone: make configurable by front-end
 	FCEUI_SetInput(0, SI_GAMEPAD, &JSreturn, 0);
