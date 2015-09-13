@@ -78,7 +78,7 @@
 #define INPUT_PRE \
 enum FCEM_Input {\
 	FCEM_NULL = 0x0000,
-#define INPUT(i_,d_,e_,t_) \
+#define INPUT(i_,dk_,dg_,e_,t_) \
 	FCEM_ ## e_ = i_,
 #define INPUT_POST \
 	FCEM_INPUT_COUNT\
@@ -204,6 +204,7 @@ void ButtonConfigEnd();
 
 void RegisterCallbacksForCanvas();
 void BindKey(int id, int keyIdx);
+void BindGamepad(int id, int binding);
 void BindPort(int portIdx, ESI peri);
 void FCEUD_UpdateInput(void);
 

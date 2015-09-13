@@ -229,6 +229,12 @@ void FCEM_BindKey(int id, int keyIdx)
 	BindKey(id, keyIdx);
 }
 
+// Bind a HTML5 Gamepad API button/axis to an input ID.
+void FCEM_BindGamepad(int id, int binding)
+{
+	BindGamepad(id, binding);
+}
+
 extern int webgl_supported;
 
 // Set control value.

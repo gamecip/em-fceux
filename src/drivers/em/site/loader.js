@@ -146,26 +146,38 @@ toggleSound : (function() {
   getLocalKey : function(id) {
     return parseInt(localStorage['input' + id]);
   },
-  resetKeys : function() {
+  setLocalGamepad : function(id, binding) {
+    localStorage['gp' + id] = binding;
+  },
+  getLocalGamepad : function(id) {
+    return parseInt(localStorage['gp' + id]);
+  },
+  clearInputBindings : function() {
     for (var id in FCEC.inputs) {
       var key = FCEM.getLocalKey(id);
       FCEM.bindKey(0, key);
+      var binding = FCEM.getLocalGamepad(id);
+      FCEM.bindGamepad(0, binding);
+      // TODO: tsone: Reads default bindings from config, but doesn't set them...?
       var item = FCEC.inputs[id];
       FCEM.setLocalKey(id, item[0]);
+      FCEM.setLocalGamepad(id, item[1]);
     }
   },
-  mapAllKeys : function() {
+  syncInputBindings : function() {
     for (var id in FCEC.inputs) {
       var key = FCEM.getLocalKey(id);
       FCEM.bindKey(id, key);
+      var binding = FCEM.getLocalGamepad(id);
+      FCEM.bindGamepad(id, binding);
     }
   },
   setupKeys : function() {
     if (!localStorage.getItem('inputInit')) {
-      FCEM.resetKeys();
+      FCEM.clearInputBindings();
       localStorage['inputInit'] = 'true';
     }
-    FCEM.mapAllKeys();
+    FCEM.syncInputBindings();
     FCEM.initKeyBind();
   },
   key2Name : function (key) {
@@ -178,6 +190,14 @@ toggleSound : (function() {
     if (key & 0x800 && keyName !== 'Meta')  prefix += 'Meta+';
     return prefix + keyName;
   },
+  gamepad2Name : function (binding) {
+    var type = binding & 0x03;
+    var pad = (binding & 0x0C) >> 2;
+    var idx = (binding & 0xF0) >> 4;
+    if (!type) return '(Undefined)';
+    var typeNames = [ 'Button', '-Axis', '+Axis' ];
+    return 'Gamepad ' + pad + ': ' + typeNames[type-1] + ' ' + idx;
+  },
   initKeyBind : function() {
     var table = document.getElementById("keyBindTable");
     var proto = document.getElementById("keyBindProto");
@@ -189,13 +209,16 @@ toggleSound : (function() {
     for (id in FCEC.inputs) {
       var item = FCEC.inputs[id];
       var key = FCEM.getLocalKey(id);
+      var gamepad = FCEM.getLocalGamepad(id);
       var keyName = FCEM.key2Name(key);
+      var gamepadName = FCEM.gamepad2Name(gamepad);
 
       var el = proto.cloneNode(true);
-      el.children[0].innerHTML = item[1];
+      el.children[0].innerHTML = item[2];
       el.children[1].innerHTML = keyName;
-      el.children[2].dataset.id = id;
-      el.children[2].dataset.name = item[1];
+      el.children[2].innerHTML = gamepadName;
+      el.children[3].dataset.id = id;
+      el.children[3].dataset.name = item[2];
 
       table.appendChild(el);
     }
@@ -210,8 +233,8 @@ toggleSound : (function() {
     FCEM.initKeyBind();
   },
   keyBindResetAll : function() {
-    FCEM.resetKeys();
-    FCEM.mapAllKeys();
+    FCEM.clearInputBindings();
+    FCEM.syncInputBindings();
     FCEM.initKeyBind();
   },
   setLocalController : function(id, val) {
@@ -271,7 +294,7 @@ catchEnd : (function(save) {
 		  for (var id in FCEC.inputs) {
 		    var key = FCEM.getLocalKey(id);
 		    if (FCEV.catchKey == key) {
-		      if (!confirm('Key ' + FCEM.key2Name(key) + ' already bound as ' + FCEC.inputs[id][1] + '. Overwrite?')) {
+		      if (!confirm('Key ' + FCEM.key2Name(key) + ' already bound as ' + FCEC.inputs[id][2] + '. Overwrite?')) {
 		        FCEV.catchEnabled = true; // Re-enable key catching
 		        return;
 		      }
@@ -325,6 +348,7 @@ var Module = {
   postRun: [function() {
     FCEM.setController = Module.cwrap('FCEM_SetController', null, ['number', 'number']);
     FCEM.bindKey = Module.cwrap('FCEM_BindKey', null, ['number', 'number']);
+    FCEM.bindGamepad = Module.cwrap('FCEM_BindGamepad', null, ['number', 'number']);
     FCEM.silenceSound = Module.cwrap('FCEM_SilenceSound', null, ['number']);
     // HACK: Disable default fullscreen handlers. See Emscripten's library_browser.js
     // The handlers forces the canvas size by setting css style width and height with
