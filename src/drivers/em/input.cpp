@@ -541,7 +541,8 @@ const unsigned int *GetKeyboard()
 	return s_key_map;
 }
 
-// TODO: tsone: dummy functions
+// Dummy functions...
 void FCEUD_MovieRecordTo() {}
 void FCEUD_SaveStateAs() {}
 void FCEUD_LoadStateFrom() {}
+

@@ -156,8 +156,7 @@ toggleSound : (function() {
     for (var id in FCEC.inputs) {
       var key = FCEM.getLocalKey(id);
       FCEM.bindKey(0, key);
-      var binding = FCEM.getLocalGamepad(id);
-      FCEM.bindGamepad(0, binding);
+      FCEM.bindGamepad(id, 0);
       // TODO: tsone: Reads default bindings from config, but doesn't set them...?
       var item = FCEC.inputs[id];
       FCEM.setLocalKey(id, item[0]);
@@ -181,7 +180,7 @@ toggleSound : (function() {
     FCEM.initKeyBind();
   },
   key2Name : function (key) {
-    var keyName = (key & 0x0FF) ? KEY_CODE_TO_NAME[key & 0x0FF] : '(Undefined)';
+    var keyName = (key & 0x0FF) ? KEY_CODE_TO_NAME[key & 0x0FF] : '(Unset)';
     if (keyName === undefined) keyName = '(Unknown)';
     var prefix = '';
     if (key & 0x100 && keyName !== 'Ctrl')  prefix += 'Ctrl+';
@@ -194,9 +193,9 @@ toggleSound : (function() {
     var type = binding & 0x03;
     var pad = (binding & 0x0C) >> 2;
     var idx = (binding & 0xF0) >> 4;
-    if (!type) return '(Undefined)';
+    if (!type) return '(Unset)';
     var typeNames = [ 'Button', '-Axis', '+Axis' ];
-    return 'Gamepad ' + pad + ': ' + typeNames[type-1] + ' ' + idx;
+    return 'Gamepad ' + pad + ' ' + typeNames[type-1] + ' ' + idx;
   },
   initKeyBind : function() {
     var table = document.getElementById("keyBindTable");
@@ -223,16 +222,16 @@ toggleSound : (function() {
       table.appendChild(el);
     }
   },
-  keyBindUnset : function(keyBind) {
+  clearBinding : function(keyBind) {
     var id = keyBind.dataset.id;
     var key = FCEM.getLocalKey(id);
-    if (key) {
-      FCEM.bindKey(0, key);
-    }
+    FCEM.bindKey(0, key);
     FCEM.setLocalKey(id, 0);
+    FCEM.bindGamepad(id, 0);
+    FCEM.setLocalGamepad(id, 0);
     FCEM.initKeyBind();
   },
-  keyBindResetAll : function() {
+  resetBindings : function() {
     FCEM.clearInputBindings();
     FCEM.syncInputBindings();
     FCEM.initKeyBind();
@@ -260,6 +259,7 @@ var FCEV = {
 catchEnabled : false,
 catchId : null,
 catchKey : null,
+catchGamepad : null,
 keyBindToggle : (function() {
 	var el = document.getElementById("keyBindDiv");
 	return function() {
@@ -269,6 +269,7 @@ keyBindToggle : (function() {
 catchStart : (function(keyBind) {
 	var nameEl = document.getElementById("catchName");
 	var keyEl = document.getElementById("catchKey");
+	var gamepadEl = document.getElementById("catchGamepad");
 	var catchDivEl = document.getElementById("catchDiv");
 	return function(keyBind) {
 		var id = keyBind.dataset.id;
@@ -278,6 +279,10 @@ catchStart : (function(keyBind) {
 		var key = FCEM.getLocalKey(id);
 		FCEV.catchKey = key;
 		keyEl.innerHTML = FCEM.key2Name(key);
+
+		var binding = FCEM.getLocalGamepad(id);
+		FCEV.catchGamepad = binding;
+		gamepadEl.innerHTML = FCEM.gamepad2Name(binding);
 
 		catchDivEl.style.display = 'block';
 
@@ -290,22 +295,46 @@ catchEnd : (function(save) {
 		FCEV.catchEnabled = false;
 
 		if (save && FCEV.catchId) {
-		  // Check/overwrite duplicate bindings
+		  // Check/overwrite duplicates
 		  for (var id in FCEC.inputs) {
+
+                    // Skip current binding
+		    if (FCEV.catchId == id) {
+                      continue;
+                    }
+
+                    // Check duplicate key binding
 		    var key = FCEM.getLocalKey(id);
-		    if (FCEV.catchKey == key) {
-		      if (!confirm('Key ' + FCEM.key2Name(key) + ' already bound as ' + FCEC.inputs[id][2] + '. Overwrite?')) {
+		    if (key && FCEV.catchKey == key) {
+		      if (!confirm('Key ' + FCEM.key2Name(key) + ' already bound as ' + FCEC.inputs[id][2] + '. Clear the previous binding?')) {
 		        FCEV.catchEnabled = true; // Re-enable key catching
 		        return;
 		      }
 		      FCEM.setLocalKey(id, 0);
 		      FCEM.bindKey(0, key);
 		    }
+
+                    // Check duplicate gamepad binding
+		    var binding = FCEM.getLocalGamepad(id);
+		    if (binding && FCEV.catchGamepad == binding) {
+		      if (!confirm(FCEM.gamepad2Name(binding) + ' already bound as ' + FCEC.inputs[id][2] + '. Clear the previous binding?')) {
+		        FCEV.catchEnabled = true; // Re-enable key catching
+		        return;
+		      }
+		      FCEM.setLocalGamepad(id, 0);
+		      FCEM.bindGamepad(id, 0);
+		    }
 		  }
 
-		  // Set new binding
+                  // Clear old key binding
+		  var oldKey = FCEM.getLocalKey(FCEV.catchId);
+		  FCEM.bindKey(0, oldKey);
+		  // Set new bindings
 		  FCEM.setLocalKey(FCEV.catchId, FCEV.catchKey);
 		  FCEM.bindKey(FCEV.catchId, FCEV.catchKey);
+		  FCEM.setLocalGamepad(FCEV.catchId, FCEV.catchGamepad);
+		  FCEM.bindGamepad(FCEV.catchId, FCEV.catchGamepad);
+
 		  FCEV.catchId = null;
 		  FCEM.initKeyBind();
 		}
@@ -331,6 +360,40 @@ setProgress : (function(x) {
 		el.style.width = 3 * ((42*x) |0) + 'px';
 	};
 })(),
+scanForGamepadBinding : function() {
+  if (navigator && navigator.getGamepads) {
+    var gamepads = navigator.getGamepads();
+    // Scan through gamepads.
+    var i = gamepads.length - 1;
+    if (i > 3) i = 3; // Max 4 gamepads.
+    for (; i >= 0; --i) {
+      var p = gamepads[i];
+      if (p && p.connected) {
+        // Scan for button.
+        var j = p.buttons.length - 1;
+        if (j > 15) j = 15; // Max 16 buttons.
+        for (; j >= 0; --j) {
+          var button = p.buttons[j];
+          if (button.pressed || (button.value >= 0.1)) {
+            return (j << 4) | (i << 2) | 1; // Produce button binding.
+          }
+        }
+        // Scan for axis.
+        var j = p.axes.length - 1;
+        if (j > 15) j = 15; // Max 16 axes.
+        for (; j >= 0; --j) {
+          var value = p.axes[j];
+          if (value <= -0.1) {
+            return (j << 4) | (i << 2) | 2; // Produce -axis binding.
+          } else if (value >= 0.1) {
+            return (j << 4) | (i << 2) | 3; // Produce +axis binding.
+          }
+        }
+      }
+    }
+  }
+  return 0;
+},
 };
 
 window.onbeforeunload = function (ev) {
@@ -546,5 +609,19 @@ document.addEventListener("keydown", function(e) {
 
   FCEV.catchKey = key;
 });
+
+// Must scan/poll as Gamepad API doesn't send input events...
+setInterval(function() {
+  if (!FCEV.catchEnabled) {
+    return;
+  }
+  var binding = FCEV.scanForGamepadBinding();
+  if (!binding) {
+    return;
+  }
+  var el = document.getElementById("catchGamepad");
+  el.innerHTML = FCEM.gamepad2Name(binding);
+  FCEV.catchGamepad = binding;
+}, 60);
 
 document.addEventListener('DOMContentLoaded', FCEM.onDOMLoaded, false);

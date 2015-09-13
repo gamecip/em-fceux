@@ -121,15 +121,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   <div class="scrollingContent">
     <img id="dpadIndicator" width="48" height="48" src="img/{{indicator.gif}}" alt="flashing indicator" />
 
-    <h3>KEYBOARD BINDINGS</h3>
+    <h3>INPUT BINDINGS</h3>
     <table hidden>
-      <tr id="keyBindProto"><td><td><td><td data-id="" data-name=""><input type="button" value="Set" onclick="FCEV.catchStart(this.parentNode);" /> <input type="button" value="Unset" onclick="FCEM.keyBindUnset(this.parentNode);" />
+      <tr id="keyBindProto"><td><td><td><td data-id="" data-name=""><input type="button" value="Set" onclick="FCEV.catchStart(this.parentNode);" /> <input type="button" value="Clear" onclick="FCEM.clearBinding(this.parentNode);" />
     </table>
     
-    <p>Click 'Set' button to bind a key to an input. Click 'Unset' to remove a binding.
-    <p><table id="keyBindTable"><tr><td><b>Input</b><td><b>Key</b><td><b>Gamepad</b><td><b>Options</b></table>
+    <p>Click 'Set' button to change bindings for an input. Click 'Clear' to remove the binding.
+    <p><table id="keyBindTable"><tr><td><b>Input</b><td><b>Keyboard</b><td><b>Gamepad</b><td><b>Options</b></table>
     <br/>
-    <input type="button" value="Reset to Defaults" onclick="FCEM.keyBindResetAll();" />
+    <input type="button" value="Reset to Defaults" onclick="FCEM.resetBindings();" />
     <br/><br/>
   </div>
   </div>
@@ -139,8 +139,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 <div id="catchDiv">
   <div class="dimmer"></div>
   <div id="catch">
-    <h1>PRESS A KEY TO CHANGE BINDING</h1>
-    <p>Key <span id="catchKey"></span> will be bound to <span id="catchName"></span>.
+    <h1>PRESS A KEY OR GAMEPAD BUTTON</h1>
+    <p><span id="catchKey"></span> and <span id="catchGamepad"></span> will be bound to <span id="catchName"></span>.
     <p>
     <input type="button" value="Cancel" onclick="FCEV.catchEnd(false);" />
     <input type="button" value="OK" onclick="FCEV.catchEnd(true);" />
@@ -166,8 +166,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     
     <h3>INPUTS</h3>
 
-    <p>Keyboard bindings can be customized by clicking <img src="img/{{dpad_sm.gif}}" width=20 height=20 alt="key bindings icon" /> icon in top right corner of this window.
-    <p>Default keyboard bindings are:
+    <p>Input bindings can be customized by clicking <img src="img/{{dpad_sm.gif}}" width=20 height=20 alt="key bindings icon" /> icon in top right corner of the window.
+    <p>Default keyboard keys are:
     <table>
       <tr><td><b>Input</b><td><b>Key</b>
       <tr><td>Directional Pad (Controller 1)<td>Arrow Keys

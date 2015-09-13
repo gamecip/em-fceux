@@ -384,7 +384,7 @@ img.preload {
   margin-top: -60px;
   text-align: center;
 }
-#catchName, #catchKey {
+#catchName, #catchKey, #catchGamepad {
   font-family: "RobotoBold";
   font-weight: normal;
   font-style: normal;
