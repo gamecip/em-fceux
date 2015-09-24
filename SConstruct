@@ -228,19 +228,20 @@ if env['DEBUG']:
     common = ''
     common += ' -s ASSERTIONS=2 -s SAFE_HEAP=1 -s ALIASING_FUNCTION_POINTERS=0'
     common += ' -s DEMANGLE_SUPPORT=1'
-    common += ' -s OUTLINING_LIMIT=100000'
+    common += ' -s OUTLINING_LIMIT=25000'
     env.Append(CCFLAGS = common, LINKFLAGS = common)
+    
 
 if env['RELEASE']:
   if env['EMSCRIPTEN']:
     common = ''
     common += ' -flto -Oz'
-    common += ' --llvm-opts 3'
-    common += ' --llvm-lto 1'
-    common += ' -s NO_EXIT_RUNTIME=1 -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
+    #common += ' --llvm-lto 1' # NOTE: unstable (emscripten 1.34.6)
+    common += ' -s NO_EXIT_RUNTIME=1'
+    common += ' -s AGGRESSIVE_VARIABLE_ELIMINATION=1'
     common += ' -s DISABLE_EXCEPTION_CATCHING=1'
     common += ' -s ASSERTIONS=0'
-    common += ' -s OUTLINING_LIMIT=100000'
+    common += ' -s OUTLINING_LIMIT=25000'
     env.Append(CCFLAGS = common)
     env.Append(LINKFLAGS = common)
     env.Append(LINKFLAGS = '-strip-all')
