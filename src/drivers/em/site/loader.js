@@ -140,27 +140,38 @@ toggleSound : (function() {
   
     stackContainer.scrollTop = scrollPos;
   },
+  _getLocalInputDefault : function(id, type) {
+    var m = (type ? 'gp' : 'input') + id;
+    if (localStorage[m] === undefined) {
+      if (FCEC.inputs[id] === undefined) {
+        localStorage[m] = '0'; // NOTE: fallback if the id is undefined
+      } else {
+        localStorage[m] = FCEC.inputs[id][type];
+      }
+    }
+    return parseInt(localStorage[m]);
+  },
   setLocalKey : function(id, key) {
     localStorage['input' + id] = key;
   },
   getLocalKey : function(id) {
-    return parseInt(localStorage['input' + id]);
+    return FCEM._getLocalInputDefault(id, 0);
   },
   setLocalGamepad : function(id, binding) {
     localStorage['gp' + id] = binding;
   },
   getLocalGamepad : function(id) {
-    return parseInt(localStorage['gp' + id]);
+    return FCEM._getLocalInputDefault(id, 1);
   },
   clearInputBindings : function() {
     for (var id in FCEC.inputs) {
+      // clear local bindings
+      delete localStorage['input' + id];
+      delete localStorage['gp' + id];
+      // clear host bindings
       var key = FCEM.getLocalKey(id);
       FCEM.bindKey(0, key);
       FCEM.bindGamepad(id, 0);
-      // TODO: tsone: Reads default bindings from config, but doesn't set them...?
-      var item = FCEC.inputs[id];
-      FCEM.setLocalKey(id, item[0]);
-      FCEM.setLocalGamepad(id, item[1]);
     }
   },
   syncInputBindings : function() {
@@ -171,11 +182,7 @@ toggleSound : (function() {
       FCEM.bindGamepad(id, binding);
     }
   },
-  setupKeys : function() {
-    if (!localStorage.getItem('inputInit')) {
-      FCEM.clearInputBindings();
-      localStorage['inputInit'] = 'true';
-    }
+  initInputBindings : function() {
     FCEM.syncInputBindings();
     FCEM.initKeyBind();
   },
@@ -231,16 +238,15 @@ toggleSound : (function() {
     FCEM.setLocalGamepad(id, 0);
     FCEM.initKeyBind();
   },
-  resetBindings : function() {
+  resetDefaultBindings : function() {
     FCEM.clearInputBindings();
-    FCEM.syncInputBindings();
-    FCEM.initKeyBind();
+    FCEM.initInputBindings();
   },
   setLocalController : function(id, val) {
     localStorage['ctrl' + id] = Number(val);
     FCEM.setController(id, val);
   },
-  setupControllers : function(force) {
+  initControllers : function(force) {
     if (force || !localStorage.getItem('ctrlInit')) {
       for (var id in FCEC.controllers) {
         localStorage['ctrl' + id] = FCEC.controllers[id][0];
@@ -421,8 +427,8 @@ var Module = {
     // Initial IDBFS sync.
     FS.syncfs(true, FCEM.onInitialSyncFromIDB);
     // Setup configuration from localStorage.
-    FCEM.setupControllers();
-    FCEM.setupKeys();
+    FCEM.initControllers();
+    FCEM.initInputBindings();
   }],
   print: function() {
     text = Array.prototype.slice.call(arguments).join(' ');

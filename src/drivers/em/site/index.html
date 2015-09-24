@@ -94,7 +94,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
       <tr><td>Video System<td><select id="video_system" onchange="FCEM.setLocalController(VIDEO_SYSTEM, this.value)"><option value="-1">(Auto)</option><option value="0">NTSC</option><option value="1">PAL</option></select>
       <tr><td>Use WebGL<td><input id="webgl_enabled" type="checkbox" oninput="FCEM.setLocalController(WEBGL_ENABLED, this.checked)" onchange="FCEM.setLocalController(WEBGL_ENABLED, this.checked)"/>
     </table>
-    <p><input type="button" value="Reset to Defaults" onclick="FCEM.setupControllers(true)" />
+    <p><input type="button" value="Reset to Defaults" onclick="FCEM.initControllers(true)" />
     <p><i><small>* NTSC composite signal path emulation.</small></i>
     <!-- <input type="button" value="dump FS" onclick="var f = findFiles('/'); f.forEach(function(x) { console.log('!!!! dump: ' + x); })" /> -->
   </div>
@@ -129,7 +129,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
     <p>Click 'Set' button to change bindings for an input. Click 'Clear' to remove the binding.
     <p><table id="keyBindTable"><tr><td><b>Input</b><td><b>Keyboard</b><td><b>Gamepad</b><td><b>Options</b></table>
     <br/>
-    <input type="button" value="Reset to Defaults" onclick="FCEM.resetBindings();" />
+    <input type="button" value="Reset to Defaults" onclick="FCEM.resetDefaultBindings();" />
     <br/><br/>
   </div>
   </div>
