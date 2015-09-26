@@ -56,12 +56,11 @@ int LoadGame(const char *path)
 		CloseGame();
 	}
 
-	if(!FCEUI_LoadGame(path, 1)) {
+	// Pass user's autodetect setting to LoadGame().
+	int autodetect = (GetController(FCEM_VIDEO_SYSTEM) <= -1) ? 1 : 0;
+	if(!FCEUI_LoadGame(path, autodetect)) {
 		return 0;
 	}
-
-// TODO: tsone: needed for some reason even though FCEUI_LoadGame() calls it. something to do with ResetNES() call there?
-	FCEUI_SetVidSystem(PAL);
 
 	s_status |= STATUS_LOAD;
 	return 1;
