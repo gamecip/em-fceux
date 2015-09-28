@@ -1,12 +1,13 @@
 
+# Disable directory file index generation
 Options -Indexes
 
 ExpiresActive On
-RewriteEngine on
+RewriteEngine On
 
-# Set Expires and Cache-Control for 1 week expiration
+# By default use 1 week expiration
 ExpiresDefault A604800
-Header set Cache-Control "max-age=604800"
+Header set Cache-Control "public, max-age=604800"
 
 # If the browser accepts gzip and the requested file exists with
 # a .gz appended, then rewrite the request to the .gz file
@@ -38,17 +39,17 @@ RewriteRule (.*\.(css|js|mem|data))$ $1\.gz [L]
     Header set Content-Encoding gzip
 </FilesMatch>
 
-# Set index.html to revalidate
-<filesMatch "index\.html$">
-    Header set Cache-Control "max-age=604800, must-revalidate"
-</filesMatch>
+# index.html uses 5 minute expiration
+<FilesMatch "index\.html$">
+    ExpiresDefault A300
+    Header set Cache-Control "public, max-age=300"
+</FilesMatch>
 
-# Tell caching proxy servers to cache the file based on both
-# browser type and encoding
-Header append Vary Accept-Encoding
+# Cache based on both browser type and encoding
+Header append Vary "User-Agent, Accept-Encoding"
 
-# Do this to set proper ETags for server clusters
-FileETag MTime Size
+# Disable ETags
+FileETag none
 
 # Disable framing
 Header always append X-Frame-Options DENY
