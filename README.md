@@ -60,7 +60,7 @@ Notable *unsupported* FCEUX features:
 
 em-fceux can be built under Linux or Unix. Windows is not currently supported.
 
-First install Emscripten 1.32.0 (tested) by following instructions in:
+First install Emscripten (tested on: 1.34.6, 1.32.0) by following instructions in:
 http://emscripten.org/
 
 Then you also need scons build tool, gzip and Python 2.7.x. Their installation
@@ -68,11 +68,15 @@ depends on the operating system.
 
 Build the source with ./embuild.sh bash script in the em-fceux directory root.
 
-Release build: ./embuild.sh
+```
+# Release build:
+./embuild.sh
 
-Debug build: ./embuild.sh RELEASE=0
+# Debug build:
+./embuild.sh RELEASE=0
+```
 
-After successfull build, the src/drivers/em/site/ directory will contain
+After successful build, the src/drivers/em/site/ directory will contain
 the em-fceux "binaries": fceux.js, fceux.js.mem, fceux.data and their respective
 gzipped versions. To deploy and test, please follow the steps in the RUN / DEPLOY
 section.
@@ -85,11 +89,13 @@ run ./buildshaders.sh in the em-fceux root. This requires a *glslopt* binary
 (=glsl optimizer). Currently (28-Sep-2015) one way to get it is to build
 it from the source as follows:
 
+```
 git clone https://github.com/aras-p/glsl-optimizer.git ../glsl-optimizer
 cd ../glsl-optimizer
 cmake . && make glslopt
+```
 
-NOTE: You must run ./buildshaders.sh BEFORE the ./embuild.sh script. This is because
+Note, you must run ./buildshaders.sh before the ./embuild.sh script. This is because
 the shaders are copied/embedded in the file system created by the latter script.
 
 
@@ -107,20 +113,21 @@ The ./embuildsite.sh script suffixes all static site content with git file hash
 for explicit cache/version control.
 
 Note, to take advantage of the pre-built .gz files, you must set HTTP server to
-forward request to the .gz files instead of the uncompressed ones and to set the
-transfer encoding headers properly. It's also good to have some cache control.
+forward request to these files instead of the uncompressed ones and also to set
+the transfer encoding headers properly. It's also good to have some cache control.
 For Apache, please refer to an example .htaccess file in src/drivers/em/assets/
 which does these things.
 
 
 ### SUMMARY ###
 
-To build a release and the site, run following in the em-fceux root directory:
+```
+# Build a em-fceux and the site:
 ./embuild.sh && ./embuildsite.sh
 
-...and if you also want to build the shaders:
+# ...also build the shaders:
 ./buildshaders.sh && ./embuild.sh && ./embuildsite.sh
-
+```
 
 ### CONTACT ###
 
@@ -141,7 +148,7 @@ file system) to store the games, save data and save states. None of these
 are ever transmitted out from the client/browser.
 
 Emulator settings and input bindings are stored in localStorage.
-Web Audio API is used for the audio and Gamepad API for the gamepads.
+Web Audio API is used for the audio and Web Gamepad API for the gamepads.
 
 em-fceux implements NTSC signal emulation by modeling the composite YIQ
 output. The separation of YIQ luminance (Y) and chrominance (IQ/UV) is
@@ -162,4 +169,3 @@ http://sourceforge.net/projects/fceultra/files/Source%20Code/2.2.2%20src/fceux-2
 The built-in games (binaries, ROMs) in em-fceux are distributed with permission
 from the game authors who retain all the rights to the games. The games are
 not licensed with GNU GPL Version 2.
-
