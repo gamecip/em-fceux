@@ -135,7 +135,7 @@ Please submit bugs and feature requests in the issue tracker here:
 https://bitbucket.org/tsone/em-fceux/issues/new
 
 em-fceux is written and maintained by Valtteri "tsone" Heikkilä.
-Send a bitbucket message to user "tsone" or email rnd at nic dot fi.
+Send a bitbucket message to user "tsone".
 
 FCEUX 2.2.2 emulator is written and maintained by the FCEUX project team:
 http://www.fceux.com/web/contact.html
