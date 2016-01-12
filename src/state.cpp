@@ -792,14 +792,14 @@ bool FCEUSS_Load(const char *fname, bool display_message)
             if (display_message)
 			{
                 FCEU_DispMessage("State %s loaded.", 0, szFilename);
-				//FCEU_DispMessage("State %s loaded. Filename: %s", 0, szFilename, fn);
+				FCEU_DispMessage("State %s loaded. Filename: %s", 0, szFilename, fn);
             }
 		} else
 		{
             if (display_message)
 			{
                 FCEU_DispMessage("State %d loaded.", 0, CurrentState);
-				//FCEU_DispMessage("State %d loaded. Filename: %s", 0, CurrentState, fn);
+				FCEU_DispMessage("State %d loaded. Filename: %s", 0, CurrentState, fn);
             }
 			SaveStateStatus[CurrentState] = 1;
 		}

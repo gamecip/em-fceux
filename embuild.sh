@@ -1,6 +1,5 @@
 #!/bin/bash
 # Huh?? Why we suddenly start needing pwd here?
-pushd ~/emsdk && pwd && source emsdk_env.sh && popd
 emscons scons -j 4 $@
 # TODO: tsone: following should be added to Scons scripts?
 config_js=src/drivers/em/site/config.js

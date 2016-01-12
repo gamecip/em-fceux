@@ -209,7 +209,6 @@ static void UpdateSystem()
 		CloseGame ();
 	}
 	else
-#endif
 
 	for (int i = 0; i < 10; ++i) {
 		if (IsInputOnce(FCEM_SYSTEM_STATE_SELECT_0 + i)) {
@@ -218,7 +217,6 @@ static void UpdateSystem()
 	}
 
 // TODO: tsone: not implemented
-#ifndef EMSCRIPTEN
 	if (_keyonly (SDLK_PAGEUP)) {
 		FCEUI_SelectStateNext (1);
 	}

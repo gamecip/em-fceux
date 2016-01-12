@@ -24,12 +24,6 @@ var KEY_CODE_TO_NAME = {8:"Backspace",9:"Tab",13:"Return",16:"Shift",17:"Ctrl",1
 var FCEM = {
 games : [],
 soundEnabled : true,
-showStack : (function(show) {
-	var el = document.getElementById('stackToggle');
-	return function(show) {
-		el.checked = (show === undefined) ? !el.checked : show;
-	};
-})(),
 showControls : (function(show) {
 	var el = document.getElementById('controllersToggle');
 	return function(show) {
@@ -54,24 +48,27 @@ toggleSound : (function() {
       FS.mkdir('/fceux/rom');
     } catch (e) {
     }
+    try {
+        FS.writeFile("/fceux/sav/boot.fc0", FS.readFile("/data/sav/boot.fc0", {encoding:'binary'}), {encoding:'binary'});
+        console.log("Wrote!");
+    } catch(e) {
+        console.log("failed to write", FS.lookupPath("/data/"));
+    }
     // var savs = findFiles('/data/'); 
     // savs.forEach(function(x) { console.log('!!!! sav: ' + x); });
     FCEM.updateGames();
-    FCEM.updateStack();
-    FCEM.showStack(true);
+    FCEM.startGame("/data/games/boot.nes");
     // Write savegame and synchronize IDBFS in intervals.
     setInterval(Module.cwrap('FCEM_OnSaveGameInterval'), 1000);
   },
   onDeleteGameSyncFromIDB : function(er) {
     assert(!er);
     FCEM.updateGames();
-    FCEM.updateStack();
   },
   onSyncToIDB : function(er) {
     assert(!er);
   },
   onDOMLoaded : function() {
-    FCEM.showStack(false);
     FCEM.showControls(false);
   },
   startGame : function(path) {
@@ -91,54 +88,12 @@ toggleSound : (function() {
     };
 
     addGamesIn('/data/games/', false);
-    addGamesIn('/fceux/rom/', true);
 
     // sort in alphabetic order and assign as new games list
     games.sort(function(a, b) {
       return (a.label < b.label) ? -1 : ((a.label > b.label) ? 1 : 0);
     });
     FCEM.games = games;
-  },
-  updateStack : function() {
-    var games = FCEM.games;
-    var stackContainer = document.getElementById("stackContainer");
-    var scrollPos = stackContainer.scrollTop;
-    var list = document.getElementById("stack");
-    var proto = document.getElementById("cartProto");
-  
-    while (list.firstChild != list.lastChild) {
-      list.removeChild(list.lastChild);
-    }
-  
-    for (var i = 0; i < games.length; i++) {
-      var item = games[i];
-      var el = proto.cloneNode(true);
-  
-      el.dataset.idx = i;
-      el.style.backgroundPosition = item.offset + 'px 0px';
-      list.appendChild(el);
-  
-      var label = el.firstChild.firstChild.firstChild;
-      label.innerHTML = item.label;
-
-      label.style.fontSize = '16px';
-      label.style.lineHeight = '18px';
-
-      var fontSize = 13;
-      while (label.scrollHeight > 18 && fontSize >= 9) {
-        label.style.fontSize = fontSize + 'px';
-        fontSize -= 2;
-      }
-      if (label.scrollHeight > 18) {
-        label.style.lineHeight = '9px';
-      }
-
-      if (!item.deletable) {
-        el.firstChild.lastChild.hidden = true;
-      }
-    }
-  
-    stackContainer.scrollTop = scrollPos;
   },
   _getLocalInputDefault : function(id, type) {
     var m = (type ? 'gp' : 'input') + id;
@@ -491,35 +446,6 @@ req.addEventListener('load', function(event) {
 req.open("GET", "{{fceux.js}}", true);
 req.send();
 
-function dragHandler(text) {
-  return function(ev) {
-    ev.stopPropagation();
-    ev.preventDefault();
-  };
-}
-function dropHandler(ev) {
-  ev.stopPropagation();
-  ev.preventDefault();
-  var f = ev.dataTransfer.files[0];
-  if (f && confirm('Do you want to run the game ' + f.name + ' and add it to stack?')) {
-    var r = new FileReader();
-    r.onload = function(e) { 
-      var opts = {encoding:'binary'};
-      var path = PATH.join2('/fceux/rom/', f.name);
-      FS.writeFile(path, new Uint8Array(e.target.result), opts);
-      FCEM.updateGames();
-      FCEM.updateStack();
-      FCEM.startGame(path);
-    }
-    r.readAsArrayBuffer(f);
-  }
-}
-
-document.addEventListener('dragenter', dragHandler('enter'), false);
-document.addEventListener('dragleave', dragHandler('leave'), false);
-document.addEventListener('dragover', dragHandler('over'), false);
-document.addEventListener('drop', dropHandler, false);
-
 var current = 0;
 
 function calcGameOffset() {
@@ -542,7 +468,7 @@ function askSelectGame(ev, el) {
   var idx = askConfirmGame(ev, el, 'Do you want to play');
   if (idx != -1) {
     FCEM.startGame(FCEM.games[idx].path);
-    setTimeout(function() { FCEM.showStack(false); FCEM.showControls(false); }, 1000);
+    setTimeout(function() { FCEM.showControls(false); }, 1000);
   }
   return false;
 }
