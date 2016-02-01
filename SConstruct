@@ -68,6 +68,12 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
   exports = '-s EXPORTED_FUNCTIONS=\'["_' + '","_'.join(exportsList) + '"]\''
   env.Append(LINKFLAGS = exports)
   env.Append(LINKFLAGS = '--preload-file src/drivers/em/assets/data/@/data/')
+  env.Append(LINKFLAGS = '--pre-js src/drivers/em/site/config.js')
+  env.Append(LINKFLAGS = '--pre-js src/drivers/em/pre.js')
+  env.Append(LINKFLAGS = '-s MODULARIZE=1')
+  env.Append(LINKFLAGS = '-s EXPORT_NAME=\"\'FCEUX\'\"')
+  env.Append(LINKFLAGS = '-s EXTRA_EXPORTED_RUNTIME_METHODS=\'[\"FS\"\']')
+  
 else:
   env['EMSCRIPTEN'] = 0
 

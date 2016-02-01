@@ -218,9 +218,6 @@ void FCEM_OnSaveGameInterval()
     if (GameInterface) {
         GameInterface(GI_SAVE);
     }
-    EM_ASM({
-      FS.syncfs(FCEM.onSyncToIDB);
-    });
 }
 
 // Bind a HTML5 keyCode with an input ID.

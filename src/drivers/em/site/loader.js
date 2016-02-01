@@ -38,8 +38,8 @@ toggleSound : (function() {
 		el.style.backgroundPosition = (FCEM.soundEnabled ? '-32' : '-80') + 'px -48px';
 	};
 })(),
-  onInitialSyncFromIDB : function(er) {
-    assert(!er);
+  setupFiles : function() {
+
     try {
       FS.mkdir('/fceux/sav');
     } catch (e) {
@@ -48,25 +48,24 @@ toggleSound : (function() {
       FS.mkdir('/fceux/rom');
     } catch (e) {
     }
-    try {
-        FS.writeFile("/fceux/sav/boot.fc0", FS.readFile("/data/sav/boot.fc0", {encoding:'binary'}), {encoding:'binary'});
-        console.log("Wrote!");
-    } catch(e) {
-        console.log("failed to write", FS.lookupPath("/data/"));
+    
+    var gameFile = Module["gameFile"];
+    var freezeFile = Module["freezeFile"];
+    var extraFiles = Module["extraFiles"] || {};
+    //todo: handle .fds
+    FS.createPreloadedFile("/fceux/rom/", "boot.nes", gameFile, true, true);
+    if(freezeFile) {
+        FS.createPreloadedFile("/fceux/sav/", "boot.fc0", freezeFile, true, true);
+    }
+    if(extraFiles["battery"]) {
+        FS.createPreloadedFile("/fceux/sav/", "boot.sav", extraFiles["battery"], true, true);
     }
     // var savs = findFiles('/data/'); 
     // savs.forEach(function(x) { console.log('!!!! sav: ' + x); });
     FCEM.updateGames();
-    FCEM.startGame("/data/games/boot.nes");
-    // Write savegame and synchronize IDBFS in intervals.
+    FCEM.startGame("/fceux/rom/boot.nes");
+    // Write savegame
     setInterval(Module.cwrap('FCEM_OnSaveGameInterval'), 1000);
-  },
-  onDeleteGameSyncFromIDB : function(er) {
-    assert(!er);
-    FCEM.updateGames();
-  },
-  onSyncToIDB : function(er) {
-    assert(!er);
   },
   onDOMLoaded : function() {
     FCEM.showControls(false);
@@ -87,7 +86,7 @@ toggleSound : (function() {
       });
     };
 
-    addGamesIn('/data/games/', false);
+    addGamesIn('/fceux/rom/', false);
 
     // sort in alphabetic order and assign as new games list
     games.sort(function(a, b) {
@@ -357,17 +356,18 @@ scanForGamepadBinding : function() {
 },
 };
 
-window.onbeforeunload = function (ev) {
-  return 'To prevent save game data loss, please let the game run at least one second after saving and before closing the window.';
-};
-
 var loaderEl = document.getElementById('loader');
 
+//todo: saveState, loadState, saveExtraFiles functions
+//todo: remove all dependencies on container HTML, even if that means losing some features
+
 var Module = {
+  gameFile: "/data/games/boot.nes",
+  freezeFile: "/data/sav/boot.fc0",
+  extraFiles: {battery:null},
   preRun: [function() {
-    // Mount IndexedDB file system (IDBFS) to /fceux.
     FS.mkdir('/fceux');
-    FS.mount(IDBFS, {}, '/fceux');
+    FCEM.setupFiles();
   }],
   postRun: [function() {
     FCEM.setController = Module.cwrap('FCEM_SetController', null, ['number', 'number']);
@@ -379,8 +379,6 @@ var Module = {
     // "!important" flag. Workaround is to disable the default fullscreen handlers.
     // See Emscripten's updateCanvasDimensions() in library_browser.js for the faulty code.
     Browser.fullScreenHandlersInstalled = true;
-    // Initial IDBFS sync.
-    FS.syncfs(true, FCEM.onInitialSyncFromIDB);
     // Setup configuration from localStorage.
     FCEM.initControllers();
     FCEM.initInputBindings();
@@ -395,7 +393,6 @@ var Module = {
   },
   canvas: (function() {
     var el = document.getElementById('canvas');
-// TODO: tsone: handle context loss, see: http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
     el.addEventListener("webglcontextlost", function(e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
     return el;
   })(),
@@ -404,7 +401,6 @@ var Module = {
   })(),
   setStatus: function(text) {
     var dl = 'Downloading data...';
-// TODO: tsone: add startswith() method?
     if (text.substring(0, dl.length) === dl) {
       var r = text.match(/\(([\d.]+)\/([\d.]+)\)/);
       var x = parseFloat(r[1]) / parseFloat(r[2]);
@@ -480,7 +476,7 @@ function askDeleteGame(ev, el) {
     if (idx != -1) {
       var item = FCEM.games.slice(idx, idx+1)[0];
       FS.unlink(item.path);
-      FS.syncfs(FCEM.onDeleteGameSyncFromIDB);
+      FCEM.updateGames();
     }
   }
   return false;
@@ -503,27 +499,6 @@ function findFiles(startPath) {
   } catch (e) {
       return [];
   }
-// TODO: remove, this is for recursive search
-/*
-  while (check.length) {
-    var path = check.pop();
-    var stat;
-
-    try {
-      stat = FS.stat(path);
-    } catch (e) {
-      return [];
-    }
-
-    if (FS.isDir(stat.mode)) {
-      check.push.apply(check, FS.readdir(path).filter(isRealDir).map(toAbsolute(path)));
-    }
-
-    entries.push(path);
-  }
-
-  return entries;
-*/
 }
 
 document.addEventListener("keydown", function(e) {

@@ -470,12 +470,6 @@ bool FCEUSS_SaveMS(EMUFILE* outstream, int compressionLevel)
 	outstream->fwrite((char*)header,16);
 	outstream->fwrite((char*)cbuf,comprlen==-1?totalsize:comprlen);
 
-#ifdef EMSCRIPTEN
-	EM_ASM({
-		FS.syncfs(FCEM.onSyncToIDB);
-	});
-#endif
-
 	return error == Z_OK;
 }
 

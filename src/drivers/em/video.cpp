@@ -117,15 +117,15 @@ static void Resize(int width, int height)
 	// in library_browser.js for the faulty code.
 	EM_ASM_INT({
 		var canvas = Module.canvas2D;
-		canvas.style.setProperty( "width", $0 + "px", "important");
-		canvas.style.setProperty("height", $1 + "px", "important");
+		// canvas.style.setProperty( "width", $0 + "px", "important");
+		// canvas.style.setProperty("height", $1 + "px", "important");
 
 		if ($2) {
 			canvas = Module.canvas3D;
 			canvas.width = canvas.widthNative = $0;
 			canvas.height = canvas.heightNative = $1;
-			canvas.style.setProperty( "width", $0 + "px", "important");
-			canvas.style.setProperty("height", $1 + "px", "important");
+			// canvas.style.setProperty( "width", $0 + "px", "important");
+			// canvas.style.setProperty("height", $1 + "px", "important");
 		}
 
 	}, s_width, s_height, webgl_supported);
