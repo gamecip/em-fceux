@@ -168,7 +168,7 @@ var FCEM = {
         FCEM.updateGames();
         FCEM.startGame("/fceux/rom/boot.nes");
         // Write savegame
-        setInterval(Module.cwrap('FCEM_OnSaveGameInterval'), 1000);
+        setInterval(FCEM.saveGameFn, 1000);
     },
     startGame: function (path) {
         Module.romName = path;
@@ -287,6 +287,7 @@ var FCEM = {
 };
 
 Module.preRun.push(function () {
+    ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = Module.targetID;
     FS.mkdir('/fceux');
     FCEM.setupFiles();
     // HACK: Disable default fullscreen handlers. See Emscripten's library_browser.js
@@ -300,50 +301,71 @@ Module.postRun.push(function () {
     FCEM.bindKey = Module.cwrap('FCEM_BindKey', null, ['number', 'number']);
     FCEM.bindGamepad = Module.cwrap('FCEM_BindGamepad', null, ['number', 'number']);
     FCEM.silenceSound = Module.cwrap('FCEM_SilenceSound', null, ['number']);
+    FCEM.saveGameFn = Module.cwrap('FCEM_OnSaveGameInterval', null, []);
+    gamecip_freeze = Module.cwrap('gamecip_freeze', null, []);
+    gamecip_unfreeze = Module.cwrap('gamecip_unfreeze', null, []);
+    
+    Module.setMuted(true);
     // Setup configuration from localStorage.
+    FCEM.resetDefaultBindings();
     FCEM.initControllers();
     FCEM.initInputBindings();
 });
 Module.print = console.log;
 Module.printErr = console.error;
 Module.canvas2D = Module.canvas;
-Module.canvas2D.style.setProperty("width", Module.canvas2D.width + "px", "important");
-Module.canvas2D.style.setProperty("height", Module.canvas2D.height + "px", "important");
+Module.canvas2D.style.setProperty("width", "inherit", "important");
+Module.canvas2D.style.setProperty("height", "inherit", "important");
 Module.canvas3D = (function () {
     var targetElement = document.getElementById(Module.targetID);
     var canvas = document.createElement("canvas");
     canvas.width = Module.canvas2D.width;
     canvas.height = Module.canvas2D.height;
-    canvas.style.setProperty("width", canvas.width + "px", "important");
-    canvas.style.setProperty("height", canvas.height + "px", "important");
+    canvas.style.setProperty("width", "inherit", "important");
+    canvas.style.setProperty("height", "inherit", "important");
     targetElement.appendChild(canvas);
     return canvas;
 })();
 
+Module['setMuted'] = function(b) {
+    FCEM.soundEnabled = !b;
+    FCEM.silenceSound(b ? 1 : 0);
+}
 
+Module['isMuted'] = function() {
+    return !FCEM.soundEnabled;
+}
 //todo: these guys
-// Module['saveState'] = function(onSaved) {
-//     gamecip_freeze();
-//     if(onSaved) {
-//         onSaved(FS.readFile("/state.frz", {encoding:'binary'}));
-//     }
-// }
-//
-// Module['saveExtraFiles'] = function(onSaved) {
-//     gamecip_saveSRAM();
-//     if(onSaved) {
-//         onSaved({"battery": FS.readFile("/rom.srm", {encoding:'binary'})});
-//     }
-// }
-//
-// Module['loadState'] = function(s, onLoaded) {
-//     //load s in place of "state.frz"
-//     FS.writeFile("/state.frz", s, {encoding:'binary'});
-//     gamecip_unfreeze();
-//     if(onLoaded) {
-//         onLoaded(s);
-//     }
-// }
+Module['saveState'] = function(onSaved) {
+    gamecip_freeze();
+    if(onSaved) {
+        onSaved(FS.readFile("/fceux/sav/boot.fc0", {encoding:'binary'}));
+    }
+}
+
+Module['saveExtraFiles'] = function(files, onSaved) {
+    FCEM.saveGameFn();
+    if(onSaved) {
+        var r = {};
+        for(var i = 0; i < files.length; i++) {
+            if(files[i] == "battery") {
+                r["battery"] = FS.readFile("/fceux/sav/boot.sav", {encoding:'binary'});
+            } else if(files[i] == "state") {
+                r["state"] = FS.readFile("/fceux/sav/boot.fc0", {encoding:'binary'});
+            }
+        }
+        onSaved(r);
+    }
+}
+
+Module['loadState'] = function(s, onLoaded) {
+    //load s in place of "state.frz"
+    FS.writeFile("/fceux/sav/boot.fc0", s, {encoding:'binary'});
+    gamecip_unfreeze();
+    if(onLoaded) {
+        onLoaded(s);
+    }
+}
 
 var current = 0;
 

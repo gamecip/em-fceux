@@ -20,6 +20,7 @@
 #include "em.h"
 #include "../../fceu.h"
 #include "../../version.h"
+#include "../../state.h"
 #include <emscripten.h>
 
 
@@ -128,6 +129,17 @@ static void ReloadROM(void*)
 //	CloseGame();
 	LoadGame(filename);
 }
+
+extern "C" void gamecip_freeze() __attribute__((used));
+extern "C" void gamecip_unfreeze() __attribute__((used));
+
+extern "C" void gamecip_freeze() {
+	FCEUSS_Save(0, false);
+}
+extern "C" void gamecip_unfreeze() {
+	FCEUSS_Load(0, false);
+}
+
 
 static void MainLoop()
 {

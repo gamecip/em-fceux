@@ -528,7 +528,8 @@ void FCEUD_SetInput(bool fourscore, bool microphone, ESI, ESI, ESIFC fcexp)
 // TODO: tsone: support fourscore?
 //	FCEUI_SetInputFourscore((eoptions & EO_FOURSCORE) != 0);
 
-	const char *elem = "#window";
+	const char *elem = getenv("SDL_EMSCRIPTEN_KEYBOARD_ELEMENT");
+	if(elem == NULL) { elem = "#window"; }
 	emscripten_set_keydown_callback(elem, 0, 0, KeyCallback);
 	emscripten_set_keyup_callback(elem, 0, 0, KeyCallback);
 }

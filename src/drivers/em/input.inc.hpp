@@ -22,12 +22,12 @@ The key codes were taken from:
 */
 INPUT_PRE
 // System inputs
-INPUT(0x0100, 0x152, 0x00, SYSTEM_RESET, "Reset") // Ctrl+R
-INPUT(0x0101, 0x009, 0x00, SYSTEM_THROTTLE, "Throttle") // Tab
-INPUT(0x0102, 0x050, 0x00, SYSTEM_PAUSE, "Pause") // P
-INPUT(0x0103, 0x0DC, 0x00, SYSTEM_FRAME_ADVANCE, "Single Frame Step") // Backslash
-INPUT(0x0104, 0x074, 0x00, SYSTEM_STATE_SAVE, "Save State") // F5
-INPUT(0x0105, 0x076, 0x00, SYSTEM_STATE_LOAD, "Load State") // F7
+INPUT(0x0100, 0x000, 0x00, SYSTEM_RESET, "Reset") // Ctrl+R
+INPUT(0x0101, 0x000, 0x00, SYSTEM_THROTTLE, "Throttle") // Tab
+INPUT(0x0102, 0x000, 0x00, SYSTEM_PAUSE, "Pause") // P
+INPUT(0x0103, 0x000, 0x00, SYSTEM_FRAME_ADVANCE, "Single Frame Step") // Backslash
+INPUT(0x0104, 0x000, 0x00, SYSTEM_STATE_SAVE, "Save State") // F5
+INPUT(0x0105, 0x000, 0x00, SYSTEM_STATE_LOAD, "Load State") // F7
 // Controller 1
 INPUT(0x0200, 0x046, 0x01, GAMEPAD0_A, "A (Controller 1)") // F
 INPUT(0x0201, 0x044, 0x11, GAMEPAD0_B, "B (Controller 1)") // D
