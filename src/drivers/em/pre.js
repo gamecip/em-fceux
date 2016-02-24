@@ -358,6 +358,10 @@ Module['saveExtraFiles'] = function(files, onSaved) {
     }
 }
 
+Module['listExtraFiles'] = function() {
+    return ["battery", "state"];
+}
+
 Module['loadState'] = function(s, onLoaded) {
     //load s in place of "state.frz"
     FS.writeFile("/fceux/sav/boot.fc0", s, {encoding:'binary'});
