@@ -336,25 +336,37 @@ Module['isMuted'] = function() {
     return !FCEM.soundEnabled;
 }
 //todo: these guys
-Module['saveState'] = function(onSaved) {
-    gamecip_freeze();
-    if(onSaved) {
-        onSaved(FS.readFile("/fceux/sav/boot.fc0", {encoding:'binary'}));
+Module['saveState'] = function(onSaved, onError) {
+    try {
+        gamecip_freeze();
+        if(onSaved) {
+            onSaved(FS.readFile("/fceux/sav/boot.fc0", {encoding:'binary'}));
+        }
+    } catch(e) {
+        if(onError) {
+            onError(e);
+        }
     }
 }
 
-Module['saveExtraFiles'] = function(files, onSaved) {
-    FCEM.saveGameFn();
-    if(onSaved) {
-        var r = {};
-        for(var i = 0; i < files.length; i++) {
-            if(files[i] == "battery") {
-                r["battery"] = FS.readFile("/fceux/sav/boot.sav", {encoding:'binary'});
-            } else if(files[i] == "state") {
-                r["state"] = FS.readFile("/fceux/sav/boot.fc0", {encoding:'binary'});
+Module['saveExtraFiles'] = function(files, onSaved, onError) {
+    try {
+        FCEM.saveGameFn();
+        if(onSaved) {
+            var r = {};
+            for(var i = 0; i < files.length; i++) {
+                if(files[i] == "battery") {
+                    r["battery"] = FS.readFile("/fceux/sav/boot.sav", {encoding:'binary'});
+                } else if(files[i] == "state") {
+                    r["state"] = FS.readFile("/fceux/sav/boot.fc0", {encoding:'binary'});
+                }
             }
+            onSaved(r);
         }
-        onSaved(r);
+    } catch(e) {
+        if(onError) { 
+            onError(files, e); 
+        }
     }
 }
 
@@ -362,12 +374,18 @@ Module['listExtraFiles'] = function() {
     return ["battery", "state"];
 }
 
-Module['loadState'] = function(s, onLoaded) {
-    //load s in place of "state.frz"
-    FS.writeFile("/fceux/sav/boot.fc0", s, {encoding:'binary'});
-    gamecip_unfreeze();
-    if(onLoaded) {
-        onLoaded(s);
+Module['loadState'] = function(s, onLoaded, onError) {
+    try {
+        //load s in place of "state.frz"
+        FS.writeFile("/fceux/sav/boot.fc0", s, {encoding:'binary'});
+        gamecip_unfreeze();
+        if(onLoaded) {
+            onLoaded(s);
+        }
+    } catch(e) {
+        if(onError) {
+            onError(s, e);
+        }
     }
 }
 
