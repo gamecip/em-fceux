@@ -167,8 +167,6 @@ var FCEM = {
         }
         FCEM.updateGames();
         FCEM.startGame("/fceux/rom/boot.nes");
-        // Write savegame
-        setInterval(FCEM.saveGameFn, 1000);
     },
     startGame: function (path) {
         Module.romName = path;
@@ -311,8 +309,8 @@ Module.postRun.push(function () {
     FCEM.initControllers();
     FCEM.initInputBindings();
 });
-Module.print = console.log;
-Module.printErr = console.error;
+Module.print = function(c) { console.log(c); };
+Module.printErr = function(e) { console.error(e); };
 Module.canvas2D = Module.canvas;
 Module.canvas2D.style.setProperty("width", "inherit", "important");
 Module.canvas2D.style.setProperty("height", "inherit", "important");
@@ -326,6 +324,14 @@ Module.canvas3D = (function () {
     targetElement.appendChild(canvas);
     return canvas;
 })();
+
+Module['quit'] = function() {
+    Module.noExitRuntime = false;
+    try { Module.exit(0,false); }
+    catch(e) { }
+    Module.canvas2D.remove();
+    Module.canvas3D.remove();
+}
 
 Module['setMuted'] = function(b) {
     FCEM.soundEnabled = !b;
