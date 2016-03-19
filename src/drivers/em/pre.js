@@ -285,6 +285,30 @@ var FCEM = {
 };
 
 Module.preRun.push(function () {
+    SDL.openAudioContext();
+    SDL.realAudioContext = SDL.audioContext;
+    var bufferSize = 16384;
+    var captureNode = SDL.realAudioContext.createScriptProcessor(bufferSize,2,2);
+    SDL.audioContext = {
+        createBufferSource:function() { return SDL.realAudioContext.createBufferSource(); },
+        createBuffer:function(chans,sizePerChan,freq) {
+            return SDL.realAudioContext.createBuffer(chans,sizePerChan,freq);
+        },
+        decodeAudioData:function(buf,onDone) {
+            return SDL.realAudioContext.decodeAudioData(buf,onDone);
+        },
+        createPanner:function() { return SDL.realAudioContext.createPanner(); },
+        createGain:function() { return SDL.realAudioContext.createGain(); },
+        destination:captureNode,
+        get currentTime() { return SDL.realAudioContext.currentTime; }
+    };
+    SDL.audioContext.destination.connect(SDL.realAudioContext.destination);
+    Module["getAudioCaptureInfo"] = function() {
+        return {
+            context:SDL.realAudioContext,
+            capturedNode:SDL.audioContext.destination
+        };
+    }
     ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = Module.targetID;
     FS.mkdir('/fceux');
     FCEM.setupFiles();
@@ -303,7 +327,6 @@ Module.postRun.push(function () {
     gamecip_freeze = Module.cwrap('gamecip_freeze', null, []);
     gamecip_unfreeze = Module.cwrap('gamecip_unfreeze', null, []);
     
-    Module.setMuted(true);
     // Setup configuration from localStorage.
     FCEM.resetDefaultBindings();
     FCEM.initControllers();
