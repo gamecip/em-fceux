@@ -257,7 +257,8 @@ void FCEM_SetController(int idx, double v)
 		}
 		break;
 	case FCEM_WEBGL_ENABLED:
-		EnableWebGL(v);
+		//Added by gamecip branch, turns off WebGL context so we can record from default 2d context
+		EnableWebGL(0);
 		break;
 	default:
 		if ((idx >= FCEM_BRIGHTNESS) && (idx <= FCEM_NOISE) && webgl_supported) {
