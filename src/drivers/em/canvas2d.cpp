@@ -23,7 +23,7 @@
 
 
 // Possible values: 1 or 2, corresponding to 1x and 2x.
-#define CANVAS_SCALER 2
+#define CANVAS_SCALER 1
 #define CANVAS_W (CANVAS_SCALER * 256)
 #define CANVAS_H (CANVAS_SCALER * 224)
 
