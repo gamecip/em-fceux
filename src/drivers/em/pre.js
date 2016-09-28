@@ -319,14 +319,28 @@ Module.preRun.push(function () {
     // Browser.fullScreenHandlersInstalled = true;
 });
 Module.postRun.push(function () {
+    console.log("Post Run 1");
     FCEM.setController = Module.cwrap('FCEM_SetController', null, ['number', 'number']);
     FCEM.bindKey = Module.cwrap('FCEM_BindKey', null, ['number', 'number']);
     FCEM.bindGamepad = Module.cwrap('FCEM_BindGamepad', null, ['number', 'number']);
     FCEM.silenceSound = Module.cwrap('FCEM_SilenceSound', null, ['number']);
     FCEM.saveGameFn = Module.cwrap('FCEM_OnSaveGameInterval', null, []);
+    //Might change to have these not be implicitly declared
     gamecip_freeze = Module.cwrap('gamecip_freeze', null, []);
     gamecip_unfreeze = Module.cwrap('gamecip_unfreeze', null, []);
-    
+
+    Module["getAudioCaptureInfo"] = function() {
+        return {
+            context:FCEM.audioContext,
+            capturedNode:FCEM.scriptProcessorNode
+        };
+    };
+
+    Module['setMuted'] = function(b) {
+        FCEM.soundEnabled = !b;
+        FCEM.silenceSound(b ? 1 : 0);
+    };
+
     // Setup configuration from localStorage.
     FCEM.resetDefaultBindings();
     FCEM.initControllers();
@@ -354,16 +368,12 @@ Module['quit'] = function() {
     catch(e) { }
     Module.canvas2D.remove();
     Module.canvas3D.remove();
-}
+};
 
-Module['setMuted'] = function(b) {
-    FCEM.soundEnabled = !b;
-    FCEM.silenceSound(b ? 1 : 0);
-}
 
 Module['isMuted'] = function() {
     return !FCEM.soundEnabled;
-}
+};
 //todo: these guys
 Module['saveState'] = function(onSaved, onError) {
     try {
@@ -376,7 +386,7 @@ Module['saveState'] = function(onSaved, onError) {
             onError(e);
         }
     }
-}
+};
 
 Module['saveExtraFiles'] = function(files, onSaved, onError) {
     try {
@@ -397,11 +407,11 @@ Module['saveExtraFiles'] = function(files, onSaved, onError) {
             onError(files, e); 
         }
     }
-}
+};
 
 Module['listExtraFiles'] = function() {
     return ["battery", "state"];
-}
+};
 
 Module['loadState'] = function(s, onLoaded, onError) {
     try {
@@ -416,7 +426,7 @@ Module['loadState'] = function(s, onLoaded, onError) {
             onError(s, e);
         }
     }
-}
+};
 
 var current = 0;
 
@@ -425,12 +435,12 @@ function findFiles(startPath) {
 
     function isRealDir(p) {
         return p !== '.' && p !== '..';
-    };
+    }
     function toAbsolute(root) {
         return function (p) {
             return PATH.join2(root, p);
         }
-    };
+    }
 
     try {
         return FS.readdir(startPath).filter(isRealDir).map(toAbsolute(startPath));
