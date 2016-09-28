@@ -288,7 +288,7 @@ Module.preRun.push(function () {
     SDL.openAudioContext();
     SDL.realAudioContext = SDL.audioContext;
     var bufferSize = 16384;
-    var captureNode = SDL.realAudioContext.createScriptProcessor(bufferSize,2,2);
+    var captureNode = SDL.realAudioContext.createGain();
     SDL.audioContext = {
         createBufferSource:function() { return SDL.realAudioContext.createBufferSource(); },
         createBuffer:function(chans,sizePerChan,freq) {
