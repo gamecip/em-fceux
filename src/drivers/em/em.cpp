@@ -18,11 +18,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "em.h"
+#include "../../debug.h"
 #include "../../fceu.h"
+#include "../../ppu.h"
 #include "../../version.h"
 #include "../../state.h"
+#include "../../palette.h"
+#include "../../cart.h"
 #include <emscripten.h>
-
 
 extern "C" void gamecip_freeze() __attribute__((used));
 extern "C" void gamecip_unfreeze() __attribute__((used));
@@ -32,6 +35,81 @@ extern "C" void gamecip_freeze() {
 extern "C" void gamecip_unfreeze() {
 	FCEUSS_Load(0, false);
 }
+
+//size 0x800
+extern "C" uint8 * gamecip_ram() {
+  return RAM;
+}
+//size 0x800
+extern "C" uint8* gamecip_ntaram() {
+  return NTARAM;
+}
+//size 0x20
+extern "C" uint8* gamecip_palram() {
+  return PALRAM;
+}
+//size 4
+extern "C" uint8* gamecip_ppu() {
+  return PPU;
+}
+//size 0x100
+extern "C" uint8* gamecip_spram() {
+  return SPRAM;
+}
+//0-7
+extern "C" uint8* gamecip_VPage(int i) {
+  return VPage[i];
+}
+// //0-3
+// extern "C" uint8* gamecip_vnapage(int i) {
+//   return vnapage[i];
+// }
+//0-32, yikes
+extern "C" uint8* gamecip_chr(int i) {
+  return CHRptr[i];
+}
+extern "C" uint32 gamecip_chrSize(int i) {
+  return CHRsize[i];
+}
+extern "C" uint8* gamecip_prg(int i) {
+  return PRGptr[i];
+}
+extern "C" uint32 gamecip_prgSize(int i) {
+  return PRGsize[i];
+}
+extern uint8 *CHRRAM;
+extern uint32 CHRRAMSIZE;
+extern "C" uint8* gamecip_chrRAM() {
+  return CHRRAM;
+}
+extern "C" uint32 gamecip_chrRAMSize() {
+  return CHRRAMSIZE;
+}
+
+//TODO: linker is not finding FDSRAM, etc... ):
+// extern uint8 *FDSRAM;
+// extern uint32 FDSRAMSize;
+// extern "C" uint8* gamecip_fdsRAM() {
+//   return FDSRAM;
+// }
+// extern "C" uint32 gamecip_fdsRAMSize() {
+//   return FDSRAMSize;
+// }
+
+// extern uint8 *WRAM;
+// extern uint32 WRAMSize;
+// extern "C" uint8* gamecip_wRAM() {
+//   return WRAM;
+// }
+// extern "C" uint32 gamecip_wRAMSize() {
+//   return WRAMSize;
+// }
+
+// //1024 for mmc5
+// extern uint8 *ExRAM;
+// extern "C" uint8* gamecip_exRAM() {
+//   return ExRAM;
+// }
 
 
 // Number of frames to skip per regular frame when frameskipping.

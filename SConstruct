@@ -65,7 +65,25 @@ if 'EMSCRIPTEN_TOOL_PATH' in os.environ:
     'FCEM_BindGamepad',
     'FCEM_SilenceSound',
     'gamecip_freeze',
-    'gamecip_unfreeze'
+    'gamecip_unfreeze',
+    'gamecip_ram',
+    'gamecip_ntaram',
+    'gamecip_palram',
+    'gamecip_ppu',
+    'gamecip_spram',
+    'gamecip_VPage',
+    'gamecip_vnapage',
+    'gamecip_chr',
+    'gamecip_chrSize',
+    'gamecip_prg',
+    'gamecip_prgSize',
+    'gamecip_chrRAM',
+    'gamecip_chrRAMSize' # ,
+    # 'gamecip_fdsRAM',
+    # 'gamecip_fdsRAMSize',
+    # 'gamecip_wRAM',
+    # 'gamecip_wRAMSize',
+    # 'gamecip_exRAM'
   ]
   exports = '-s EXPORTED_FUNCTIONS=\'["_' + '","_'.join(exportsList) + '"]\''
   env.Append(LINKFLAGS = exports)

@@ -285,30 +285,6 @@ var FCEM = {
 };
 
 Module.preRun.push(function () {
-    SDL.openAudioContext();
-    SDL.realAudioContext = SDL.audioContext;
-    var bufferSize = 16384;
-    var captureNode = SDL.realAudioContext.createGain();
-    SDL.audioContext = {
-        createBufferSource:function() { return SDL.realAudioContext.createBufferSource(); },
-        createBuffer:function(chans,sizePerChan,freq) {
-            return SDL.realAudioContext.createBuffer(chans,sizePerChan,freq);
-        },
-        decodeAudioData:function(buf,onDone) {
-            return SDL.realAudioContext.decodeAudioData(buf,onDone);
-        },
-        createPanner:function() { return SDL.realAudioContext.createPanner(); },
-        createGain:function() { return SDL.realAudioContext.createGain(); },
-        destination:captureNode,
-        get currentTime() { return SDL.realAudioContext.currentTime; }
-    };
-    SDL.audioContext.destination.connect(SDL.realAudioContext.destination);
-    Module["getAudioCaptureInfo"] = function() {
-        return {
-            context:SDL.realAudioContext,
-            capturedNode:SDL.audioContext.destination
-        };
-    }
     ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = Module.targetID;
     FS.mkdir('/fceux');
     FCEM.setupFiles();
@@ -328,6 +304,35 @@ Module.postRun.push(function () {
     //Might change to have these not be implicitly declared
     gamecip_freeze = Module.cwrap('gamecip_freeze', null, []);
     gamecip_unfreeze = Module.cwrap('gamecip_unfreeze', null, []);
+    //ptrs
+    gamecip_ram = Module.cwrap('gamecip_ram', 'number', []);
+    gamecip_ntaram = Module.cwrap('gamecip_ntaram', 'number', []);
+    gamecip_palram = Module.cwrap('gamecip_palram', 'number', []);
+    gamecip_ppu = Module.cwrap('gamecip_ppu', 'number', []);
+    gamecip_spram = Module.cwrap('gamecip_spram', 'number', []);
+    gamecip_VPage = Module.cwrap('gamecip_VPage', 'number', ['number']);
+    //gamecip_vnapage = Module.cwrap('gamecip_vnapage', 'number', ['number']);
+    gamecip_chr = Module.cwrap('gamecip_chr','number',['number']);
+    //not ptr
+    gamecip_chrSize = Module.cwrap('gamecip_chrSize','number',['number']);
+    //ptr
+    gamecip_prg = Module.cwrap('gamecip_prg','number',['number']);
+    //not ptr
+    gamecip_prgSize = Module.cwrap('gamecip_prgSize','number',['number']);
+    //ptr
+    gamecip_chrRAM = Module.cwrap('gamecip_chrRAM','number',[]);
+    //not ptr
+    gamecip_chrRAMSize = Module.cwrap('gamecip_chrRAMSize','number',[]);
+    // //ptr
+    // gamecip_fds = Module.cwrap('gamecip_fdsRAM','number',[]);
+    // //not ptr
+    // gamecip_fdsSize = Module.cwrap('gamecip_fdsRAMSize','number',[]);
+    // //ptr
+    // gamecip_wram = Module.cwrap('gamecip_wRAM','number',[]);
+    // //not ptr
+    // gamecip_wramSize = Module.cwrap('gamecip_wRAMSize','number',[]);
+    // //ptr
+    // gamecip_exRAM = Module.cwrap('gamecip_exRAM','number',[]);
 
     Module["getAudioCaptureInfo"] = function() {
         return {
@@ -447,4 +452,104 @@ function findFiles(startPath) {
     } catch (e) {
         return [];
     }
+}
+
+function range(lo,hi) {
+    var r = [];
+    for(var i = lo; i < hi; i++) {
+        r.push(i);
+    }
+    return r;
+}
+
+Module["getMemoryRegions"] = function() {
+    return {
+        RAM:{size:0x800},
+        NTARAM:{size:0x800},
+        PALRAM:{size:0x20},
+        PPU:{size:4},
+        SPRAM:{size:0x100},
+        VPage:range(0,8).map(function(i) { return {size:0x800, index:i}; }),
+        chr:range(0,32).map(function(i) { return {size:gamecip_chrSize(i), index:i}; }),
+        prg:range(0,32).map(function(i) { return {size:gamecip_prgSize(i), index:i}; }),
+        chrRAM:{size:gamecip_chrRAMSize()},
+      //  fdsRAM:{size:gamecip_fdsRAMSize()},
+      //  WRAM:{size:gamecip_WRAMSize()},
+      //  ExRAM:{size:gamecip_ExRAMSize()}
+        //TODO: later: vnapage
+    }
+}
+
+function getMemoryRegion(path) {
+    var regions = Module.getMemoryRegions();
+    if(typeof path == "string" && regions[path]) {
+        regions[path].name = path;
+        return regions[path];
+    }
+    var r = regions;
+    for(var i = 0; i < path.length; i++) {
+        if(!r[path[i]]) {
+            return null;
+        }
+        r = r[path[i]];
+    }
+    r.name = path[0] || path;
+    return r;
+}
+
+//regionPath is either a region ID or a list of region IDs (numbers or strings).
+Module["getBytes"] = function(regionPath, offset, count) {
+    var region = getMemoryRegion(regionPath);
+    var ptr;
+    /*
+      gamecip_vnapage = Module.cwrap('gamecip_vnapage', number, [number]);
+    */
+    switch(region.name) {
+    case "RAM":
+        ptr = gamecip_ram();
+        break;
+    case "NTARAM":
+        ptr = gamecip_ntaram();
+        break;
+    case "PALRAM":
+        ptr = gamecip_palram();
+        break;
+    case "PPU":
+        ptr = gamecip_ppu();
+        break;
+    case "SPRAM":
+        ptr = gamecip_spram();
+        break;
+    case "chr":
+        ptr = gamecip_chr(region.index);
+        break;
+    case "prg":
+        ptr = gamecip_prg(region.index);
+        break;
+    case "chrRAM":
+        ptr = gamecip_chrRAM();
+        break;
+    // case "fdsRAM":
+    //     ptr = gamecip_fds();
+    //     break;
+    // case "WRAM":
+    //     ptr = gamecip_wram();
+    //     break;
+    // case "ExRAM":
+    //     ptr = gamecip_exRAM();
+    //     break;
+    case "VPage":
+        ptr = gamecip_VPage(region.index);
+        break;
+        //...
+    default:
+        return null;
+    }
+    return new Uint8Array(Module.HEAPU8.buffer, ptr, count);
+}
+
+Module["setBytes"] = function(regionID, offset, byteArray) {
+    //danger!
+    var mem = Module.getBytes(regionID, offset, byteArray.length);
+    mem.set(byteArray);
 }
