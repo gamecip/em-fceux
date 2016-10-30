@@ -561,7 +561,7 @@ Module["getBytes"] = function(regionPath, offset, count) {
     default:
         return null;
     }
-    return new Uint8Array(Module.HEAPU8.buffer, ptr, count);
+    return new Uint8Array(Module.HEAPU8.buffer, ptr+offset, count);
 }
 
 Module["setBytes"] = function(regionID, offset, byteArray) {
