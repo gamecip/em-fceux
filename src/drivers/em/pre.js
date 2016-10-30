@@ -148,10 +148,14 @@ var FCEM = {
         try {
             FS.mkdir('/fceux/sav');
         } catch (e) {
+            console.log("Error creating /fceux/sav in " + Module['instanceID']);
+            console.log(e.message);
         }
         try {
             FS.mkdir('/fceux/rom');
         } catch (e) {
+            console.log("Error creating /fceux/rom in " + Module['instanceID']);
+            console.log(e.message);
         }
 
         var gameFile = Module["gameFile"];
@@ -288,6 +292,8 @@ Module.preRun.push(function () {
     ENV.SDL_EMSCRIPTEN_KEYBOARD_ELEMENT = Module.targetID;
     FS.mkdir('/fceux');
     FCEM.setupFiles();
+    Module['JSEvents'] = JSEvents;
+    Module['FS'] = FS;
     // HACK: Disable default fullscreen handlers. See Emscripten's library_browser.js
     // The handlers forces the canvas size by setting css style width and height with
     // "!important" flag. Workaround is to disable the default fullscreen handlers.
@@ -354,8 +360,16 @@ Module.postRun.push(function () {
 Module.print = function(c) { console.log(c); };
 Module.printErr = function(e) { console.error(e); };
 Module.canvas2D = Module.canvas;
-Module.canvas2D.style.setProperty("width", "inherit", "important");
-Module.canvas2D.style.setProperty("height", "inherit", "important");
+if(Module.enforcedHeight){
+    Module.canvas2D.style.setProperty("height", Module.enforcedHeight, "important");
+}else{
+    Module.canvas2D.style.setProperty("height", "inherit", "important");
+}
+if(Module.enforcedWidth){
+    Module.canvas2D.style.setProperty("width", Module.enforcedWidth, "important");
+}else{
+    Module.canvas2D.style.setProperty("width", "inherit", "important");
+}
 Module.canvas3D = (function () {
     var targetElement = document.getElementById(Module.targetID);
     var canvas = document.createElement("canvas");
@@ -363,6 +377,7 @@ Module.canvas3D = (function () {
     canvas.height = Module.canvas2D.height;
     canvas.style.setProperty("width", "inherit", "important");
     canvas.style.setProperty("height", "inherit", "important");
+    canvas.setAttribute("id", "canvas3DModule" + Module.instanceID);
     targetElement.appendChild(canvas);
     return canvas;
 })();
@@ -373,6 +388,7 @@ Module['quit'] = function() {
     catch(e) { }
     Module.canvas2D.remove();
     Module.canvas3D.remove();
+    FCEM.audioContext.close();
 };
 
 
